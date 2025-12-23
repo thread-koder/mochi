@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -21,9 +22,16 @@ type LogConfig struct {
 var AppConfig *Config
 
 // Reads configuration from file and environment variables
-func Load(configPath string) (*Config, error) {
+func Load() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
+
+	configPath := ""
+
+	// Get config path from env var
+	if configPath == "" {
+		configPath = os.Getenv("MOCHI_CONFIG_PATH")
+	}
 
 	// Add config paths
 	if configPath != "" {
