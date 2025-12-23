@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Build artifacts
+bin/
+*.out
+*.test
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# CI/CD
+.github/
+
+# Environment
+.env
+.env.local
+
+# Temporary files
+tmp/
+temp/
+*.log
+
+# Test files
+*_test.go
+
+# Configs (will be mounted or provided separately)
+configs/
