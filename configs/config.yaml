@@ -1,0 +1,4 @@
+log:
+  level: "info" # debug, info, warn, error
+  format: "console" # json, console
+
