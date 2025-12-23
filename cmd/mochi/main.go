@@ -3,6 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/rs/zerolog/log"
+	"github.com/thread_koder/mochi/internal/config"
+	"github.com/thread_koder/mochi/internal/logger"
 )
 
 var (
@@ -12,11 +16,21 @@ var (
 )
 
 func main() {
-	fmt.Printf("Mochi - Kubernetes Resource Optimization Platform\n")
-	fmt.Printf("Version: %s\n", Version)
-	fmt.Printf("Build Time: %s\n", BuildTime)
-	fmt.Printf("Git Commit: %s\n", GitCommit)
-	fmt.Println("\nMochi is starting...")
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Initialize logger with config
+	logger.Init(cfg.Log.Level, cfg.Log.Format)
+
+	log.Info().
+		Str("version", Version).
+		Str("build_time", BuildTime).
+		Str("git_commit", GitCommit).
+		Msg("Mochi - Kubernetes Resource Optimization Platform")
 
 	os.Exit(0)
 }
