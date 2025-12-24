@@ -2,3 +2,15 @@ log:
   level: "info" # debug, info, warn, error
   format: "console" # json, console
 
+database:
+  host: "localhost"
+  port: 5432
+  user: "mochi"
+  password: "" # Set via MOCHI_DATABASE_PASSWORD env var
+  database: "mochi"
+  ssl_mode: "disable" # disable, require, verify-ca, verify-full
+  max_connections: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 300 # seconds
+  conn_max_idle_time: 60 # seconds
+

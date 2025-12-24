@@ -10,13 +10,28 @@ import (
 
 // Holds all application configuration
 type Config struct {
-	Log LogConfig `mapstructure:"log"`
+	Log      LogConfig      `mapstructure:"log"`
+	Database DatabaseConfig `mapstructure:"database"`
 }
 
 // Holds logger configuration
 type LogConfig struct {
 	Level  string `mapstructure:"level"`  // debug, info, warn, error
 	Format string `mapstructure:"format"` // json, console
+}
+
+// Holds database configuration
+type DatabaseConfig struct {
+	Host            string `mapstructure:"host"`               // PostgreSQL host
+	Port            int    `mapstructure:"port"`               // PostgreSQL port
+	User            string `mapstructure:"user"`               // PostgreSQL user
+	Password        string `mapstructure:"password"`           // PostgreSQL password
+	Database        string `mapstructure:"database"`           // PostgreSQL database name
+	SSLMode         string `mapstructure:"ssl_mode"`           // SSL mode (disable, require, verify-ca, verify-full)
+	MaxConnections  int    `mapstructure:"max_connections"`    // Maximum number of connections in pool
+	MaxIdleConns    int    `mapstructure:"max_idle_conns"`     // Maximum number of idle connections
+	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
+	ConnMaxIdleTime int    `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
 }
 
 var AppConfig *Config
@@ -71,4 +86,16 @@ func setDefaults() {
 	// Log defaults
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.format", "console")
+
+	// Database defaults
+	viper.SetDefault("database.host", "localhost")
+	viper.SetDefault("database.port", 5432)
+	viper.SetDefault("database.user", "mochi")
+	viper.SetDefault("database.password", "")
+	viper.SetDefault("database.database", "mochi")
+	viper.SetDefault("database.ssl_mode", "disable")
+	viper.SetDefault("database.max_connections", 25)
+	viper.SetDefault("database.max_idle_conns", 5)
+	viper.SetDefault("database.conn_max_lifetime", 300)
+	viper.SetDefault("database.conn_max_idle_time", 60)
 }
