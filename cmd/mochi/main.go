@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rs/zerolog/log"
 	"github.com/thread_koder/mochi/internal/config"
 	"github.com/thread_koder/mochi/internal/logger"
 )
@@ -26,6 +25,7 @@ func main() {
 	// Initialize logger with config
 	logger.Init(cfg.Log.Level, cfg.Log.Format)
 
+	log := logger.WithComponent("main")
 	log.Info().
 		Str("version", Version).
 		Str("build_time", BuildTime).

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog/log"
 	"github.com/thread_koder/mochi/internal/config"
+	"github.com/thread_koder/mochi/internal/logger"
 )
 
 var (
@@ -45,11 +45,12 @@ func Init(cfg *config.DatabaseConfig) error {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
+	log := logger.WithComponent("database")
 	log.Info().
 		Str("host", cfg.Host).
 		Int("port", cfg.Port).
 		Str("database", cfg.Database).
-		Msg("Database connection established")
+		Msg("Connection established")
 
 	return nil
 }

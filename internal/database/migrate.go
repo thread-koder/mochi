@@ -10,8 +10,8 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/rs/zerolog/log"
 	"github.com/thread_koder/mochi/internal/config"
+	"github.com/thread_koder/mochi/internal/logger"
 )
 
 //go:embed migrations/*.sql
@@ -47,15 +47,16 @@ func Migrate(cfg *config.DatabaseConfig) error {
 	}
 
 	// Run migrations
+	log := logger.WithComponent("migrate")
 	if err := m.Up(); err != nil {
 		if err == migrate.ErrNoChange {
-			log.Info().Msg("Database already up to date")
+			log.Info().Msg("Already up to date")
 			return nil
 		}
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	log.Info().Msg("Database migrations applied successfully")
+	log.Info().Msg("Applied successfully")
 	return nil
 }
 
