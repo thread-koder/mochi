@@ -47,16 +47,16 @@ func Migrate(cfg *config.DatabaseConfig) error {
 	}
 
 	// Run migrations
-	log := logger.WithComponent("migrate")
+	log := logger.WithComponent("database")
 	if err := m.Up(); err != nil {
 		if err == migrate.ErrNoChange {
-			log.Info().Msg("Already up to date")
+			log.Info().Msg("Migrations already up to date")
 			return nil
 		}
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	log.Info().Msg("Applied successfully")
+	log.Info().Msg("Migrations applied successfully")
 	return nil
 }
 
