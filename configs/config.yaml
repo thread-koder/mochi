@@ -14,3 +14,10 @@ database:
   conn_max_lifetime: 300 # seconds
   conn_max_idle_time: 60 # seconds
 
+kubernetes:
+  kubeconfig_path: "" # Empty = use default (~/.kube/config), or set path to kubeconfig file
+  in_cluster: false # Set to true when running as a pod in cluster
+  request_timeout: 30 # Request timeout in seconds
+  qps: 50 # Queries per second (rate limiting)
+  burst: 100 # Burst limit for rate limiting
+

@@ -10,8 +10,9 @@ import (
 
 // Holds all application configuration
 type Config struct {
-	Log      LogConfig      `mapstructure:"log"`
-	Database DatabaseConfig `mapstructure:"database"`
+	Log        LogConfig        `mapstructure:"log"`
+	Database   DatabaseConfig   `mapstructure:"database"`
+	Kubernetes KubernetesConfig `mapstructure:"kubernetes"`
 }
 
 // Holds logger configuration
@@ -32,6 +33,15 @@ type DatabaseConfig struct {
 	MaxIdleConns    int    `mapstructure:"max_idle_conns"`     // Maximum number of idle connections
 	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
 	ConnMaxIdleTime int    `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
+}
+
+// Holds Kubernetes configuration
+type KubernetesConfig struct {
+	KubeconfigPath string `mapstructure:"kubeconfig_path"` // Path to kubeconfig file (empty = use default)
+	InCluster      bool   `mapstructure:"in_cluster"`      // Use in-cluster config
+	RequestTimeout int    `mapstructure:"request_timeout"` // Request timeout in seconds
+	QPS            int    `mapstructure:"qps"`             // Queries per second (rate limiting)
+	Burst          int    `mapstructure:"burst"`           // Burst limit for rate limiting
 }
 
 var AppConfig *Config
@@ -98,4 +108,11 @@ func setDefaults() {
 	viper.SetDefault("database.max_idle_conns", 5)
 	viper.SetDefault("database.conn_max_lifetime", 300)
 	viper.SetDefault("database.conn_max_idle_time", 60)
+
+	// Kubernetes defaults
+	viper.SetDefault("kubernetes.kubeconfig_path", "")
+	viper.SetDefault("kubernetes.in_cluster", false)
+	viper.SetDefault("kubernetes.request_timeout", 30)
+	viper.SetDefault("kubernetes.qps", 50)
+	viper.SetDefault("kubernetes.burst", 100)
 }
