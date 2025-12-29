@@ -21,3 +21,8 @@ kubernetes:
   qps: 50 # Queries per second (rate limiting)
   burst: 100 # Burst limit for rate limiting
 
+prometheus:
+  url: "http://localhost:9090" # Prometheus server URL
+  timeout: 30 # Request timeout in seconds
+  insecure_skip_verify: false # Skip TLS certificate verification
+

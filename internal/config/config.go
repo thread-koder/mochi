@@ -13,6 +13,7 @@ type Config struct {
 	Log        LogConfig        `mapstructure:"log"`
 	Database   DatabaseConfig   `mapstructure:"database"`
 	Kubernetes KubernetesConfig `mapstructure:"kubernetes"`
+	Prometheus PrometheusConfig `mapstructure:"prometheus"`
 }
 
 // Holds logger configuration
@@ -42,6 +43,13 @@ type KubernetesConfig struct {
 	RequestTimeout int    `mapstructure:"request_timeout"` // Request timeout in seconds
 	QPS            int    `mapstructure:"qps"`             // Queries per second (rate limiting)
 	Burst          int    `mapstructure:"burst"`           // Burst limit for rate limiting
+}
+
+// Holds Prometheus configuration
+type PrometheusConfig struct {
+	URL                string `mapstructure:"url"`                  // Prometheus server URL
+	Timeout            int    `mapstructure:"timeout"`              // Request timeout in seconds
+	InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"` // Skip TLS certificate verification
 }
 
 var AppConfig *Config
@@ -115,4 +123,9 @@ func setDefaults() {
 	viper.SetDefault("kubernetes.request_timeout", 30)
 	viper.SetDefault("kubernetes.qps", 50)
 	viper.SetDefault("kubernetes.burst", 100)
+
+	// Prometheus defaults
+	viper.SetDefault("prometheus.url", "http://localhost:9090")
+	viper.SetDefault("prometheus.timeout", 30)
+	viper.SetDefault("prometheus.insecure_skip_verify", false)
 }
