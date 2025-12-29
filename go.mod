@@ -5,6 +5,8 @@ go 1.25.5
 require (
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jackc/pgx/v5 v5.7.6
+	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/common v0.66.1
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/viper v1.21.0
 	k8s.io/api v0.35.0
@@ -37,6 +39,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
