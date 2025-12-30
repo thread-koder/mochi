@@ -11,6 +11,7 @@ import (
 // Holds all application configuration
 type Config struct {
 	Log        LogConfig        `mapstructure:"log"`
+	API        APIConfig        `mapstructure:"api"`
 	Database   DatabaseConfig   `mapstructure:"database"`
 	Kubernetes KubernetesConfig `mapstructure:"kubernetes"`
 	Prometheus PrometheusConfig `mapstructure:"prometheus"`
@@ -20,6 +21,15 @@ type Config struct {
 type LogConfig struct {
 	Level  string `mapstructure:"level"`  // debug, info, warn, error
 	Format string `mapstructure:"format"` // json, console
+}
+
+// Holds API server configuration
+type APIConfig struct {
+	Host         string `mapstructure:"host"`          // API server host
+	Port         int    `mapstructure:"port"`          // API server port
+	ReadTimeout  int    `mapstructure:"read_timeout"`  // Read timeout in seconds
+	WriteTimeout int    `mapstructure:"write_timeout"` // Write timeout in seconds
+	Mode         string `mapstructure:"mode"`          // debug, release, test
 }
 
 // Holds database configuration
@@ -104,6 +114,13 @@ func setDefaults() {
 	// Log defaults
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.format", "console")
+
+	// API defaults
+	viper.SetDefault("api.host", "0.0.0.0")
+	viper.SetDefault("api.port", 8080)
+	viper.SetDefault("api.read_timeout", 30)
+	viper.SetDefault("api.write_timeout", 30)
+	viper.SetDefault("api.mode", "release")
 
 	// Database defaults
 	viper.SetDefault("database.host", "localhost")

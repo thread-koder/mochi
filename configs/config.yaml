@@ -2,6 +2,13 @@ log:
   level: "info" # debug, info, warn, error
   format: "console" # json, console
 
+api:
+  host: "0.0.0.0" # API server host
+  port: 8080 # API server port
+  read_timeout: 30 # Read timeout in seconds
+  write_timeout: 30 # Write timeout in seconds
+  mode: "release" # debug, release, test
+
 database:
   host: "localhost"
   port: 5432
