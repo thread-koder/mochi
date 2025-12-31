@@ -53,17 +53,15 @@ func NewServer(cfg *config.APIConfig) *Server {
 // Starts the HTTP server
 func (s *Server) Start() error {
 	log := logger.WithComponent("api")
-	log.Info().Msg("Starting server...")
-
-	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("failed to start server: %w", err)
-	}
-
 	log.Info().
 		Str("host", s.cfg.Host).
 		Int("port", s.cfg.Port).
 		Str("mode", s.cfg.Mode).
-		Msg("Server started")
+		Msg("Server listening...")
+
+	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("failed to start server: %w", err)
+	}
 
 	return nil
 }
