@@ -69,20 +69,12 @@ func Load() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 
-	configPath := ""
-
-	// Get config path from env var
-	if configPath == "" {
-		configPath = os.Getenv("MOCHI_CONFIG_PATH")
-	}
+	configPath := os.Getenv("MOCHI_CONFIG_PATH")
 
 	// Add config paths
 	if configPath != "" {
 		viper.AddConfigPath(configPath)
 	}
-	viper.AddConfigPath("./configs")
-	viper.AddConfigPath("/etc/mochi")
-	viper.AddConfigPath(".")
 
 	// Setup environment variables
 	viper.SetEnvPrefix("MOCHI")
@@ -126,7 +118,7 @@ func setDefaults() {
 	viper.SetDefault("database.host", "localhost")
 	viper.SetDefault("database.port", 5432)
 	viper.SetDefault("database.user", "mochi")
-	viper.SetDefault("database.password", "")
+	viper.SetDefault("database.password", "mochi")
 	viper.SetDefault("database.database", "mochi")
 	viper.SetDefault("database.ssl_mode", "disable")
 	viper.SetDefault("database.max_connections", 25)
