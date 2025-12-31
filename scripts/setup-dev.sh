@@ -44,8 +44,9 @@ helm upgrade --install ${POSTGRES_RELEASE} bitnami/postgresql \
     --namespace ${NAMESPACE} \
     --set fullnameOverride=${POSTGRES_RELEASE} \
     --set auth.postgresPassword=mochi \
-    --set auth.database=mochi \
+    --set auth.username=mochi \
     --set auth.password=mochi \
+    --set auth.database=mochi \
     --set primary.persistence.size=2Gi \
     --set primary.resources.requests.memory=256Mi \
     --set primary.resources.requests.cpu=250m \
@@ -74,7 +75,7 @@ echo -e "${GREEN}PostgreSQL:${NC}"
 echo "  Host: ${POSTGRES_SVC}.${NAMESPACE}.svc.cluster.local"
 echo "  Port: 5432"
 echo "  Database: mochi"
-echo "  Username: postgres"
+echo "  Username: mochi"
 echo "  Password: mochi"
 echo ""
 
