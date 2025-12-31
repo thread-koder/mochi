@@ -17,6 +17,9 @@ var (
 
 // Initializes the database connection pool using pgx
 func Init(cfg *config.DatabaseConfig) error {
+	log := logger.WithComponent("database")
+	log.Info().Msg("Initializing connection pool...")
+
 	dsn := buildDSN(cfg)
 
 	// Parse connection string and create pool config
@@ -45,7 +48,6 @@ func Init(cfg *config.DatabaseConfig) error {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	log := logger.WithComponent("database")
 	log.Info().
 		Str("host", cfg.Host).
 		Int("port", cfg.Port).

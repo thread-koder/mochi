@@ -53,15 +53,17 @@ func NewServer(cfg *config.APIConfig) *Server {
 // Starts the HTTP server
 func (s *Server) Start() error {
 	log := logger.WithComponent("api")
-	log.Info().
-		Str("host", s.cfg.Host).
-		Int("port", s.cfg.Port).
-		Str("mode", s.cfg.Mode).
-		Msg("Starting server")
+	log.Info().Msg("Starting server...")
 
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("failed to start server: %w", err)
 	}
+
+	log.Info().
+		Str("host", s.cfg.Host).
+		Int("port", s.cfg.Port).
+		Str("mode", s.cfg.Mode).
+		Msg("Server started")
 
 	return nil
 }
@@ -69,7 +71,13 @@ func (s *Server) Start() error {
 // Shuts down the server gracefully
 func (s *Server) Shutdown(ctx context.Context) error {
 	log := logger.WithComponent("api")
-	log.Info().Msg("Shutting down server")
+	log.Info().Msg("Shutting down server...")
 
-	return s.server.Shutdown(ctx)
+	if err := s.server.Shutdown(ctx); err != nil {
+		return fmt.Errorf("failed to shutdown server: %w", err)
+	}
+
+	log.Info().Msg("Server shutdown")
+
+	return nil
 }

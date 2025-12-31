@@ -19,6 +19,9 @@ var migrationsFS embed.FS
 
 // Runs database migrations using a temporary sql.DB connection
 func Migrate(cfg *config.DatabaseConfig) error {
+	log := logger.WithComponent("database")
+	log.Info().Msg("Applying migrations...")
+
 	dsn := buildDSN(cfg)
 
 	// Create sql.DB connection for migrations
@@ -47,16 +50,15 @@ func Migrate(cfg *config.DatabaseConfig) error {
 	}
 
 	// Run migrations
-	log := logger.WithComponent("database")
 	if err := m.Up(); err != nil {
 		if err == migrate.ErrNoChange {
 			log.Info().Msg("Migrations already up to date")
 			return nil
 		}
-		return fmt.Errorf("failed to run migrations: %w", err)
+		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
-	log.Info().Msg("Migrations applied successfully")
+	log.Info().Msg("Migrations applied")
 	return nil
 }
 

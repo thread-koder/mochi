@@ -23,6 +23,7 @@ var (
 // Initializes the Prometheus client
 func Init(cfg *config.PrometheusConfig) error {
 	log := logger.WithComponent("prometheus")
+	log.Info().Msg("Initializing client...")
 
 	// Create HTTP transport
 	transport := &http.Transport{}

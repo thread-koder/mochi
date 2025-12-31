@@ -36,6 +36,7 @@ func Init(cfg *config.KubernetesConfig) error {
 	var kubeconfig string
 
 	log := logger.WithComponent("kubernetes")
+	log.Info().Msg("Initializing client...")
 
 	// Determine kubeconfig path
 	if cfg.KubeconfigPath != "" {
@@ -92,7 +93,7 @@ func Init(cfg *config.KubernetesConfig) error {
 	log.Info().
 		Str("version", version.String()).
 		Str("api_server", RestConfig.Host).
-		Msg("Connected to the cluster")
+		Msg("Connection established")
 
 	return nil
 }
