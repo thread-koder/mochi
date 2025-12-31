@@ -1,4 +1,4 @@
-.PHONY: help build test clean run lint fmt docker-build docker-run deps deps-update dev
+.PHONY: help build test clean run lint fmt docker-build docker-run deps deps-update dev dev-env-setup dev-env-clean dev-env-status
 
 # Variables
 BINARY_NAME=mochi
@@ -63,3 +63,14 @@ dev: ## Run in development mode
 	@echo "Running in development mode..."
 	@go run $(MAIN_PATH)
 
+dev-env-setup: ## Set up PostgreSQL and Prometheus in minikube using Helm
+	@chmod +x scripts/setup-dev.sh
+	@./scripts/setup-dev.sh
+
+dev-env-clean: ## Remove PostgreSQL and Prometheus from minikube
+	@chmod +x scripts/cleanup-dev.sh
+	@./scripts/cleanup-dev.sh
+
+dev-env-status: ## Check status of development environment
+	@chmod +x scripts/status-dev.sh
+	@./scripts/status-dev.sh

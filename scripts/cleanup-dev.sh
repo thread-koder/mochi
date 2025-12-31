@@ -1,0 +1,52 @@
+#!/bin/bash
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Configuration
+NAMESPACE="mochi-dev"
+POSTGRES_RELEASE="mochi-postgres"
+PROMETHEUS_RELEASE="mochi-prometheus"
+
+echo -e "${YELLOW}🧹 Cleaning up Mochi development environment${NC}\n"
+
+# Confirm deletion
+read -p "Are you sure you want to remove all Mochi dev services? (y/N): " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${GREEN}Aborted.${NC}"
+    exit 0
+fi
+
+# Uninstall Helm releases
+echo -e "${GREEN}🗑️  Uninstalling Helm releases...${NC}"
+
+if helm list -n ${NAMESPACE} | grep -q ${POSTGRES_RELEASE}; then
+    echo -e "${YELLOW}Removing PostgreSQL...${NC}"
+    helm uninstall ${POSTGRES_RELEASE} -n ${NAMESPACE} || true
+else
+    echo -e "${YELLOW}PostgreSQL not found, skipping...${NC}"
+fi
+
+if helm list -n ${NAMESPACE} | grep -q ${PROMETHEUS_RELEASE}; then
+    echo -e "${YELLOW}Removing Prometheus...${NC}"
+    helm uninstall ${PROMETHEUS_RELEASE} -n ${NAMESPACE} || true
+else
+    echo -e "${YELLOW}Prometheus not found, skipping...${NC}"
+fi
+
+# Optionally remove namespace
+read -p "Do you want to remove the namespace '${NAMESPACE}'? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${YELLOW}Removing namespace...${NC}"
+    kubectl delete namespace ${NAMESPACE} --wait || true
+    echo -e "${GREEN}✅ Namespace removed${NC}"
+fi
+
+echo -e "\n${GREEN}✅ Cleanup complete!${NC}"
