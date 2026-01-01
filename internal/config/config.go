@@ -15,6 +15,7 @@ type Config struct {
 	Database   DatabaseConfig   `mapstructure:"database"`
 	Kubernetes KubernetesConfig `mapstructure:"kubernetes"`
 	Prometheus PrometheusConfig `mapstructure:"prometheus"`
+	Redis      RedisConfig      `mapstructure:"redis"`
 }
 
 // Holds logger configuration
@@ -60,6 +61,20 @@ type PrometheusConfig struct {
 	URL                string `mapstructure:"url"`                  // Prometheus server URL
 	Timeout            int    `mapstructure:"timeout"`              // Request timeout in seconds
 	InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"` // Skip TLS certificate verification
+}
+
+// Holds Redis configuration
+type RedisConfig struct {
+	Host            string `mapstructure:"host"`               // Redis host
+	Port            int    `mapstructure:"port"`               // Redis port
+	Password        string `mapstructure:"password"`           // Redis password (empty = no auth)
+	Database        int    `mapstructure:"database"`           // Redis database number (0-15)
+	MaxRetries      int    `mapstructure:"max_retries"`        // Maximum number of retries
+	PoolSize        int    `mapstructure:"pool_size"`          // Connection pool size
+	MinIdleConns    int    `mapstructure:"min_idle_conns"`     // Minimum idle connections
+	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
+	ConnMaxIdleTime int    `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
+	CacheTTL        int    `mapstructure:"cache_ttl"`          // Default cache TTL in seconds
 }
 
 var AppConfig *Config
@@ -137,4 +152,16 @@ func setDefaults() {
 	viper.SetDefault("prometheus.url", "http://localhost:9090")
 	viper.SetDefault("prometheus.timeout", 30)
 	viper.SetDefault("prometheus.insecure_skip_verify", false)
+
+	// Redis defaults
+	viper.SetDefault("redis.host", "localhost")
+	viper.SetDefault("redis.port", 6379)
+	viper.SetDefault("redis.password", "")
+	viper.SetDefault("redis.database", 0)
+	viper.SetDefault("redis.max_retries", 3)
+	viper.SetDefault("redis.pool_size", 10)
+	viper.SetDefault("redis.min_idle_conns", 5)
+	viper.SetDefault("redis.conn_max_lifetime", 300)
+	viper.SetDefault("redis.conn_max_idle_time", 60)
+	viper.SetDefault("redis.cache_ttl", 300)
 }

@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.66.1
+	github.com/redis/go-redis/v9 v9.17.2
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/viper v1.21.0
 	k8s.io/api v0.35.0
@@ -18,8 +19,10 @@ require (
 require (
 	github.com/bytedance/sonic v1.14.0 // indirect
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect

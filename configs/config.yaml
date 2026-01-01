@@ -33,3 +33,14 @@ prometheus:
   timeout: 30 # Request timeout in seconds
   insecure_skip_verify: false # Skip TLS certificate verification
 
+redis:
+  host: "localhost" # Redis host
+  port: 6379 # Redis port
+  password: "" # Set via MOCHI_REDIS_PASSWORD env var
+  database: 0 # Redis database number (0-15)
+  max_retries: 3 # Maximum number of retries
+  pool_size: 10 # Connection pool size
+  min_idle_conns: 5 # Minimum idle connections
+  conn_max_lifetime: 300 # seconds
+  conn_max_idle_time: 60 # seconds
+  cache_ttl: 300 # Default cache TTL in seconds

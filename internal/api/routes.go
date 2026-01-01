@@ -12,6 +12,7 @@ func setupRoutes(router *gin.Engine) {
 	router.GET("/health/database", handlers.DatabaseHealthHandler)
 	router.GET("/health/kubernetes", handlers.KubernetesHealthHandler)
 	router.GET("/health/prometheus", handlers.PrometheusHealthHandler)
+	router.GET("/health/redis", handlers.RedisHealthHandler)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")

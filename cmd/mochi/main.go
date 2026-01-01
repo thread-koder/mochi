@@ -14,6 +14,7 @@ import (
 	"github.com/thread_koder/mochi/internal/kubernetes"
 	"github.com/thread_koder/mochi/internal/logger"
 	"github.com/thread_koder/mochi/internal/prometheus"
+	"github.com/thread_koder/mochi/internal/redis"
 )
 
 var (
@@ -61,6 +62,12 @@ func main() {
 	if err := prometheus.Init(&cfg.Prometheus); err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize Prometheus client")
 	}
+
+	// Initialize Redis client
+	if err := redis.Init(&cfg.Redis); err != nil {
+		log.Fatal().Err(err).Msg("Failed to initialize Redis client")
+	}
+	defer redis.Close()
 
 	// Create and start API server
 	server := api.NewServer(&cfg.API)

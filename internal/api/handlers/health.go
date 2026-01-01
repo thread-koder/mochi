@@ -9,6 +9,7 @@ import (
 	"github.com/thread_koder/mochi/internal/database"
 	"github.com/thread_koder/mochi/internal/kubernetes"
 	"github.com/thread_koder/mochi/internal/prometheus"
+	"github.com/thread_koder/mochi/internal/redis"
 )
 
 // Returns the overall health status
@@ -56,6 +57,19 @@ func HealthHandler(c *gin.Context) {
 		}
 	} else {
 		health["checks"].(gin.H)["prometheus"] = gin.H{
+			"status": "healthy",
+		}
+	}
+
+	// Check Redis
+	if err := redis.HealthCheck(ctx); err != nil {
+		health["status"] = "unhealthy"
+		health["checks"].(gin.H)["redis"] = gin.H{
+			"status": "unhealthy",
+			"error":  err.Error(),
+		}
+	} else {
+		health["checks"].(gin.H)["redis"] = gin.H{
 			"status": "healthy",
 		}
 	}
@@ -110,6 +124,24 @@ func PrometheusHealthHandler(c *gin.Context) {
 	defer cancel()
 
 	if err := prometheus.HealthCheck(ctx); err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status": "unhealthy",
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "healthy",
+	})
+}
+
+// Returns the Redis health status
+func RedisHealthHandler(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := redis.HealthCheck(ctx); err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "unhealthy",
 			"error":  err.Error(),
