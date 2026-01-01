@@ -12,6 +12,7 @@ NC='\033[0m' # No Color
 NAMESPACE="mochi-dev"
 POSTGRES_RELEASE="mochi-postgres"
 PROMETHEUS_RELEASE="mochi-prometheus"
+REDIS_RELEASE="mochi-redis"
 
 echo -e "${GREEN}🚀 Setting up Mochi development environment in minikube${NC}\n"
 
@@ -65,6 +66,19 @@ helm upgrade --install ${PROMETHEUS_RELEASE} prometheus-community/kube-prometheu
     --set alertmanager.enabled=false \
     --wait >/dev/null 2>&1
 
+# Install Redis
+echo -e "\n${GREEN}🔴 Installing Redis...${NC}"
+helm upgrade --install ${REDIS_RELEASE} bitnami/redis \
+    --namespace ${NAMESPACE} \
+    --set fullnameOverride=${REDIS_RELEASE} \
+    --set auth.enabled=true \
+    --set auth.password=mochi \
+    --set master.persistence.size=2Gi \
+    --set master.resources.requests.memory=256Mi \
+    --set master.resources.requests.cpu=250m \
+    --set replica.replicaCount=0 \
+    --wait >/dev/null 2>&1
+
 # Print Services info
 echo -e "\n${GREEN}✅ Installation complete!${NC}\n"
 echo -e "${YELLOW}📋 Services Information:${NC}\n"
@@ -83,6 +97,15 @@ echo ""
 PROMETHEUS_SVC="${PROMETHEUS_RELEASE}-prometheus"
 echo -e "\n${GREEN}Prometheus:${NC}"
 echo "  URL: http://${PROMETHEUS_SVC}.${NAMESPACE}.svc.cluster.local:9090"
+echo ""
+
+# Redis
+REDIS_SVC="${REDIS_RELEASE}-master"
+echo -e "\n${GREEN}Redis:${NC}"
+echo "  Host: ${REDIS_SVC}.${NAMESPACE}.svc.cluster.local"
+echo "  Port: 6379"
+echo "  Password: mochi"
+echo "  Database: 0"
 echo ""
 
 echo -e "\n${GREEN}💡 Tip: Use 'make dev-env-status' to check the status of services${NC}"

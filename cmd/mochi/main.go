@@ -93,4 +93,7 @@ func main() {
 		log.Error().Err(err).Msg("Server forced to shutdown")
 		os.Exit(1)
 	}
+
+	log.Info().Msg("Completed shutdown")
+	os.Exit(0)
 }

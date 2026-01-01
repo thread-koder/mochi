@@ -156,7 +156,7 @@ func setDefaults() {
 	// Redis defaults
 	viper.SetDefault("redis.host", "localhost")
 	viper.SetDefault("redis.port", 6379)
-	viper.SetDefault("redis.password", "")
+	viper.SetDefault("redis.password", "mochi")
 	viper.SetDefault("redis.database", 0)
 	viper.SetDefault("redis.max_retries", 3)
 	viper.SetDefault("redis.pool_size", 10)

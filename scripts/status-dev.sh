@@ -11,6 +11,7 @@ NC='\033[0m' # No Color
 NAMESPACE="mochi-dev"
 POSTGRES_RELEASE="mochi-postgres"
 PROMETHEUS_RELEASE="mochi-prometheus"
+REDIS_RELEASE="mochi-redis"
 
 echo -e "${BLUE}📊 Mochi Development Environment Status${NC}\n"
 
@@ -64,6 +65,28 @@ if helm list -n ${NAMESPACE} | grep -q ${PROMETHEUS_RELEASE}; then
         fi
         PROMETHEUS_SVC="${PROMETHEUS_RELEASE}-prometheus"
         echo -e "  Service: http://${PROMETHEUS_SVC}.${NAMESPACE}.svc.cluster.local:9090"
+    else
+        echo -e "  Status: ${YELLOW}Pod not found${NC}"
+    fi
+else
+    echo -e "  Status: ${RED}Not installed${NC}"
+fi
+
+echo ""
+
+# Check Redis
+echo -e "${BLUE}🔴 Redis:${NC}"
+if helm list -n ${NAMESPACE} | grep -q ${REDIS_RELEASE}; then
+    REDIS_POD=$(kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=redis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [ -n "$REDIS_POD" ]; then
+        STATUS=$(kubectl get pod ${REDIS_POD} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null)
+        if [ "$STATUS" = "Running" ]; then
+            echo -e "  Status: ${GREEN}Running${NC}"
+        else
+            echo -e "  Status: ${YELLOW}${STATUS}${NC}"
+        fi
+        REDIS_SVC="${REDIS_RELEASE}-master"
+        echo -e "  Service: ${REDIS_SVC}.${NAMESPACE}.svc.cluster.local:6379"
     else
         echo -e "  Status: ${YELLOW}Pod not found${NC}"
     fi

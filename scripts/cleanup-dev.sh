@@ -12,6 +12,7 @@ NC='\033[0m' # No Color
 NAMESPACE="mochi-dev"
 POSTGRES_RELEASE="mochi-postgres"
 PROMETHEUS_RELEASE="mochi-prometheus"
+REDIS_RELEASE="mochi-redis"
 
 echo -e "${YELLOW}🧹 Cleaning up Mochi development environment${NC}\n"
 
@@ -38,6 +39,13 @@ if helm list -n ${NAMESPACE} | grep -q ${PROMETHEUS_RELEASE}; then
     helm uninstall ${PROMETHEUS_RELEASE} -n ${NAMESPACE} || true
 else
     echo -e "${YELLOW}Prometheus not found, skipping...${NC}"
+fi
+
+if helm list -n ${NAMESPACE} | grep -q ${REDIS_RELEASE}; then
+    echo -e "${YELLOW}Removing Redis...${NC}"
+    helm uninstall ${REDIS_RELEASE} -n ${NAMESPACE} || true
+else
+    echo -e "${YELLOW}Redis not found, skipping...${NC}"
 fi
 
 # Optionally remove namespace

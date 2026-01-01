@@ -63,11 +63,11 @@ dev: ## Run in development mode
 	@echo "Running in development mode..."
 	@go run $(MAIN_PATH)
 
-dev-env-setup: ## Set up PostgreSQL and Prometheus in minikube using Helm
+dev-env-setup: ## Set up PostgreSQL, Prometheus, and Redis in minikube using Helm
 	@chmod +x scripts/setup-dev.sh
 	@./scripts/setup-dev.sh
 
-dev-env-clean: ## Remove PostgreSQL and Prometheus from minikube
+dev-env-clean: ## Remove PostgreSQL, Prometheus, and Redis from minikube
 	@chmod +x scripts/cleanup-dev.sh
 	@./scripts/cleanup-dev.sh
 
