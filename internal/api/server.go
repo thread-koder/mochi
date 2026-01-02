@@ -30,7 +30,6 @@ func NewServer(cfg *config.APIConfig) *Server {
 	// Apply middleware
 	router.Use(gin.Recovery())
 	router.Use(middleware.LoggingMiddleware())
-	router.Use(middleware.ErrorHandlingMiddleware())
 
 	// Setup routes
 	setupRoutes(router)
