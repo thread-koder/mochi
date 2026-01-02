@@ -1,0 +1,131 @@
+package database
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/thread_koder/mochi/internal/logger"
+)
+
+// Upserts deployment metadata into the database
+func UpsertDeployment(ctx context.Context, deployment *Deployment) error {
+	log := logger.WithComponent("database")
+	log.Debug().
+		Str("name", deployment.Name).
+		Str("namespace", deployment.Namespace).
+		Msg("Upserting deployment")
+
+	query := `
+		INSERT INTO deployments (
+			name, namespace, uid, replicas, ready_replicas, available_replicas,
+			labels, annotations, created_at, synced_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (uid) DO UPDATE SET
+			name = EXCLUDED.name,
+			namespace = EXCLUDED.namespace,
+			replicas = EXCLUDED.replicas,
+			ready_replicas = EXCLUDED.ready_replicas,
+			available_replicas = EXCLUDED.available_replicas,
+			labels = EXCLUDED.labels,
+			annotations = EXCLUDED.annotations,
+			synced_at = EXCLUDED.synced_at
+	`
+
+	_, err := Pool.Exec(ctx, query,
+		deployment.Name, deployment.Namespace, deployment.UID,
+		deployment.Replicas, deployment.ReadyReplicas, deployment.AvailableReplicas,
+		deployment.Labels, deployment.Annotations, deployment.CreatedAt, deployment.SyncedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to upsert deployment: %w", err)
+	}
+
+	log.Debug().
+		Str("name", deployment.Name).
+		Str("namespace", deployment.Namespace).
+		Msg("Deployment upserted successfully")
+
+	return nil
+}
+
+// Upserts multiple deployments in a batch transaction
+func UpsertDeploymentsBatch(ctx context.Context, deployments []*Deployment) error {
+	if len(deployments) == 0 {
+		return nil
+	}
+
+	log := logger.WithComponent("database")
+	log.Debug().Int("count", len(deployments)).Msg("Upserting deployments batch")
+
+	tx, err := Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	query := `
+		INSERT INTO deployments (
+			name, namespace, uid, replicas, ready_replicas, available_replicas,
+			labels, annotations, created_at, synced_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (uid) DO UPDATE SET
+			name = EXCLUDED.name,
+			namespace = EXCLUDED.namespace,
+			replicas = EXCLUDED.replicas,
+			ready_replicas = EXCLUDED.ready_replicas,
+			available_replicas = EXCLUDED.available_replicas,
+			labels = EXCLUDED.labels,
+			annotations = EXCLUDED.annotations,
+			synced_at = EXCLUDED.synced_at
+	`
+
+	batch := &pgx.Batch{}
+	for _, deployment := range deployments {
+		batch.Queue(query,
+			deployment.Name, deployment.Namespace, deployment.UID,
+			deployment.Replicas, deployment.ReadyReplicas, deployment.AvailableReplicas,
+			deployment.Labels, deployment.Annotations, deployment.CreatedAt, deployment.SyncedAt,
+		)
+	}
+
+	results := tx.SendBatch(ctx, batch)
+
+	for i := range deployments {
+		_, err := results.Exec()
+		if err != nil {
+			results.Close()
+			return fmt.Errorf("failed to execute batch upsert for deployment %d: %w", i, err)
+		}
+	}
+
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("failed to close batch results: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	log.Debug().Int("count", len(deployments)).Msg("Deployments upserted successfully")
+	return nil
+}
+
+// Deletes deployments that haven't been synced since the specified time
+func DeleteDeploymentsNotSyncedSince(ctx context.Context, since time.Time) error {
+	log := logger.WithComponent("database")
+
+	query := `DELETE FROM deployments WHERE synced_at < $1`
+	result, err := Pool.Exec(ctx, query, since)
+	if err != nil {
+		return fmt.Errorf("failed to delete stale deployments: %w", err)
+	}
+
+	deleted := result.RowsAffected()
+	if deleted > 0 {
+		log.Debug().Int64("count", deleted).Msg("Stale deployments deleted")
+	}
+
+	return nil
+}

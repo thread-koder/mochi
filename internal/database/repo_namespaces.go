@@ -1,0 +1,117 @@
+package database
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/thread_koder/mochi/internal/logger"
+)
+
+// Upserts namespace metadata into the database
+func UpsertNamespace(ctx context.Context, namespace *Namespace) error {
+	log := logger.WithComponent("database")
+	log.Debug().
+		Str("name", namespace.Name).
+		Msg("Upserting namespace")
+
+	query := `
+		INSERT INTO namespaces (name, uid, phase, labels, annotations, created_at, synced_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (uid) DO UPDATE SET
+			name = EXCLUDED.name,
+			phase = EXCLUDED.phase,
+			labels = EXCLUDED.labels,
+			annotations = EXCLUDED.annotations,
+			synced_at = EXCLUDED.synced_at
+	`
+
+	_, err := Pool.Exec(ctx, query,
+		namespace.Name, namespace.UID, namespace.Phase,
+		namespace.Labels, namespace.Annotations, namespace.CreatedAt, namespace.SyncedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to upsert namespace: %w", err)
+	}
+
+	log.Debug().
+		Str("name", namespace.Name).
+		Msg("Namespace upserted successfully")
+
+	return nil
+}
+
+// Upserts multiple namespaces in a batch transaction
+func UpsertNamespacesBatch(ctx context.Context, namespaces []*Namespace) error {
+	if len(namespaces) == 0 {
+		return nil
+	}
+
+	log := logger.WithComponent("database")
+	log.Debug().Int("count", len(namespaces)).Msg("Upserting namespaces batch")
+
+	tx, err := Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	query := `
+		INSERT INTO namespaces (name, uid, phase, labels, annotations, created_at, synced_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (uid) DO UPDATE SET
+			name = EXCLUDED.name,
+			phase = EXCLUDED.phase,
+			labels = EXCLUDED.labels,
+			annotations = EXCLUDED.annotations,
+			synced_at = EXCLUDED.synced_at
+	`
+
+	batch := &pgx.Batch{}
+	for _, namespace := range namespaces {
+		batch.Queue(query,
+			namespace.Name, namespace.UID, namespace.Phase,
+			namespace.Labels, namespace.Annotations, namespace.CreatedAt, namespace.SyncedAt,
+		)
+	}
+
+	results := tx.SendBatch(ctx, batch)
+
+	for i := range namespaces {
+		_, err := results.Exec()
+		if err != nil {
+			results.Close()
+			return fmt.Errorf("failed to execute batch upsert for namespace %d: %w", i, err)
+		}
+	}
+
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("failed to close batch results: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	log.Debug().Int("count", len(namespaces)).Msg("Namespaces upserted successfully")
+	return nil
+}
+
+// Deletes namespaces that haven't been synced since the specified time
+func DeleteNamespacesNotSyncedSince(ctx context.Context, since time.Time) error {
+	log := logger.WithComponent("database")
+
+	query := `DELETE FROM namespaces WHERE synced_at < $1`
+	result, err := Pool.Exec(ctx, query, since)
+	if err != nil {
+		return fmt.Errorf("failed to delete stale namespaces: %w", err)
+	}
+
+	deleted := result.RowsAffected()
+	if deleted > 0 {
+		log.Debug().Int64("count", deleted).Msg("Stale namespaces deleted")
+	}
+
+	return nil
+}
