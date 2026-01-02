@@ -16,6 +16,7 @@ func ClusterInfoHandler(c *gin.Context) {
 
 	info, err := kubernetes.GetClusterInfo(ctx)
 	if err != nil {
+		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "failed to get cluster info",
 			"details": err.Error(),
@@ -26,6 +27,7 @@ func ClusterInfoHandler(c *gin.Context) {
 	// Get cluster resources
 	resources, err := kubernetes.DiscoverCluster(ctx)
 	if err != nil {
+		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "failed to discover cluster resources",
 			"details": err.Error(),

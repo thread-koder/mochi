@@ -24,6 +24,7 @@ func HealthHandler(c *gin.Context) {
 
 	// Check database
 	if err := database.HealthCheck(ctx); err != nil {
+		c.Error(err)
 		health["status"] = "unhealthy"
 		health["checks"].(gin.H)["database"] = gin.H{
 			"status": "unhealthy",
@@ -37,6 +38,7 @@ func HealthHandler(c *gin.Context) {
 
 	// Check Kubernetes
 	if err := kubernetes.HealthCheck(ctx); err != nil {
+		c.Error(err)
 		health["status"] = "unhealthy"
 		health["checks"].(gin.H)["kubernetes"] = gin.H{
 			"status": "unhealthy",
@@ -50,6 +52,7 @@ func HealthHandler(c *gin.Context) {
 
 	// Check Prometheus
 	if err := prometheus.HealthCheck(ctx); err != nil {
+		c.Error(err)
 		health["status"] = "unhealthy"
 		health["checks"].(gin.H)["prometheus"] = gin.H{
 			"status": "unhealthy",
@@ -63,6 +66,7 @@ func HealthHandler(c *gin.Context) {
 
 	// Check Redis
 	if err := redis.HealthCheck(ctx); err != nil {
+		c.Error(err)
 		health["status"] = "unhealthy"
 		health["checks"].(gin.H)["redis"] = gin.H{
 			"status": "unhealthy",
@@ -88,6 +92,7 @@ func DatabaseHealthHandler(c *gin.Context) {
 	defer cancel()
 
 	if err := database.HealthCheck(ctx); err != nil {
+		c.Error(err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "unhealthy",
 			"error":  err.Error(),
@@ -106,6 +111,7 @@ func KubernetesHealthHandler(c *gin.Context) {
 	defer cancel()
 
 	if err := kubernetes.HealthCheck(ctx); err != nil {
+		c.Error(err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "unhealthy",
 			"error":  err.Error(),
@@ -124,6 +130,7 @@ func PrometheusHealthHandler(c *gin.Context) {
 	defer cancel()
 
 	if err := prometheus.HealthCheck(ctx); err != nil {
+		c.Error(err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "unhealthy",
 			"error":  err.Error(),
@@ -142,6 +149,7 @@ func RedisHealthHandler(c *gin.Context) {
 	defer cancel()
 
 	if err := redis.HealthCheck(ctx); err != nil {
+		c.Error(err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "unhealthy",
 			"error":  err.Error(),
