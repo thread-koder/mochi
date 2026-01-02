@@ -15,6 +15,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 	"github.com/thread_koder/mochi/internal/prometheus"
 	"github.com/thread_koder/mochi/internal/redis"
+	"github.com/thread_koder/mochi/internal/workers"
 )
 
 var (
@@ -69,6 +70,11 @@ func main() {
 	}
 	defer redis.Close()
 
+	// Create and start worker pool
+	workerPool := workers.NewWorkerPool(&cfg.Workers)
+	workerPool.Start()
+	defer workerPool.Stop()
+
 	// Create and start API server
 	server := api.NewServer(&cfg.API)
 	log.Info().Msg("Components initialized")
@@ -94,6 +100,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Info().Msg("Completed shutdown")
+	log.Info().Msg("All components shutdown")
 	os.Exit(0)
 }

@@ -16,6 +16,7 @@ type Config struct {
 	Kubernetes KubernetesConfig `mapstructure:"kubernetes"`
 	Prometheus PrometheusConfig `mapstructure:"prometheus"`
 	Redis      RedisConfig      `mapstructure:"redis"`
+	Workers    WorkerConfig     `mapstructure:"workers"`
 }
 
 // Holds logger configuration
@@ -75,6 +76,12 @@ type RedisConfig struct {
 	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
 	ConnMaxIdleTime int    `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
 	CacheTTL        int    `mapstructure:"cache_ttl"`          // Default cache TTL in seconds
+}
+
+// Holds worker configuration
+type WorkerConfig struct {
+	ResourceSyncInterval   int `mapstructure:"resource_sync_interval"`   // Resource sync interval in seconds
+	StaleResourceThreshold int `mapstructure:"stale_resource_threshold"` // Stale resource threshold in seconds
 }
 
 var AppConfig *Config
@@ -164,4 +171,8 @@ func setDefaults() {
 	viper.SetDefault("redis.conn_max_lifetime", 300)
 	viper.SetDefault("redis.conn_max_idle_time", 60)
 	viper.SetDefault("redis.cache_ttl", 300)
+
+	// Worker defaults
+	viper.SetDefault("workers.resource_sync_interval", 300)   // 5 minutes
+	viper.SetDefault("workers.stale_resource_threshold", 600) // 10 minutes
 }

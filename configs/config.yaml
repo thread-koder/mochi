@@ -44,3 +44,7 @@ redis:
   conn_max_lifetime: 300 # seconds
   conn_max_idle_time: 60 # seconds
   cache_ttl: 300 # Default cache TTL in seconds
+
+workers:
+  resource_sync_interval: 300 # Resource sync interval in seconds (5 minutes)
+  stale_resource_threshold: 600 # Stale resource threshold in seconds (10 minutes)
