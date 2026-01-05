@@ -80,7 +80,7 @@ func SyncNamespaces(ctx context.Context) error {
 		return fmt.Errorf("failed to list namespaces: %w", err)
 	}
 
-	log.Info().Int("count", len(namespaces.Items)).Msg("Syncing namespaces")
+	log.Debug().Int("count", len(namespaces.Items)).Msg("Syncing namespaces")
 
 	dbNamespaces := make([]*database.Namespace, 0, len(namespaces.Items))
 	now := time.Now()
@@ -106,7 +106,7 @@ func SyncNamespaces(ctx context.Context) error {
 		return fmt.Errorf("failed to upsert namespaces: %w", err)
 	}
 
-	log.Info().Int("count", len(dbNamespaces)).Msg("Namespaces synced successfully")
+	log.Debug().Int("count", len(dbNamespaces)).Msg("Namespaces synced successfully")
 	return nil
 }
 
@@ -123,7 +123,7 @@ func SyncNodes(ctx context.Context) error {
 		return fmt.Errorf("failed to list nodes: %w", err)
 	}
 
-	log.Info().Int("count", len(nodes.Items)).Msg("Syncing nodes")
+	log.Debug().Int("count", len(nodes.Items)).Msg("Syncing nodes")
 
 	dbNodes := make([]*database.Node, 0, len(nodes.Items))
 	now := time.Now()
@@ -186,7 +186,7 @@ func SyncNodes(ctx context.Context) error {
 		return fmt.Errorf("failed to upsert nodes: %w", err)
 	}
 
-	log.Info().Int("count", len(dbNodes)).Msg("Nodes synced successfully")
+	log.Debug().Int("count", len(dbNodes)).Msg("Nodes synced successfully")
 	return nil
 }
 
@@ -203,7 +203,7 @@ func SyncDeployments(ctx context.Context) error {
 		return fmt.Errorf("failed to list deployments: %w", err)
 	}
 
-	log.Info().Int("count", len(deployments.Items)).Msg("Syncing deployments")
+	log.Debug().Int("count", len(deployments.Items)).Msg("Syncing deployments")
 
 	dbDeployments := make([]*database.Deployment, 0, len(deployments.Items))
 	now := time.Now()
@@ -237,7 +237,7 @@ func SyncDeployments(ctx context.Context) error {
 		return fmt.Errorf("failed to upsert deployments: %w", err)
 	}
 
-	log.Info().Int("count", len(dbDeployments)).Msg("Deployments synced successfully")
+	log.Debug().Int("count", len(dbDeployments)).Msg("Deployments synced successfully")
 	return nil
 }
 
@@ -254,7 +254,7 @@ func SyncStatefulSets(ctx context.Context) error {
 		return fmt.Errorf("failed to list statefulsets: %w", err)
 	}
 
-	log.Info().Int("count", len(statefulsets.Items)).Msg("Syncing statefulsets")
+	log.Debug().Int("count", len(statefulsets.Items)).Msg("Syncing statefulsets")
 
 	dbStatefulSets := make([]*database.StatefulSet, 0, len(statefulsets.Items))
 	now := time.Now()
@@ -287,7 +287,7 @@ func SyncStatefulSets(ctx context.Context) error {
 		return fmt.Errorf("failed to upsert statefulsets: %w", err)
 	}
 
-	log.Info().Int("count", len(dbStatefulSets)).Msg("Statefulsets synced successfully")
+	log.Debug().Int("count", len(dbStatefulSets)).Msg("Statefulsets synced successfully")
 	return nil
 }
 
@@ -304,7 +304,7 @@ func SyncDaemonSets(ctx context.Context) error {
 		return fmt.Errorf("failed to list daemonsets: %w", err)
 	}
 
-	log.Info().Int("count", len(daemonsets.Items)).Msg("Syncing daemonsets")
+	log.Debug().Int("count", len(daemonsets.Items)).Msg("Syncing daemonsets")
 
 	dbDaemonSets := make([]*database.DaemonSet, 0, len(daemonsets.Items))
 	now := time.Now()
@@ -333,7 +333,7 @@ func SyncDaemonSets(ctx context.Context) error {
 		return fmt.Errorf("failed to upsert daemonsets: %w", err)
 	}
 
-	log.Info().Int("count", len(dbDaemonSets)).Msg("Daemonsets synced successfully")
+	log.Debug().Int("count", len(dbDaemonSets)).Msg("Daemonsets synced successfully")
 	return nil
 }
 
@@ -350,7 +350,7 @@ func SyncServices(ctx context.Context) error {
 		return fmt.Errorf("failed to list services: %w", err)
 	}
 
-	log.Info().Int("count", len(services.Items)).Msg("Syncing services")
+	log.Debug().Int("count", len(services.Items)).Msg("Syncing services")
 
 	dbServices := make([]*database.Service, 0, len(services.Items))
 	now := time.Now()
@@ -388,7 +388,7 @@ func SyncServices(ctx context.Context) error {
 		return fmt.Errorf("failed to upsert services: %w", err)
 	}
 
-	log.Info().Int("count", len(dbServices)).Msg("Services synced successfully")
+	log.Debug().Int("count", len(dbServices)).Msg("Services synced successfully")
 	return nil
 }
 
@@ -405,7 +405,7 @@ func SyncEndpoints(ctx context.Context) error {
 		return fmt.Errorf("failed to list endpoints: %w", err)
 	}
 
-	log.Info().Int("count", len(endpoints.Items)).Msg("Syncing endpoints")
+	log.Debug().Int("count", len(endpoints.Items)).Msg("Syncing endpoints")
 
 	dbEndpoints := make([]*database.Endpoint, 0, len(endpoints.Items))
 	now := time.Now()
@@ -444,7 +444,7 @@ func SyncEndpoints(ctx context.Context) error {
 		return fmt.Errorf("failed to upsert endpoints: %w", err)
 	}
 
-	log.Info().Int("count", len(dbEndpoints)).Msg("Endpoints synced successfully")
+	log.Debug().Int("count", len(dbEndpoints)).Msg("Endpoints synced successfully")
 	return nil
 }
 
@@ -461,7 +461,7 @@ func SyncPods(ctx context.Context) error {
 		return fmt.Errorf("failed to list pods: %w", err)
 	}
 
-	log.Info().Int("count", len(pods.Items)).Msg("Syncing pods")
+	log.Debug().Int("count", len(pods.Items)).Msg("Syncing pods")
 
 	dbPods := make([]*database.Pod, 0, len(pods.Items))
 	now := time.Now()
@@ -509,7 +509,7 @@ func SyncPods(ctx context.Context) error {
 		return fmt.Errorf("failed to upsert pods: %w", err)
 	}
 
-	log.Info().Int("count", len(dbPods)).Msg("Pods synced successfully")
+	log.Debug().Int("count", len(dbPods)).Msg("Pods synced successfully")
 	return nil
 }
 
@@ -591,13 +591,11 @@ func SyncContainers(ctx context.Context) error {
 	}
 
 	if len(dbContainers) > 0 {
-		log.Info().Int("count", len(dbContainers)).Msg("Syncing containers")
+		log.Debug().Int("count", len(dbContainers)).Msg("Syncing containers")
 		if err := database.UpsertContainersBatch(ctx, dbContainers); err != nil {
 			return fmt.Errorf("failed to upsert containers: %w", err)
 		}
-		log.Info().Int("count", len(dbContainers)).Msg("Containers synced successfully")
-	} else {
-		log.Info().Msg("No containers to sync")
+		log.Debug().Int("count", len(dbContainers)).Msg("Containers synced successfully")
 	}
 
 	return nil
