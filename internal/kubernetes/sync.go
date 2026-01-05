@@ -58,6 +58,11 @@ func SyncAllResources(ctx context.Context) error {
 		return fmt.Errorf("failed to sync pods: %w", err)
 	}
 
+	// Sync containers (they reference pods)
+	if err := SyncContainers(ctx); err != nil {
+		return fmt.Errorf("failed to sync containers: %w", err)
+	}
+
 	log.Info().Msg("Full resource sync completed")
 	return nil
 }
@@ -465,31 +470,6 @@ func SyncPods(ctx context.Context) error {
 		labelsJSON, _ := mapToJSON(pod.Labels)
 		annotationsJSON, _ := mapToJSON(pod.Annotations)
 
-		// Extract resource requests and limits from containers
-		var cpuRequest, cpuLimit, memoryRequest, memoryLimit *string
-		for _, container := range pod.Spec.Containers {
-			if container.Resources.Requests != nil {
-				if cpu := container.Resources.Requests[corev1.ResourceCPU]; !cpu.IsZero() {
-					cpuStr := cpu.String()
-					cpuRequest = &cpuStr
-				}
-				if mem := container.Resources.Requests[corev1.ResourceMemory]; !mem.IsZero() {
-					memStr := mem.String()
-					memoryRequest = &memStr
-				}
-			}
-			if container.Resources.Limits != nil {
-				if cpu := container.Resources.Limits[corev1.ResourceCPU]; !cpu.IsZero() {
-					cpuStr := cpu.String()
-					cpuLimit = &cpuStr
-				}
-				if mem := container.Resources.Limits[corev1.ResourceMemory]; !mem.IsZero() {
-					memStr := mem.String()
-					memoryLimit = &memStr
-				}
-			}
-		}
-
 		// Extract owner information
 		var ownerKind, ownerName *string
 		for _, owner := range pod.OwnerReferences {
@@ -514,10 +494,6 @@ func SyncPods(ctx context.Context) error {
 			NodeName:      nodeName,
 			Phase:         string(pod.Status.Phase),
 			RestartPolicy: &restartPolicy,
-			CPURequest:    cpuRequest,
-			CPULimit:      cpuLimit,
-			MemoryRequest: memoryRequest,
-			MemoryLimit:   memoryLimit,
 			Labels:        labelsJSON,
 			Annotations:   annotationsJSON,
 			OwnerKind:     ownerKind,
@@ -534,6 +510,96 @@ func SyncPods(ctx context.Context) error {
 	}
 
 	log.Info().Int("count", len(dbPods)).Msg("Pods synced successfully")
+	return nil
+}
+
+// Syncs containers to PostgreSQL
+func SyncContainers(ctx context.Context) error {
+	log := logger.WithComponent("kubernetes")
+
+	if Clientset == nil {
+		return fmt.Errorf("Kubernetes client not initialized")
+	}
+
+	pods, err := Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list pods: %w", err)
+	}
+
+	dbContainers := make([]*database.Container, 0)
+	now := time.Now()
+
+	for _, pod := range pods.Items {
+		podUID := string(pod.UID)
+		podName := pod.Name
+		namespace := pod.Namespace
+
+		// Extract containers from pod spec
+		for _, container := range pod.Spec.Containers {
+			var cpuRequest, cpuLimit, memoryRequest, memoryLimit *string
+			var imagePullPolicy *string
+
+			// Extract resource requests and limits
+			if container.Resources.Requests != nil {
+				if cpu := container.Resources.Requests[corev1.ResourceCPU]; !cpu.IsZero() {
+					cpuStr := cpu.String()
+					cpuRequest = &cpuStr
+				}
+				if mem := container.Resources.Requests[corev1.ResourceMemory]; !mem.IsZero() {
+					memStr := mem.String()
+					memoryRequest = &memStr
+				}
+			}
+			if container.Resources.Limits != nil {
+				if cpu := container.Resources.Limits[corev1.ResourceCPU]; !cpu.IsZero() {
+					cpuStr := cpu.String()
+					cpuLimit = &cpuStr
+				}
+				if mem := container.Resources.Limits[corev1.ResourceMemory]; !mem.IsZero() {
+					memStr := mem.String()
+					memoryLimit = &memStr
+				}
+			}
+
+			// Extract image pull policy
+			if container.ImagePullPolicy != "" {
+				policy := string(container.ImagePullPolicy)
+				imagePullPolicy = &policy
+			}
+
+			// Extract container ports
+			portsJSON, _ := sliceToJSON(container.Ports)
+
+			dbContainer := &database.Container{
+				Name:            container.Name,
+				PodUID:          podUID,
+				PodName:         podName,
+				Namespace:       namespace,
+				Image:           container.Image,
+				ImagePullPolicy: imagePullPolicy,
+				Ports:           portsJSON,
+				CPURequest:      cpuRequest,
+				CPULimit:        cpuLimit,
+				MemoryRequest:   memoryRequest,
+				MemoryLimit:     memoryLimit,
+				CreatedAt:       pod.CreationTimestamp.Time,
+				SyncedAt:        now,
+			}
+
+			dbContainers = append(dbContainers, dbContainer)
+		}
+	}
+
+	if len(dbContainers) > 0 {
+		log.Info().Int("count", len(dbContainers)).Msg("Syncing containers")
+		if err := database.UpsertContainersBatch(ctx, dbContainers); err != nil {
+			return fmt.Errorf("failed to upsert containers: %w", err)
+		}
+		log.Info().Int("count", len(dbContainers)).Msg("Containers synced successfully")
+	} else {
+		log.Info().Msg("No containers to sync")
+	}
+
 	return nil
 }
 

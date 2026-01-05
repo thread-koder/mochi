@@ -152,6 +152,9 @@ func (w *ResourceSyncWorker) sync() {
 	if err := database.DeleteEndpointsNotSyncedSince(ctx, staleThreshold); err != nil {
 		log.Warn().Err(err).Msg("Failed to delete stale endpoints")
 	}
+	if err := database.DeleteContainersNotSyncedSince(ctx, staleThreshold); err != nil {
+		log.Warn().Err(err).Msg("Failed to delete stale containers")
+	}
 	log.Info().Msg("Stale resource cleanup completed")
 
 	log.Info().Msg("Resource sync completed")
