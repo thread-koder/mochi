@@ -20,10 +20,9 @@ func UpsertPod(ctx context.Context, pod *Pod) error {
 	query := `
 		INSERT INTO pods (
 			name, namespace, uid, node_name, phase, restart_policy,
-			cpu_request, cpu_limit, memory_request, memory_limit,
 			labels, annotations, owner_kind, owner_name, created_at, synced_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
@@ -31,10 +30,6 @@ func UpsertPod(ctx context.Context, pod *Pod) error {
 			node_name = EXCLUDED.node_name,
 			phase = EXCLUDED.phase,
 			restart_policy = EXCLUDED.restart_policy,
-			cpu_request = EXCLUDED.cpu_request,
-			cpu_limit = EXCLUDED.cpu_limit,
-			memory_request = EXCLUDED.memory_request,
-			memory_limit = EXCLUDED.memory_limit,
 			labels = EXCLUDED.labels,
 			annotations = EXCLUDED.annotations,
 			owner_kind = EXCLUDED.owner_kind,
@@ -44,7 +39,6 @@ func UpsertPod(ctx context.Context, pod *Pod) error {
 
 	_, err := Pool.Exec(ctx, query,
 		pod.Name, pod.Namespace, pod.UID, pod.NodeName, pod.Phase, pod.RestartPolicy,
-		pod.CPURequest, pod.CPULimit, pod.MemoryRequest, pod.MemoryLimit,
 		pod.Labels, pod.Annotations, pod.OwnerKind, pod.OwnerName,
 		pod.CreatedAt, pod.SyncedAt,
 	)
@@ -79,10 +73,9 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	query := `
 		INSERT INTO pods (
 			name, namespace, uid, node_name, phase, restart_policy,
-			cpu_request, cpu_limit, memory_request, memory_limit,
 			labels, annotations, owner_kind, owner_name, created_at, synced_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
@@ -90,10 +83,6 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 			node_name = EXCLUDED.node_name,
 			phase = EXCLUDED.phase,
 			restart_policy = EXCLUDED.restart_policy,
-			cpu_request = EXCLUDED.cpu_request,
-			cpu_limit = EXCLUDED.cpu_limit,
-			memory_request = EXCLUDED.memory_request,
-			memory_limit = EXCLUDED.memory_limit,
 			labels = EXCLUDED.labels,
 			annotations = EXCLUDED.annotations,
 			owner_kind = EXCLUDED.owner_kind,
@@ -105,7 +94,6 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	for _, pod := range pods {
 		batch.Queue(query,
 			pod.Name, pod.Namespace, pod.UID, pod.NodeName, pod.Phase, pod.RestartPolicy,
-			pod.CPURequest, pod.CPULimit, pod.MemoryRequest, pod.MemoryLimit,
 			pod.Labels, pod.Annotations, pod.OwnerKind, pod.OwnerName,
 			pod.CreatedAt, pod.SyncedAt,
 		)
