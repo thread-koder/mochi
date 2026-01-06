@@ -26,6 +26,8 @@ type QueryOptions struct {
 	Namespace string
 	// Filters queries to a specific pod
 	Pod string
+	// Filters queries to a specific container
+	Container string
 	// Filters queries to a specific node
 	Node string
 	// The duration for range queries (e.g., "5m", "1h")
@@ -193,7 +195,7 @@ func QueryRangeWithCache(ctx context.Context, query string, r v1.Range, opts Que
 
 // Queries pod CPU usage metrics
 func QueryPodCPU(ctx context.Context, opts QueryOptions) ([]PodMetricResult, v1.Warnings, error) {
-	query := BuildPodCPUQuery(opts.Namespace, opts.Pod, "", opts.RangeDuration)
+	query := BuildPodCPUQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
 
 	result, warnings, err := QueryWithCache(ctx, query, opts)
 	if err != nil {
@@ -227,7 +229,7 @@ func QueryPodCPU(ctx context.Context, opts QueryOptions) ([]PodMetricResult, v1.
 
 // Queries pod memory usage metrics
 func QueryPodMemory(ctx context.Context, opts QueryOptions) ([]PodMetricResult, v1.Warnings, error) {
-	query := BuildPodMemoryQuery(opts.Namespace, opts.Pod, "")
+	query := BuildPodMemoryQuery(opts.Namespace, opts.Pod, opts.Container)
 
 	result, warnings, err := QueryWithCache(ctx, query, opts)
 	if err != nil {
@@ -379,7 +381,7 @@ func QueryNamespaceMemory(ctx context.Context, opts QueryOptions) ([]NamespaceMe
 
 // Queries pod CPU usage metrics over a time range
 func QueryPodCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query := BuildPodCPUQuery(opts.Namespace, opts.Pod, "", opts.RangeDuration)
+	query := BuildPodCPUQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
 
 	result, warnings, err := QueryRangeWithCache(ctx, query, r, opts)
 	if err != nil {
@@ -396,7 +398,7 @@ func QueryPodCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model
 
 // Queries pod memory usage metrics over a time range
 func QueryPodMemoryRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query := BuildPodMemoryQuery(opts.Namespace, opts.Pod, "")
+	query := BuildPodMemoryQuery(opts.Namespace, opts.Pod, opts.Container)
 
 	result, warnings, err := QueryRangeWithCache(ctx, query, r, opts)
 	if err != nil {
