@@ -156,3 +156,26 @@ type Endpoint struct {
 	UpdatedAt   time.Time       `json:"updated_at" db:"updated_at"`
 	SyncedAt    time.Time       `json:"synced_at" db:"synced_at"`
 }
+
+// Represents a resource recommendation for a container
+type ContainerRecommendation struct {
+	ID                       int64      `json:"id" db:"id"`
+	ContainerID              int64      `json:"container_id" db:"container_id"`
+	PodUID                   string     `json:"pod_uid" db:"pod_uid"`
+	ContainerName            string     `json:"container_name" db:"container_name"`
+	Namespace                string     `json:"namespace" db:"namespace"`
+	CurrentCPURequest        *string    `json:"current_cpu_request,omitempty" db:"current_cpu_request"`
+	CurrentCPULimit          *string    `json:"current_cpu_limit,omitempty" db:"current_cpu_limit"`
+	CurrentMemoryRequest     *string    `json:"current_memory_request,omitempty" db:"current_memory_request"`
+	CurrentMemoryLimit       *string    `json:"current_memory_limit,omitempty" db:"current_memory_limit"`
+	RecommendedCPURequest    *string    `json:"recommended_cpu_request,omitempty" db:"recommended_cpu_request"`
+	RecommendedCPULimit      *string    `json:"recommended_cpu_limit,omitempty" db:"recommended_cpu_limit"`
+	RecommendedMemoryRequest *string    `json:"recommended_memory_request,omitempty" db:"recommended_memory_request"`
+	RecommendedMemoryLimit   *string    `json:"recommended_memory_limit,omitempty" db:"recommended_memory_limit"`
+	RecommendationMode       string     `json:"recommendation_mode" db:"recommendation_mode"` // "burstable" or "guaranteed"
+	ConfidenceScore          float64    `json:"confidence_score" db:"confidence_score"`
+	Status                   string     `json:"status" db:"status"`
+	CreatedAt                time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt                time.Time  `json:"updated_at" db:"updated_at"`
+	AppliedAt                *time.Time `json:"applied_at,omitempty" db:"applied_at"`
+}
