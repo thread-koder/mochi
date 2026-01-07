@@ -127,6 +127,45 @@ func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 	return nil
 }
 
+// Gets all containers for a specific pod UID
+func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, error) {
+	query := `
+		SELECT id, name, pod_uid, pod_name, namespace, image, image_pull_policy, ports,
+		       cpu_request, cpu_limit, memory_request, memory_limit,
+		       created_at, updated_at, synced_at
+		FROM containers
+		WHERE pod_uid = $1
+		ORDER BY name
+	`
+
+	rows, err := Pool.Query(ctx, query, podUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query containers by pod UID: %w", err)
+	}
+	defer rows.Close()
+
+	containers := make([]*Container, 0)
+	for rows.Next() {
+		var c Container
+		err := rows.Scan(
+			&c.ID, &c.Name, &c.PodUID, &c.PodName, &c.Namespace,
+			&c.Image, &c.ImagePullPolicy, &c.Ports,
+			&c.CPURequest, &c.CPULimit, &c.MemoryRequest, &c.MemoryLimit,
+			&c.CreatedAt, &c.UpdatedAt, &c.SyncedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan container: %w", err)
+		}
+		containers = append(containers, &c)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating containers: %w", err)
+	}
+
+	return containers, nil
+}
+
 // Deletes containers that haven't been synced since the specified time
 func DeleteContainersNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")

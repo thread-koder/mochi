@@ -121,6 +121,44 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	return nil
 }
 
+// Gets all pods for a specific workload (by owner kind and name)
+func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName string, namespace string) ([]*Pod, error) {
+	query := `
+		SELECT id, name, namespace, uid, node_name, phase, restart_policy,
+		       labels, annotations, owner_kind, owner_name,
+		       created_at, updated_at, synced_at
+		FROM pods
+		WHERE owner_kind = $1 AND owner_name = $2 AND namespace = $3
+		ORDER BY name
+	`
+
+	rows, err := Pool.Query(ctx, query, workloadType, workloadName, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query pods by workload: %w", err)
+	}
+	defer rows.Close()
+
+	pods := make([]*Pod, 0)
+	for rows.Next() {
+		var p Pod
+		err := rows.Scan(
+			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.NodeName, &p.Phase, &p.RestartPolicy,
+			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan pod: %w", err)
+		}
+		pods = append(pods, &p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating pods: %w", err)
+	}
+
+	return pods, nil
+}
+
 // Deletes pods that haven't been synced since the specified time
 func DeletePodsNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")
