@@ -101,7 +101,7 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 	}
 
 	// Parse resource specs
-	specs, err := parseContainerSpecs(container)
+	specs, err := ParseContainerSpecs(container)
 	if err != nil {
 		return ContainerAnalysis{}, fmt.Errorf("failed to parse container specs: %w", err)
 	}
@@ -443,7 +443,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 }
 
 // Parses resource specs from database container model
-func parseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
+func ParseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
 	specs := ResourceSpecs{}
 
 	// Parse CPU request
