@@ -7,7 +7,6 @@ import (
 
 	"github.com/thread_koder/mochi/internal/analyzer"
 	"github.com/thread_koder/mochi/internal/database"
-	"github.com/thread_koder/mochi/internal/logger"
 )
 
 // Generates a resource recommendation for a container based on analysis results
@@ -27,13 +26,6 @@ func GenerateContainerRecommendation(
 		return nil, fmt.Errorf("invalid recommendation config: %w", err)
 	}
 
-	log := logger.WithComponent("recommender")
-	log.Debug().
-		Str("container", container.Name).
-		Str("pod", container.PodName).
-		Str("namespace", container.Namespace).
-		Msg("Generating container recommendation")
-
 	// Parse current resource specs using the analyzer package's function
 	specs, err := analyzer.ParseContainerSpecs(container)
 	if err != nil {
@@ -41,7 +33,7 @@ func GenerateContainerRecommendation(
 	}
 
 	// Calculate CPU request recommendation
-	cpuRequestRecValue, cpuRequestReason, err := CalculateCPURequestRecommendation(
+	cpuRequestRecValue, _, err := CalculateCPURequestRecommendation(
 		specs.CPURequest,
 		containerAnalysis.Utilization.CPU,
 		containerAnalysis.Provisioning.CPU,
@@ -52,7 +44,7 @@ func GenerateContainerRecommendation(
 	}
 
 	// Calculate CPU limit recommendation
-	cpuLimitRecValue, cpuLimitReason, err := CalculateCPULimitRecommendation(
+	cpuLimitRecValue, _, err := CalculateCPULimitRecommendation(
 		specs.CPULimit,
 		containerAnalysis.Utilization.CPU,
 		containerAnalysis.Provisioning.CPU,
@@ -64,7 +56,7 @@ func GenerateContainerRecommendation(
 	}
 
 	// Calculate memory request recommendation
-	memoryRequestRecValue, memoryRequestReason, err := CalculateMemoryRequestRecommendation(
+	memoryRequestRecValue, _, err := CalculateMemoryRequestRecommendation(
 		specs.MemoryRequest,
 		containerAnalysis.Utilization.Memory,
 		containerAnalysis.Provisioning.Memory,
@@ -75,7 +67,7 @@ func GenerateContainerRecommendation(
 	}
 
 	// Calculate memory limit recommendation
-	memoryLimitRecValue, memoryLimitReason, err := CalculateMemoryLimitRecommendation(
+	memoryLimitRecValue, _, err := CalculateMemoryLimitRecommendation(
 		specs.MemoryLimit,
 		containerAnalysis.Utilization.Memory,
 		containerAnalysis.Provisioning.Memory,
@@ -122,23 +114,8 @@ func GenerateContainerRecommendation(
 	// Only create recommendation if we have at least one recommendation and sufficient confidence
 	hasRecommendation := cpuRequestRec != nil || cpuLimitRec != nil || memoryRequestRec != nil || memoryLimitRec != nil
 	if !hasRecommendation || overallConfidence < config.MinConfidenceThreshold {
-		log.Debug().
-			Str("container", container.Name).
-			Str("pod", container.PodName).
-			Str("namespace", container.Namespace).
-			Float64("confidence", overallConfidence).
-			Msg("Skipping recommendation generation (no recommendations or low confidence)")
 		return nil, nil
 	}
-
-	log.Debug().
-		Str("container", container.Name).
-		Str("cpu_request_reason", string(cpuRequestReason)).
-		Str("cpu_limit_reason", string(cpuLimitReason)).
-		Str("memory_request_reason", string(memoryRequestReason)).
-		Str("memory_limit_reason", string(memoryLimitReason)).
-		Float64("confidence", overallConfidence).
-		Msg("Recommendation calculated")
 
 	// Create recommendation record
 	recommendation := &database.ContainerRecommendation{
@@ -170,8 +147,6 @@ func GenerateAndStoreRecommendation(
 	containerAnalysis analyzer.ContainerAnalysis,
 	config RecommendationConfig,
 ) (*database.ContainerRecommendation, error) {
-	log := logger.WithComponent("recommender")
-
 	// Generate recommendation
 	recommendation, err := GenerateContainerRecommendation(ctx, container, containerAnalysis, config)
 	if err != nil {
@@ -187,14 +162,6 @@ func GenerateAndStoreRecommendation(
 	if err := database.UpsertContainerRecommendation(ctx, recommendation); err != nil {
 		return nil, fmt.Errorf("failed to store recommendation: %w", err)
 	}
-
-	log.Info().
-		Int64("container_id", container.ID).
-		Str("container", container.Name).
-		Str("pod", container.PodName).
-		Str("namespace", container.Namespace).
-		Float64("confidence", recommendation.ConfidenceScore).
-		Msg("Recommendation generated and stored")
 
 	return recommendation, nil
 }

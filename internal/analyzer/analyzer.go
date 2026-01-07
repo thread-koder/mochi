@@ -8,7 +8,6 @@ import (
 
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/thread_koder/mochi/internal/database"
-	"github.com/thread_koder/mochi/internal/logger"
 	"github.com/thread_koder/mochi/internal/prometheus"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -132,17 +131,11 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 	}
 
 	// Analyze each container individually
-	log := logger.WithComponent("analyzer")
 	containerAnalyses := make([]ContainerAnalysis, 0, len(containers))
 	for _, container := range containers {
 		analysis, err := AnalyzeContainer(ctx, container, opts)
 		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("container", container.Name).
-				Str("pod", pod.Name).
-				Msg("Failed to analyze container, skipping")
-			continue
+			return PodAnalysis{}, fmt.Errorf("failed to analyze container: %w", err)
 		}
 		containerAnalyses = append(containerAnalyses, analysis)
 	}
@@ -186,29 +179,18 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 	}
 
 	// Analyze each pod individually
-	log := logger.WithComponent("analyzer")
 	podAnalyses := make([]PodAnalysis, 0, len(pods))
 	for _, pod := range pods {
 		// Fetch containers for this pod
 		containers, err := database.GetContainersByPodUID(ctx, pod.UID)
 		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("pod", pod.Name).
-				Str("workload", workloadName).
-				Msg("Failed to fetch containers for pod, skipping")
-			continue
+			return WorkloadAnalysis{}, fmt.Errorf("failed to fetch containers for pod: %w", err)
 		}
 
 		// Analyze the pod
 		podAnalysis, err := AnalyzePod(ctx, pod, containers, opts)
 		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("pod", pod.Name).
-				Str("workload", workloadName).
-				Msg("Failed to analyze pod, skipping")
-			continue
+			return WorkloadAnalysis{}, fmt.Errorf("failed to analyze pod: %w", err)
 		}
 		podAnalyses = append(podAnalyses, podAnalysis)
 	}
@@ -542,7 +524,7 @@ func timeMapToSortedDataPoints(timeMap map[time.Time]float64) []DataPoint {
 		})
 	}
 
-	// Sort by timestamp (O(n log n) instead of O(n²))
+	// Sort by timestamp
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Timestamp.Before(result[j].Timestamp)
 	})
