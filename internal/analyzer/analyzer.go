@@ -287,7 +287,7 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		Container:     container.Name,
 		UseCache:      opts.UseCache,
 		CacheTTL:      opts.CacheTTL,
-		RangeDuration: opts.TimeRange.String(),
+		RangeDuration: "5m",
 	})
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query CPU metrics: %w", err)
@@ -328,7 +328,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		Pod:           pod.Name,
 		UseCache:      opts.UseCache,
 		CacheTTL:      opts.CacheTTL,
-		RangeDuration: opts.TimeRange.String(),
+		RangeDuration: "5m",
 	})
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query pod CPU metrics: %w", err)
@@ -378,7 +378,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 			Pod:           pod.Name,
 			UseCache:      opts.UseCache,
 			CacheTTL:      opts.CacheTTL,
-			RangeDuration: opts.TimeRange.String(),
+			RangeDuration: "5m",
 		})
 		if err != nil {
 			return ResourceMetrics{}, fmt.Errorf("failed to query pod CPU metrics: %w", err)
@@ -426,7 +426,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		Namespace:     namespace,
 		UseCache:      opts.UseCache,
 		CacheTTL:      opts.CacheTTL,
-		RangeDuration: opts.TimeRange.String(),
+		RangeDuration: "5m",
 	})
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query namespace CPU metrics: %w", err)
