@@ -51,7 +51,7 @@ type RecommendationConfig struct {
 	MinCPURequest float64
 	// Minimum memory request in bytes (default: 64Mi)
 	MinMemoryRequest int64
-	// Minimum confidence threshold to generate recommendations (default: 0.3)
+	// Minimum confidence threshold to generate recommendations (default: 0.5)
 	MinConfidenceThreshold float64
 	// Maximum increase multiplier (default: 2.0 = 200% increase max)
 	MaxIncreaseMultiplier float64
