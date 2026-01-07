@@ -45,6 +45,8 @@ func (opts AnalysisOptions) Validate() error {
 // Represents analysis results for a container
 type ContainerAnalysis struct {
 	ContainerName string
+	PodName       string
+	Namespace     string
 	Utilization   UtilizationResult
 	Provisioning  ProvisioningResult
 }
@@ -53,6 +55,7 @@ type ContainerAnalysis struct {
 type PodAnalysis struct {
 	PodUID      string
 	PodName     string
+	Namespace   string
 	Containers  []ContainerAnalysis // Individual container analyses
 	Utilization UtilizationResult   // Aggregated from containers
 }
@@ -114,6 +117,8 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 
 	return ContainerAnalysis{
 		ContainerName: container.Name,
+		PodName:       container.PodName,
+		Namespace:     container.Namespace,
 		Utilization:   utilization,
 		Provisioning:  provisioning,
 	}, nil
@@ -162,6 +167,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 	return PodAnalysis{
 		PodUID:      pod.UID,
 		PodName:     pod.Name,
+		Namespace:   pod.Namespace,
 		Containers:  containerAnalyses,
 		Utilization: utilization,
 	}, nil
