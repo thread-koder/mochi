@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -239,6 +238,42 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id int64, status str
 	return nil
 }
 
+// Marks all pending recommendations for a workload as superseded (except the one being applied)
+func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadName, namespace string, excludeID int64) error {
+	log := logger.WithComponent("database")
+	log.Debug().
+		Str("workload_type", workloadType).
+		Str("workload_name", workloadName).
+		Str("namespace", namespace).
+		Int64("exclude_id", excludeID).
+		Msg("Marking recommendations as superseded")
+
+	query := `
+		UPDATE compute_recommendations
+		SET status = 'superseded', updated_at = NOW()
+		WHERE workload_type = $1
+		  AND workload_name = $2
+		  AND namespace = $3
+		  AND status = 'pending'
+		  AND id != $4
+	`
+
+	result, err := Pool.Exec(ctx, query, workloadType, workloadName, namespace, excludeID)
+	if err != nil {
+		return fmt.Errorf("failed to mark recommendations as superseded: %w", err)
+	}
+
+	rowsAffected := result.RowsAffected()
+	log.Debug().
+		Int64("rows_affected", rowsAffected).
+		Str("workload_type", workloadType).
+		Str("workload_name", workloadName).
+		Str("namespace", namespace).
+		Msg("Recommendations marked as superseded successfully")
+
+	return nil
+}
+
 // Deletes compute recommendations older than the specified time
 func DeleteComputeRecommendationsOlderThan(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")
@@ -301,23 +336,3 @@ func CleanupComputeRecommendationsForDeletedWorkloads(ctx context.Context) error
 }
 
 // Converts compute.Recommendation to database.ComputeRecommendation
-func ComputeRecommendationToDB(workloadType, workloadName, namespace, mode string, recommendations any, analysisTimeRange *string) (*ComputeRecommendation, error) {
-	recommendationsJSON, err := json.Marshal(recommendations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal recommendations: %w", err)
-	}
-
-	now := time.Now()
-	return &ComputeRecommendation{
-		WorkloadType:       workloadType,
-		WorkloadName:       workloadName,
-		Namespace:          namespace,
-		RecommendationMode: mode,
-		Recommendations:    recommendationsJSON,
-		Status:             "pending",
-		AnalysisTimeRange:  analysisTimeRange,
-		CreatedAt:          now,
-		UpdatedAt:          now,
-		GeneratedAt:        now,
-	}, nil
-}

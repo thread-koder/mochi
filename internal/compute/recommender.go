@@ -2,8 +2,10 @@ package compute
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/thread_koder/mochi/internal/database"
 )
@@ -290,4 +292,26 @@ func calculateChangePercent(current, recommended *float64) *float64 {
 	rounded := math.Round(changePercent*10) / 10
 
 	return &rounded
+}
+
+// Converts a compute Recommendation to a database ComputeRecommendation
+func ComputeRecommendationToDB(rec Recommendation, analysisTimeRange *string) (*database.ComputeRecommendation, error) {
+	recommendationsJSON, err := json.Marshal(rec.Recommendations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal recommendations: %w", err)
+	}
+
+	now := time.Now()
+	return &database.ComputeRecommendation{
+		WorkloadType:       rec.WorkloadType,
+		WorkloadName:       rec.WorkloadName,
+		Namespace:          rec.Namespace,
+		RecommendationMode: rec.RecommendationMode,
+		Recommendations:    recommendationsJSON,
+		Status:             "pending",
+		AnalysisTimeRange:  analysisTimeRange,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+		GeneratedAt:        now,
+	}, nil
 }
