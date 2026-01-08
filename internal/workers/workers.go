@@ -125,7 +125,17 @@ func (w *ResourceSyncWorker) sync() {
 		return
 	}
 
-	log.Info().Msg("Starting stale resource cleanup")
+	log.Info().Msg("Resource sync completed")
+
+	// Run cleanup after sync
+	w.cleanup(ctx)
+}
+
+// Performs cleanup operations for stale resources and recommendations
+func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
+	log := logger.WithComponent("workers")
+	log.Info().Msg("Starting resource cleanup")
+
 	// Clean up stale resources (resources that haven't been synced recently)
 	staleThreshold := time.Now().Add(-w.staleThreshold)
 	if err := database.DeletePodsNotSyncedSince(ctx, staleThreshold); err != nil {
@@ -157,5 +167,15 @@ func (w *ResourceSyncWorker) sync() {
 	}
 	log.Info().Msg("Stale resource cleanup completed")
 
-	log.Info().Msg("Resource sync completed")
+	log.Info().Msg("Starting compute recommendations cleanup")
+	oldRecommendationsThreshold := time.Now().Add(-90 * 24 * time.Hour) // 90 days
+	if err := database.DeleteComputeRecommendationsOlderThan(ctx, oldRecommendationsThreshold); err != nil {
+		log.Warn().Err(err).Msg("Failed to delete old compute recommendations")
+	}
+	if err := database.CleanupComputeRecommendationsForDeletedWorkloads(ctx); err != nil {
+		log.Warn().Err(err).Msg("Failed to cleanup compute recommendations for deleted workloads")
+	}
+	log.Info().Msg("Compute recommendations cleanup completed")
+
+	log.Info().Msg("Resource cleanup completed")
 }
