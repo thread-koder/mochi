@@ -1,10 +1,9 @@
-package recommender
+package compute
 
 import (
 	"fmt"
 	"math"
 
-	"github.com/thread_koder/mochi/internal/analyzer"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -119,8 +118,8 @@ func (config RecommendationConfig) Validate() error {
 // Calculates CPU request recommendation based on utilization analysis
 func CalculateCPURequestRecommendation(
 	currentRequest *float64,
-	utilization analyzer.CPUUtilization,
-	provisioning analyzer.CPUProvisioning,
+	utilization CPUUtilization,
+	provisioning CPUProvisioning,
 	config RecommendationConfig,
 ) (*float64, RecommendationReason, error) {
 	// Adjust confidence threshold based on efficiency
@@ -155,10 +154,10 @@ func CalculateCPURequestRecommendation(
 	safetyMargin := config.RequestSafetyMargin
 
 	// Adjust safety margin based on trend
-	if utilization.Trend.Direction == analyzer.DirectionIncreasing && utilization.Trend.Strength > 0.5 {
+	if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
 		// Increasing trend with strong signal = add extra headroom
 		safetyMargin *= 1.1
-	} else if utilization.Trend.Direction == analyzer.DirectionDecreasing && utilization.Trend.Strength > 0.5 {
+	} else if utilization.Trend.Direction == DirectionDecreasing && utilization.Trend.Strength > 0.5 {
 		// Decreasing trend = can be slightly less conservative
 		safetyMargin *= 0.95
 	}
@@ -252,8 +251,8 @@ func CalculateCPURequestRecommendation(
 // Calculates CPU limit recommendation based on utilization analysis
 func CalculateCPULimitRecommendation(
 	currentLimit *float64,
-	utilization analyzer.CPUUtilization,
-	provisioning analyzer.CPUProvisioning,
+	utilization CPUUtilization,
+	provisioning CPUProvisioning,
 	config RecommendationConfig,
 	recommendedRequest *float64,
 ) (*float64, RecommendationReason, error) {
@@ -273,7 +272,7 @@ func CalculateCPULimitRecommendation(
 
 	// Adjust safety margin based on trend
 	safetyMargin := config.LimitSafetyMargin
-	if utilization.Trend.Direction == analyzer.DirectionIncreasing && utilization.Trend.Strength > 0.5 {
+	if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
 		// Increasing trend = add extra headroom
 		safetyMargin *= 1.1
 	}
@@ -355,8 +354,8 @@ func CalculateCPULimitRecommendation(
 // Calculates memory request recommendation based on utilization analysis
 func CalculateMemoryRequestRecommendation(
 	currentRequest *float64,
-	utilization analyzer.MemoryUtilization,
-	provisioning analyzer.MemoryProvisioning,
+	utilization MemoryUtilization,
+	provisioning MemoryProvisioning,
 	config RecommendationConfig,
 ) (*float64, RecommendationReason, error) {
 	// Adjust confidence threshold based on efficiency
@@ -388,9 +387,9 @@ func CalculateMemoryRequestRecommendation(
 	safetyMargin := config.RequestSafetyMargin
 
 	// Adjust safety margin based on trend
-	if utilization.Trend.Direction == analyzer.DirectionIncreasing && utilization.Trend.Strength > 0.5 {
+	if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
 		safetyMargin *= 1.1
-	} else if utilization.Trend.Direction == analyzer.DirectionDecreasing && utilization.Trend.Strength > 0.5 {
+	} else if utilization.Trend.Direction == DirectionDecreasing && utilization.Trend.Strength > 0.5 {
 		safetyMargin *= 0.95
 	}
 
@@ -480,8 +479,8 @@ func CalculateMemoryRequestRecommendation(
 // Calculates memory limit recommendation based on utilization analysis
 func CalculateMemoryLimitRecommendation(
 	currentLimit *float64,
-	utilization analyzer.MemoryUtilization,
-	provisioning analyzer.MemoryProvisioning,
+	utilization MemoryUtilization,
+	provisioning MemoryProvisioning,
 	config RecommendationConfig,
 	recommendedRequest *float64,
 ) (*float64, RecommendationReason, error) {
@@ -501,7 +500,7 @@ func CalculateMemoryLimitRecommendation(
 
 	// Adjust safety margin based on trend
 	safetyMargin := config.LimitSafetyMargin
-	if utilization.Trend.Direction == analyzer.DirectionIncreasing && utilization.Trend.Strength > 0.5 {
+	if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
 		safetyMargin *= 1.1
 	}
 
@@ -581,8 +580,8 @@ func CalculateMemoryLimitRecommendation(
 
 // Calculates overall confidence score from CPU and memory provisioning
 func CalculateOverallConfidence(
-	cpuProvisioning analyzer.CPUProvisioning,
-	memoryProvisioning analyzer.MemoryProvisioning,
+	cpuProvisioning CPUProvisioning,
+	memoryProvisioning MemoryProvisioning,
 ) float64 {
 	// Weighted average of CPU and memory confidence
 	// Equal weight
