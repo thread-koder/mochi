@@ -13,7 +13,7 @@ import (
 )
 
 // Analyzes a namespace
-func AnalyzeNamespaceHandler(c *gin.Context) {
+func AnalyzeNamespace(c *gin.Context) {
 	namespace := c.Param("namespace")
 	timeRangeStr := c.Query("timeRange")
 
@@ -52,7 +52,7 @@ func AnalyzeNamespaceHandler(c *gin.Context) {
 }
 
 // Analyzes a workload (deployment, statefulset, daemonset, or standalone pod)
-func AnalyzeWorkloadHandler(c *gin.Context) {
+func AnalyzeWorkload(c *gin.Context) {
 	workloadType := strings.ToLower(c.Param("workloadType"))
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")

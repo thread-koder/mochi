@@ -13,7 +13,7 @@ import (
 )
 
 // Returns the overall health status
-func HealthHandler(c *gin.Context) {
+func Health(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -87,7 +87,7 @@ func HealthHandler(c *gin.Context) {
 }
 
 // Returns the database health status
-func DatabaseHealthHandler(c *gin.Context) {
+func DatabaseHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -106,7 +106,7 @@ func DatabaseHealthHandler(c *gin.Context) {
 }
 
 // Returns the Kubernetes health status
-func KubernetesHealthHandler(c *gin.Context) {
+func KubernetesHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -125,7 +125,7 @@ func KubernetesHealthHandler(c *gin.Context) {
 }
 
 // Returns the Prometheus health status
-func PrometheusHealthHandler(c *gin.Context) {
+func PrometheusHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -144,7 +144,7 @@ func PrometheusHealthHandler(c *gin.Context) {
 }
 
 // Returns the Redis health status
-func RedisHealthHandler(c *gin.Context) {
+func RedisHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

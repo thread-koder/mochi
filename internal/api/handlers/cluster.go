@@ -10,7 +10,7 @@ import (
 )
 
 // Returns information about the connected Kubernetes cluster
-func ClusterInfoHandler(c *gin.Context) {
+func ClusterInfo(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
