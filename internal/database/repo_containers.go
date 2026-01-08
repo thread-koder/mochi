@@ -127,6 +127,34 @@ func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 	return nil
 }
 
+// Gets a container by name, pod name, and namespace
+func GetContainerByName(ctx context.Context, containerName string, podName string, namespace string) (*Container, error) {
+	query := `
+		SELECT id, name, pod_uid, pod_name, namespace, image, image_pull_policy, ports,
+		       cpu_request, cpu_limit, memory_request, memory_limit,
+		       created_at, updated_at, synced_at
+		FROM containers
+		WHERE name = $1 AND pod_name = $2 AND namespace = $3
+		LIMIT 1
+	`
+
+	var c Container
+	err := Pool.QueryRow(ctx, query, containerName, podName, namespace).Scan(
+		&c.ID, &c.Name, &c.PodUID, &c.PodName, &c.Namespace,
+		&c.Image, &c.ImagePullPolicy, &c.Ports,
+		&c.CPURequest, &c.CPULimit, &c.MemoryRequest, &c.MemoryLimit,
+		&c.CreatedAt, &c.UpdatedAt, &c.SyncedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("container %s in pod %s/%s not found", containerName, namespace, podName)
+		}
+		return nil, fmt.Errorf("failed to query container by name: %w", err)
+	}
+
+	return &c, nil
+}
+
 // Gets all containers for a specific pod UID
 func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, error) {
 	query := `

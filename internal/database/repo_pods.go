@@ -121,6 +121,33 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	return nil
 }
 
+// Gets a pod by name and namespace
+func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, error) {
+	query := `
+		SELECT id, name, namespace, uid, node_name, phase, restart_policy,
+		       labels, annotations, owner_kind, owner_name,
+		       created_at, updated_at, synced_at
+		FROM pods
+		WHERE name = $1 AND namespace = $2
+		LIMIT 1
+	`
+
+	var p Pod
+	err := Pool.QueryRow(ctx, query, name, namespace).Scan(
+		&p.ID, &p.Name, &p.Namespace, &p.UID, &p.NodeName, &p.Phase, &p.RestartPolicy,
+		&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+		&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("pod %s/%s not found", namespace, name)
+		}
+		return nil, fmt.Errorf("failed to query pod by name: %w", err)
+	}
+
+	return &p, nil
+}
+
 // Gets all pods for a specific workload (by owner kind and name)
 func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName string, namespace string) ([]*Pod, error) {
 	query := `
