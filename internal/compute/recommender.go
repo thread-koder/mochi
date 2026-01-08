@@ -269,7 +269,7 @@ func GenerateWorkloadRecommendations(
 	return result, nil
 }
 
-// Calculates change percentage between current and recommended float64 values
+// Calculates change percentage between current and recommended values
 // Returns 100.0 if current is nil (new resource)
 // Returns nil if recommended is nil
 func calculateChangePercent(current, recommended *float64) *float64 {

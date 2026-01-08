@@ -9,48 +9,6 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts service metadata into the database
-func UpsertService(ctx context.Context, service *Service) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("name", service.Name).
-		Str("namespace", service.Namespace).
-		Msg("Upserting service")
-
-	query := `
-		INSERT INTO services (
-			name, namespace, uid, type, cluster_ip, ports, selector,
-			labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			namespace = EXCLUDED.namespace,
-			type = EXCLUDED.type,
-			cluster_ip = EXCLUDED.cluster_ip,
-			ports = EXCLUDED.ports,
-			selector = EXCLUDED.selector,
-			labels = EXCLUDED.labels,
-			annotations = EXCLUDED.annotations,
-			synced_at = EXCLUDED.synced_at
-	`
-
-	_, err := Pool.Exec(ctx, query,
-		service.Name, service.Namespace, service.UID, service.Type, service.ClusterIP,
-		service.Ports, service.Selector, service.Labels, service.Annotations,
-		service.CreatedAt, service.SyncedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert service: %w", err)
-	}
-
-	log.Debug().
-		Str("name", service.Name).
-		Str("namespace", service.Namespace).
-		Msg("Service upserted successfully")
-
-	return nil
-}
-
 // Upserts multiple services in a batch transaction
 func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 	if len(services) == 0 {

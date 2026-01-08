@@ -9,51 +9,6 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts pod metadata into the database
-func UpsertPod(ctx context.Context, pod *Pod) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("name", pod.Name).
-		Str("namespace", pod.Namespace).
-		Msg("Upserting pod")
-
-	query := `
-		INSERT INTO pods (
-			name, namespace, uid, node_name, phase, restart_policy,
-			labels, annotations, owner_kind, owner_name, created_at, synced_at
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
-		)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			namespace = EXCLUDED.namespace,
-			node_name = EXCLUDED.node_name,
-			phase = EXCLUDED.phase,
-			restart_policy = EXCLUDED.restart_policy,
-			labels = EXCLUDED.labels,
-			annotations = EXCLUDED.annotations,
-			owner_kind = EXCLUDED.owner_kind,
-			owner_name = EXCLUDED.owner_name,
-			synced_at = EXCLUDED.synced_at
-	`
-
-	_, err := Pool.Exec(ctx, query,
-		pod.Name, pod.Namespace, pod.UID, pod.NodeName, pod.Phase, pod.RestartPolicy,
-		pod.Labels, pod.Annotations, pod.OwnerKind, pod.OwnerName,
-		pod.CreatedAt, pod.SyncedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert pod: %w", err)
-	}
-
-	log.Debug().
-		Str("name", pod.Name).
-		Str("namespace", pod.Namespace).
-		Msg("Pod upserted successfully")
-
-	return nil
-}
-
 // Upserts multiple pods in a batch transaction
 func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	if len(pods) == 0 {

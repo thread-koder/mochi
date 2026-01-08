@@ -9,55 +9,6 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts container metadata into the database
-func UpsertContainer(ctx context.Context, container *Container) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("name", container.Name).
-		Str("pod_uid", container.PodUID).
-		Str("namespace", container.Namespace).
-		Msg("Upserting container")
-
-	query := `
-		INSERT INTO containers (
-			name, pod_uid, pod_name, namespace, image, image_pull_policy, ports,
-			cpu_request, cpu_limit, memory_request, memory_limit,
-			created_at, synced_at
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
-		)
-		ON CONFLICT (pod_uid, name) DO UPDATE SET
-			pod_name = EXCLUDED.pod_name,
-			namespace = EXCLUDED.namespace,
-			image = EXCLUDED.image,
-			image_pull_policy = EXCLUDED.image_pull_policy,
-			ports = EXCLUDED.ports,
-			cpu_request = EXCLUDED.cpu_request,
-			cpu_limit = EXCLUDED.cpu_limit,
-			memory_request = EXCLUDED.memory_request,
-			memory_limit = EXCLUDED.memory_limit,
-			synced_at = EXCLUDED.synced_at
-	`
-
-	_, err := Pool.Exec(ctx, query,
-		container.Name, container.PodUID, container.PodName, container.Namespace,
-		container.Image, container.ImagePullPolicy, container.Ports,
-		container.CPURequest, container.CPULimit, container.MemoryRequest, container.MemoryLimit,
-		container.CreatedAt, container.SyncedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert container: %w", err)
-	}
-
-	log.Debug().
-		Str("name", container.Name).
-		Str("pod_uid", container.PodUID).
-		Str("namespace", container.Namespace).
-		Msg("Container upserted successfully")
-
-	return nil
-}
-
 // Upserts multiple containers in a batch transaction
 func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 	if len(containers) == 0 {
@@ -125,34 +76,6 @@ func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 
 	log.Debug().Int("count", len(containers)).Msg("Containers upserted successfully")
 	return nil
-}
-
-// Gets a container by name, pod name, and namespace
-func GetContainerByName(ctx context.Context, containerName string, podName string, namespace string) (*Container, error) {
-	query := `
-		SELECT id, name, pod_uid, pod_name, namespace, image, image_pull_policy, ports,
-		       cpu_request, cpu_limit, memory_request, memory_limit,
-		       created_at, updated_at, synced_at
-		FROM containers
-		WHERE name = $1 AND pod_name = $2 AND namespace = $3
-		LIMIT 1
-	`
-
-	var c Container
-	err := Pool.QueryRow(ctx, query, containerName, podName, namespace).Scan(
-		&c.ID, &c.Name, &c.PodUID, &c.PodName, &c.Namespace,
-		&c.Image, &c.ImagePullPolicy, &c.Ports,
-		&c.CPURequest, &c.CPULimit, &c.MemoryRequest, &c.MemoryLimit,
-		&c.CreatedAt, &c.UpdatedAt, &c.SyncedAt,
-	)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("container %s in pod %s/%s not found", containerName, namespace, podName)
-		}
-		return nil, fmt.Errorf("failed to query container by name: %w", err)
-	}
-
-	return &c, nil
 }
 
 // Gets all containers for a specific pod UID

@@ -9,46 +9,6 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts endpoint metadata into the database
-func UpsertEndpoint(ctx context.Context, endpoint *Endpoint) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("name", endpoint.Name).
-		Str("namespace", endpoint.Namespace).
-		Msg("Upserting endpoint")
-
-	query := `
-		INSERT INTO endpoints (
-			name, namespace, uid, addresses, ports,
-			labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			namespace = EXCLUDED.namespace,
-			addresses = EXCLUDED.addresses,
-			ports = EXCLUDED.ports,
-			labels = EXCLUDED.labels,
-			annotations = EXCLUDED.annotations,
-			synced_at = EXCLUDED.synced_at
-	`
-
-	_, err := Pool.Exec(ctx, query,
-		endpoint.Name, endpoint.Namespace, endpoint.UID,
-		endpoint.Addresses, endpoint.Ports,
-		endpoint.Labels, endpoint.Annotations, endpoint.CreatedAt, endpoint.SyncedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert endpoint: %w", err)
-	}
-
-	log.Debug().
-		Str("name", endpoint.Name).
-		Str("namespace", endpoint.Namespace).
-		Msg("Endpoint upserted successfully")
-
-	return nil
-}
-
 // Upserts multiple endpoints in a batch transaction
 func UpsertEndpointsBatch(ctx context.Context, endpoints []*Endpoint) error {
 	if len(endpoints) == 0 {

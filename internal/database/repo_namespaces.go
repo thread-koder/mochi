@@ -9,39 +9,6 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts namespace metadata into the database
-func UpsertNamespace(ctx context.Context, namespace *Namespace) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("name", namespace.Name).
-		Msg("Upserting namespace")
-
-	query := `
-		INSERT INTO namespaces (name, uid, phase, labels, annotations, created_at, synced_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			phase = EXCLUDED.phase,
-			labels = EXCLUDED.labels,
-			annotations = EXCLUDED.annotations,
-			synced_at = EXCLUDED.synced_at
-	`
-
-	_, err := Pool.Exec(ctx, query,
-		namespace.Name, namespace.UID, namespace.Phase,
-		namespace.Labels, namespace.Annotations, namespace.CreatedAt, namespace.SyncedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert namespace: %w", err)
-	}
-
-	log.Debug().
-		Str("name", namespace.Name).
-		Msg("Namespace upserted successfully")
-
-	return nil
-}
-
 // Upserts multiple namespaces in a batch transaction
 func UpsertNamespacesBatch(ctx context.Context, namespaces []*Namespace) error {
 	if len(namespaces) == 0 {

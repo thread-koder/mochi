@@ -9,46 +9,6 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts statefulset metadata into the database
-func UpsertStatefulSet(ctx context.Context, statefulset *StatefulSet) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("name", statefulset.Name).
-		Str("namespace", statefulset.Namespace).
-		Msg("Upserting statefulset")
-
-	query := `
-		INSERT INTO statefulsets (
-			name, namespace, uid, replicas, ready_replicas,
-			labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			namespace = EXCLUDED.namespace,
-			replicas = EXCLUDED.replicas,
-			ready_replicas = EXCLUDED.ready_replicas,
-			labels = EXCLUDED.labels,
-			annotations = EXCLUDED.annotations,
-			synced_at = EXCLUDED.synced_at
-	`
-
-	_, err := Pool.Exec(ctx, query,
-		statefulset.Name, statefulset.Namespace, statefulset.UID,
-		statefulset.Replicas, statefulset.ReadyReplicas,
-		statefulset.Labels, statefulset.Annotations, statefulset.CreatedAt, statefulset.SyncedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert statefulset: %w", err)
-	}
-
-	log.Debug().
-		Str("name", statefulset.Name).
-		Str("namespace", statefulset.Namespace).
-		Msg("Statefulset upserted successfully")
-
-	return nil
-}
-
 // Upserts multiple statefulsets in a batch transaction
 func UpsertStatefulSetsBatch(ctx context.Context, statefulsets []*StatefulSet) error {
 	if len(statefulsets) == 0 {

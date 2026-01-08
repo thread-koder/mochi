@@ -47,22 +47,6 @@ type TrendResult struct {
 	Strength  float64   // Correlation coefficient (0-1)
 }
 
-// Represents peak detection results
-type PeakResult struct {
-	Peaks     []Peak
-	PeakCount int
-	MaxPeak   float64
-	MinPeak   float64
-	AvgPeak   float64
-}
-
-// Represents a detected peak
-type Peak struct {
-	Value     float64
-	Timestamp time.Time
-	Index     int
-}
-
 // Represents statistical calculation results
 type StatsResult struct {
 	Mean       float64
@@ -225,92 +209,6 @@ func linearRegression(x, y []float64) (slope, intercept, correlation float64) {
 	}
 
 	return slope, intercept, correlation
-}
-
-// Detects peaks in time series data using a simple local maximum approach
-func DetectPeaks(dataPoints []DataPoint, windowSize int) (PeakResult, error) {
-	if len(dataPoints) == 0 {
-		return PeakResult{}, fmt.Errorf("cannot detect peaks from empty dataset")
-	}
-
-	if windowSize < 1 {
-		windowSize = 3 // Default window size
-	}
-
-	if windowSize > len(dataPoints)/2 {
-		newSize := max(len(dataPoints)/2, 1)
-		windowSize = newSize
-	}
-
-	peaks := make([]Peak, 0)
-	values := make([]float64, len(dataPoints))
-
-	for i, dp := range dataPoints {
-		values[i] = dp.Value
-	}
-
-	// Handle very small datasets
-	minRequiredSize := 2*windowSize + 1
-	if len(values) < minRequiredSize {
-		return PeakResult{
-			Peaks:     []Peak{},
-			PeakCount: 0,
-			MaxPeak:   0,
-			MinPeak:   0,
-			AvgPeak:   0,
-		}, nil
-	}
-
-	// Detect local maxima
-	for i := windowSize; i < len(values)-windowSize; i++ {
-		isPeak := true
-		currentValue := values[i]
-
-		// Check if current point is higher than all points in the window
-		for j := i - windowSize; j <= i+windowSize; j++ {
-			if j != i && values[j] >= currentValue {
-				isPeak = false
-				break
-			}
-		}
-
-		if isPeak {
-			peaks = append(peaks, Peak{
-				Value:     currentValue,
-				Timestamp: dataPoints[i].Timestamp,
-				Index:     i,
-			})
-		}
-	}
-
-	// Calculate statistics
-	var maxPeak, minPeak, sumPeak float64
-	if len(peaks) > 0 {
-		maxPeak = peaks[0].Value
-		minPeak = peaks[0].Value
-		for _, peak := range peaks {
-			if peak.Value > maxPeak {
-				maxPeak = peak.Value
-			}
-			if peak.Value < minPeak {
-				minPeak = peak.Value
-			}
-			sumPeak += peak.Value
-		}
-	}
-
-	avgPeak := 0.0
-	if len(peaks) > 0 {
-		avgPeak = sumPeak / float64(len(peaks))
-	}
-
-	return PeakResult{
-		Peaks:     peaks,
-		PeakCount: len(peaks),
-		MaxPeak:   maxPeak,
-		MinPeak:   minPeak,
-		AvgPeak:   avgPeak,
-	}, nil
 }
 
 // Calculates statistical summary from time series data

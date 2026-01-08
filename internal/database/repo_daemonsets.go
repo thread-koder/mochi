@@ -9,47 +9,6 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts daemonset metadata into the database
-func UpsertDaemonSet(ctx context.Context, daemonset *DaemonSet) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("name", daemonset.Name).
-		Str("namespace", daemonset.Namespace).
-		Msg("Upserting daemonset")
-
-	query := `
-		INSERT INTO daemonsets (
-			name, namespace, uid, desired_number_scheduled, number_ready, number_available,
-			labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			namespace = EXCLUDED.namespace,
-			desired_number_scheduled = EXCLUDED.desired_number_scheduled,
-			number_ready = EXCLUDED.number_ready,
-			number_available = EXCLUDED.number_available,
-			labels = EXCLUDED.labels,
-			annotations = EXCLUDED.annotations,
-			synced_at = EXCLUDED.synced_at
-	`
-
-	_, err := Pool.Exec(ctx, query,
-		daemonset.Name, daemonset.Namespace, daemonset.UID,
-		daemonset.DesiredNumberScheduled, daemonset.NumberReady, daemonset.NumberAvailable,
-		daemonset.Labels, daemonset.Annotations, daemonset.CreatedAt, daemonset.SyncedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert daemonset: %w", err)
-	}
-
-	log.Debug().
-		Str("name", daemonset.Name).
-		Str("namespace", daemonset.Namespace).
-		Msg("Daemonset upserted successfully")
-
-	return nil
-}
-
 // Upserts multiple daemonsets in a batch transaction
 func UpsertDaemonSetsBatch(ctx context.Context, daemonsets []*DaemonSet) error {
 	if len(daemonsets) == 0 {

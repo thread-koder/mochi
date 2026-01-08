@@ -9,47 +9,6 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts deployment metadata into the database
-func UpsertDeployment(ctx context.Context, deployment *Deployment) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("name", deployment.Name).
-		Str("namespace", deployment.Namespace).
-		Msg("Upserting deployment")
-
-	query := `
-		INSERT INTO deployments (
-			name, namespace, uid, replicas, ready_replicas, available_replicas,
-			labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			namespace = EXCLUDED.namespace,
-			replicas = EXCLUDED.replicas,
-			ready_replicas = EXCLUDED.ready_replicas,
-			available_replicas = EXCLUDED.available_replicas,
-			labels = EXCLUDED.labels,
-			annotations = EXCLUDED.annotations,
-			synced_at = EXCLUDED.synced_at
-	`
-
-	_, err := Pool.Exec(ctx, query,
-		deployment.Name, deployment.Namespace, deployment.UID,
-		deployment.Replicas, deployment.ReadyReplicas, deployment.AvailableReplicas,
-		deployment.Labels, deployment.Annotations, deployment.CreatedAt, deployment.SyncedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert deployment: %w", err)
-	}
-
-	log.Debug().
-		Str("name", deployment.Name).
-		Str("namespace", deployment.Namespace).
-		Msg("Deployment upserted successfully")
-
-	return nil
-}
-
 // Upserts multiple deployments in a batch transaction
 func UpsertDeploymentsBatch(ctx context.Context, deployments []*Deployment) error {
 	if len(deployments) == 0 {

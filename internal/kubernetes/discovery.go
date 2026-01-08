@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -101,32 +100,4 @@ func DiscoverCluster(ctx context.Context) (*ClusterResources, error) {
 	resources.PersistentVolumes = len(pvs.Items)
 
 	return resources, nil
-}
-
-// Returns a list of all nodes in the cluster
-func GetNodeList(ctx context.Context) ([]corev1.Node, error) {
-	if Clientset == nil {
-		return nil, fmt.Errorf("Kubernetes client not initialized")
-	}
-
-	nodes, err := Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list nodes: %w", err)
-	}
-
-	return nodes.Items, nil
-}
-
-// Returns a list of all namespaces in the cluster
-func GetNamespaceList(ctx context.Context) ([]corev1.Namespace, error) {
-	if Clientset == nil {
-		return nil, fmt.Errorf("Kubernetes client not initialized")
-	}
-
-	namespaces, err := Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list namespaces: %w", err)
-	}
-
-	return namespaces.Items, nil
 }
