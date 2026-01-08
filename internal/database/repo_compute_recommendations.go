@@ -119,113 +119,8 @@ func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadN
 	return &rec, nil
 }
 
-// Gets all compute recommendations for a workload
-func GetComputeRecommendationsByWorkload(ctx context.Context, workloadType, workloadName, namespace string) ([]*ComputeRecommendation, error) {
-	query := `
-		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
-		       recommendations, status, analysis_time_range, created_at, updated_at, generated_at
-		FROM compute_recommendations
-		WHERE namespace = $1 AND workload_type = $2 AND workload_name = $3
-		ORDER BY created_at DESC
-	`
-
-	rows, err := Pool.Query(ctx, query, namespace, workloadType, workloadName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query compute recommendations by workload: %w", err)
-	}
-	defer rows.Close()
-
-	recommendations := make([]*ComputeRecommendation, 0)
-	for rows.Next() {
-		var rec ComputeRecommendation
-		var analysisTimeRange *time.Duration
-
-		err := rows.Scan(
-			&rec.ID, &rec.WorkloadType, &rec.WorkloadName, &rec.Namespace,
-			&rec.RecommendationMode, &rec.Recommendations, &rec.Status,
-			&analysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt, &rec.GeneratedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan compute recommendation: %w", err)
-		}
-
-		if analysisTimeRange != nil {
-			durationStr := analysisTimeRange.String()
-			rec.AnalysisTimeRange = &durationStr
-		}
-
-		recommendations = append(recommendations, &rec)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating compute recommendations: %w", err)
-	}
-
-	return recommendations, nil
-}
-
-// Gets compute recommendations by namespace with optional filters
-func GetComputeRecommendationsByNamespace(ctx context.Context, namespace string, status *string, mode *string) ([]*ComputeRecommendation, error) {
-	query := `
-		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
-		       recommendations, status, analysis_time_range, created_at, updated_at, generated_at
-		FROM compute_recommendations
-		WHERE namespace = $1
-	`
-	args := []any{namespace}
-	argIndex := 2
-
-	if status != nil {
-		query += fmt.Sprintf(" AND status = $%d", argIndex)
-		args = append(args, *status)
-		argIndex++
-	}
-
-	if mode != nil {
-		query += fmt.Sprintf(" AND recommendation_mode = $%d", argIndex)
-		args = append(args, *mode)
-		argIndex++
-	}
-
-	query += " ORDER BY created_at DESC"
-
-	rows, err := Pool.Query(ctx, query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query compute recommendations by namespace: %w", err)
-	}
-	defer rows.Close()
-
-	recommendations := make([]*ComputeRecommendation, 0)
-	for rows.Next() {
-		var rec ComputeRecommendation
-		var analysisTimeRange *time.Duration
-
-		err := rows.Scan(
-			&rec.ID, &rec.WorkloadType, &rec.WorkloadName, &rec.Namespace,
-			&rec.RecommendationMode, &rec.Recommendations, &rec.Status,
-			&analysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt, &rec.GeneratedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan compute recommendation: %w", err)
-		}
-
-		if analysisTimeRange != nil {
-			durationStr := analysisTimeRange.String()
-			rec.AnalysisTimeRange = &durationStr
-		}
-
-		recommendations = append(recommendations, &rec)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating compute recommendations: %w", err)
-	}
-
-	return recommendations, nil
-}
-
 // Gets all compute recommendations with optional filters
-func GetComputeRecommendations(ctx context.Context, namespace *string, status *string, mode *string, limit, offset int) ([]*ComputeRecommendation, error) {
+func GetComputeRecommendations(ctx context.Context, namespace *string, status *string, mode *string, workloadType *string, workloadName *string, limit, offset int) ([]*ComputeRecommendation, error) {
 	query := `
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
 		       recommendations, status, analysis_time_range, created_at, updated_at, generated_at
@@ -250,6 +145,18 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 	if mode != nil {
 		query += fmt.Sprintf(" AND recommendation_mode = $%d", argIndex)
 		args = append(args, *mode)
+		argIndex++
+	}
+
+	if workloadType != nil {
+		query += fmt.Sprintf(" AND workload_type = $%d", argIndex)
+		args = append(args, *workloadType)
+		argIndex++
+	}
+
+	if workloadName != nil {
+		query += fmt.Sprintf(" AND workload_name = $%d", argIndex)
+		args = append(args, *workloadName)
 		argIndex++
 	}
 
