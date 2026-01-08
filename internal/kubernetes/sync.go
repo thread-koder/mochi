@@ -16,7 +16,7 @@ import (
 // Syncs all Kubernetes resources to PostgreSQL
 func SyncAllResources(ctx context.Context) error {
 	log := logger.WithComponent("kubernetes")
-	log.Info().Msg("Starting full resource sync")
+	log.Debug().Msg("Starting full resource sync")
 
 	// Sync namespaces first (they are referenced by other resources)
 	if err := SyncNamespaces(ctx); err != nil {
@@ -63,7 +63,7 @@ func SyncAllResources(ctx context.Context) error {
 		return fmt.Errorf("failed to sync containers: %w", err)
 	}
 
-	log.Info().Msg("Full resource sync completed")
+	log.Debug().Msg("Full resource sync completed")
 	return nil
 }
 
