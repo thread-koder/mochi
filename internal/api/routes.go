@@ -33,6 +33,7 @@ func setupRoutes(router *gin.Engine) {
 			compute.GET("/recommendations", computeHandlers.ListRecommendations)
 			compute.GET("/recommendations/:id", computeHandlers.GetRecommendationByID)
 			compute.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestWorkloadRecommendation)
+			compute.POST("/recommendations/apply", computeHandlers.ApplyRecommendation)
 		}
 	}
 }

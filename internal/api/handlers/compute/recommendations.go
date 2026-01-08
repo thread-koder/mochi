@@ -324,6 +324,154 @@ func GetLatestWorkloadRecommendation(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendation)
 }
 
+// Applies a compute recommendation to the target workload
+func ApplyRecommendation(c *gin.Context) {
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	var recommendation *database.ComputeRecommendation
+	var id int64
+	var isImmediate bool
+
+	// Check if ID is provided in query param
+	idStr := c.Query("id")
+	if idStr != "" {
+		// Apply by ID (stored recommendation)
+		var err error
+		id, err = parseInt64(idStr)
+		if err != nil {
+			c.Error(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "invalid recommendation ID",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		// Get recommendation from database
+		recommendation, err = database.GetComputeRecommendationByID(ctx, id)
+		if err != nil {
+			c.Error(err)
+			if strings.Contains(err.Error(), "not found") {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error":   "recommendation not found",
+					"details": err.Error(),
+				})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error":   "failed to get recommendation",
+					"details": err.Error(),
+				})
+			}
+			return
+		}
+
+		// Check if recommendation is already applied
+		if recommendation.Status == "applied" {
+			err := fmt.Errorf("recommendation %d was already applied", id)
+			c.Error(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "recommendation already applied",
+				"details": err.Error(),
+			})
+			return
+		}
+	} else {
+		// Apply from body (immediate apply)
+		isImmediate = true
+		var bodyRec compute.Recommendation
+		if err := c.ShouldBindJSON(&bodyRec); err != nil {
+			c.Error(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "invalid request body",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		// Validate required fields
+		if bodyRec.WorkloadType == "" || bodyRec.WorkloadName == "" || bodyRec.Namespace == "" {
+			err := fmt.Errorf("workload_type, workload_name, and namespace are required")
+			c.Error(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "missing required fields",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		if len(bodyRec.Recommendations) == 0 {
+			err := fmt.Errorf("recommendations field is required")
+			c.Error(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "missing recommendations",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		// Set default mode if not provided
+		if bodyRec.RecommendationMode == "" {
+			bodyRec.RecommendationMode = "burstable"
+		}
+
+		// Convert to database model
+		dbRec, err := compute.ComputeRecommendationToDB(bodyRec, nil)
+		if err != nil {
+			c.Error(err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "failed to convert recommendation",
+				"details": err.Error(),
+			})
+			return
+		}
+
+		recommendation = dbRec
+	}
+
+	// Apply the recommendation
+	if err := compute.ApplyRecommendation(ctx, recommendation); err != nil {
+		c.Error(err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "failed to apply recommendation",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// If immediate apply, save to database first
+	if isImmediate {
+		recommendation.Status = "applied"
+		if err := database.UpsertComputeRecommendation(ctx, recommendation); err != nil {
+			c.Error(err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "failed to save recommendation",
+				"details": err.Error(),
+			})
+			return
+		}
+		id = recommendation.ID
+	} else {
+		// if applying by ID, update status to "applied"
+		if err := database.UpdateComputeRecommendationStatus(ctx, id, "applied"); err != nil {
+			// Log error but don't fail
+			c.Error(err)
+		}
+	}
+
+	// Mark other pending recommendations as superseded
+	if err := database.MarkRecommendationsSuperseded(ctx, recommendation.WorkloadType, recommendation.WorkloadName, recommendation.Namespace, id); err != nil {
+		// Log error but don't fail
+		c.Error(err)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "recommendation applied successfully",
+		"id":      id,
+	})
+}
+
 // Helper function to parse integer from string
 func parseInt(s string) (int, error) {
 	result, err := strconv.Atoi(s)

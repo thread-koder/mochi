@@ -334,5 +334,3 @@ func CleanupComputeRecommendationsForDeletedWorkloads(ctx context.Context) error
 
 	return nil
 }
-
-// Converts compute.Recommendation to database.ComputeRecommendation
