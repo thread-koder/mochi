@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/internal/api/handlers"
 	computeHandlers "github.com/thread_koder/mochi/internal/api/handlers/compute"
+	webHandlers "github.com/thread_koder/mochi/internal/api/handlers/web"
 )
 
 // Configures all API routes
@@ -15,11 +16,18 @@ func setupRoutes(router *gin.Engine) {
 	router.GET("/health/prometheus", handlers.PrometheusHealth)
 	router.GET("/health/redis", handlers.RedisHealth)
 
+	// Web UI routes
+	router.GET("/", webHandlers.Home)
+
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
 		// Cluster info
 		v1.GET("/cluster/info", handlers.ClusterInfo)
+
+		// Web UI API endpoints
+		v1.GET("/stats", webHandlers.GetStats)
+		v1.GET("/activity", webHandlers.GetActivity)
 
 		// Compute domain
 		compute := v1.Group("/compute")
