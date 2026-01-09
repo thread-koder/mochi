@@ -42,3 +42,30 @@ func GetPodCount(ctx context.Context) (int, error) {
 	}
 	return count, nil
 }
+
+// Gets the count of pods in a specific namespace
+func GetPodCountByNamespace(ctx context.Context, namespace string) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM pods WHERE namespace = $1`
+	err := Pool.QueryRow(ctx, query, namespace).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count pods by namespace: %w", err)
+	}
+	return count, nil
+}
+
+// Gets the count of containers in a specific namespace
+func GetContainerCountByNamespace(ctx context.Context, namespace string) (int, error) {
+	var count int
+	query := `
+		SELECT COUNT(*) 
+		FROM containers c
+		INNER JOIN pods p ON c.pod_uid = p.uid
+		WHERE p.namespace = $1
+	`
+	err := Pool.QueryRow(ctx, query, namespace).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count containers by namespace: %w", err)
+	}
+	return count, nil
+}
