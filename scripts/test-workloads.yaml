@@ -1,0 +1,150 @@
+---
+# Deployment with 2 replicas
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-deployment
+  namespace: mochi-dev
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: test-deployment
+  template:
+    metadata:
+      labels:
+        app: test-deployment
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "400m"
+              memory: "64Mi"
+            limits:
+              cpu: "800m"
+              memory: "128Mi"
+        - name: load-generator
+          image: curlimages/curl:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              while true; do
+                curl -s http://localhost:80 > /dev/null
+                sleep 0.5
+              done
+---
+# DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: test-daemonset
+  namespace: mochi-dev
+spec:
+  selector:
+    matchLabels:
+      app: test-daemonset
+  template:
+    metadata:
+      labels:
+        app: test-daemonset
+    spec:
+      containers:
+        - name: redis
+          image: redis:alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+          command:
+            - redis-server
+            - --maxmemory
+            - "256mb"
+            - --maxmemory-policy
+            - allkeys-lru
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "384Mi"
+            limits:
+              cpu: "150m"
+              memory: "768Mi"
+        - name: app
+          image: python:alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              pip install flask redis && \
+              python -c "
+              from flask import Flask
+              import redis
+              import os
+              app = Flask(__name__)
+              r = redis.Redis(host=os.getenv('REDIS_HOST', 'localhost'), port=int(os.getenv('REDIS_PORT', 6379)), decode_responses=True)
+              @app.route('/')
+              def hello():
+                  r.incr('hits')
+                  return f'Hello! This page has been viewed {r.get(\"hits\")} times.'
+              app.run(host='0.0.0.0', port=5000)
+              "
+          ports:
+            - containerPort: 5000
+          env:
+            - name: REDIS_HOST
+              value: "localhost"
+            - name: REDIS_PORT
+              value: "6379"
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "192Mi"
+        - name: load-generator
+          image: curlimages/curl:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              while true; do
+                curl -s http://localhost:5000 > /dev/null
+                sleep 0.5
+              done
+---
+# Standalone Pod (no owner/controller)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-standalone-pod
+  namespace: mochi-dev
+spec:
+  containers:
+    - name: nginx
+      image: nginx:alpine
+      imagePullPolicy: IfNotPresent
+      ports:
+        - containerPort: 80
+    - name: load-generator
+      image: curlimages/curl:latest
+      imagePullPolicy: IfNotPresent
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            curl -s http://localhost:80 > /dev/null
+            sleep 0.5
+          done
+      resources:
+        requests:
+          cpu: "25m"
+          memory: "32Mi"
+        limits:
+          cpu: "50m"
+          memory: "64Mi"

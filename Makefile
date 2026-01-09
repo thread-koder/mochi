@@ -1,4 +1,4 @@
-.PHONY: help build test clean run lint fmt docker-build docker-run deps deps-update dev dev-env-setup dev-env-clean dev-env-status
+.PHONY: help build test clean run lint fmt docker-build docker-run deps deps-update dev dev-env-setup dev-env-clean dev-env-status test-workloads-setup test-workloads-clean
 
 # Variables
 BINARY_NAME=mochi
@@ -74,3 +74,11 @@ dev-env-clean: ## Remove PostgreSQL, Prometheus, and Redis from minikube
 dev-env-status: ## Check status of development environment
 	@chmod +x scripts/status-dev.sh
 	@./scripts/status-dev.sh
+
+test-workloads-setup: ## Set up test workloads (Deployment, DaemonSet, Standalone Pod) in minikube
+	@chmod +x scripts/setup-test-workloads.sh
+	@./scripts/setup-test-workloads.sh
+
+test-workloads-clean: ## Remove test workloads from minikube
+	@chmod +x scripts/cleanup-test-workloads.sh
+	@./scripts/cleanup-test-workloads.sh
