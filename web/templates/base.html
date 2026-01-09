@@ -129,13 +129,32 @@
         
         <!-- Main Content -->
         <main class="flex-1 overflow-y-auto">
-            {{block "content" .}}{{end}}
+            {{if eq .Page "home"}}
+                {{block "home-content" .}}{{end}}
+            {{else if eq .Page "namespace"}}
+                {{block "namespace-content" .}}{{end}}
+            {{else if eq .Page "error"}}
+                {{block "error-content" .}}{{end}}
+            {{end}}
         </main>
     </div>
     
     <!-- Alpine.js Components -->
     <script>
         document.addEventListener('alpine:init', () => {
+            Alpine.data('counter', (target, intervalMs = 50) => ({
+                count: 0,
+                init() {
+                    const interval = setInterval(() => {
+                        if (this.count < target) {
+                            this.count++;
+                        } else {
+                            clearInterval(interval);
+                        }
+                    }, intervalMs);
+                }
+            }));
+
             Alpine.data('namespacesNavItems', () => ({
                 open: true,
                 namespaces: [],

@@ -146,22 +146,4 @@
         </div>
     </div>
 </div>
-
-<!-- Alpine.js Components -->
-<script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('counter', (target, intervalMs = 50) => ({
-            count: 0,
-            init() {
-                const interval = setInterval(() => {
-                    if (this.count < target) {
-                        this.count++;
-                    } else {
-                        clearInterval(interval);
-                    }
-                }, intervalMs);
-            }
-        }));
-    });
-</script>
 {{end}}
