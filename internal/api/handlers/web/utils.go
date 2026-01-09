@@ -52,14 +52,20 @@ func GetStatsData(ctx context.Context) (Stats, error) {
 
 	if count, err := database.GetNamespaceCount(ctx); err == nil {
 		stats.Namespaces = count
+	} else {
+		return stats, fmt.Errorf("failed to get namespace count: %w", err)
 	}
 
 	if count, err := database.GetWorkloadCount(ctx); err == nil {
 		stats.Workloads = count
+	} else {
+		return stats, fmt.Errorf("failed to get workload count: %w", err)
 	}
 
 	if count, err := database.GetPodCount(ctx); err == nil {
 		stats.Pods = count
+	} else {
+		return stats, fmt.Errorf("failed to get pod count: %w", err)
 	}
 
 	return stats, nil
@@ -74,7 +80,7 @@ func GetActivityItems(ctx context.Context, limit int) ([]ActivityItem, error) {
 		0,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get compute recommendations: %w", err)
 	}
 
 	activities := make([]ActivityItem, 0, len(computeRecommendations))
