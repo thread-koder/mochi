@@ -22,7 +22,7 @@ func LoggingMiddleware() gin.HandlerFunc {
 
 		// Build base fields
 		fields := map[string]any{
-			"component":  "api",
+			"component":  "server",
 			"method":     c.Request.Method,
 			"path":       path,
 			"status":     c.Writer.Status(),

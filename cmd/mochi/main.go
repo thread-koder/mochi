@@ -100,6 +100,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Info().Msg("All components shutdown")
+	log.Info().Msg("Server shutdown")
 	os.Exit(0)
 }
