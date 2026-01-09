@@ -115,10 +115,6 @@ func GetClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 	}
 	info.ServerVersion = version.String()
 
-	// TODO: Extract context name from kubeconfig if available
-	info.ContextName = "default"
-	info.ClusterName = "default"
-
 	return info, nil
 }
 
