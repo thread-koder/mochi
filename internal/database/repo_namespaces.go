@@ -95,6 +95,26 @@ func GetNamespaces(ctx context.Context) ([]*Namespace, error) {
 	return namespaces, nil
 }
 
+// Gets a namespace by name
+func GetNamespaceByName(ctx context.Context, name string) (*Namespace, error) {
+	query := `SELECT id, name, uid, phase, labels, annotations, created_at, updated_at, synced_at FROM namespaces WHERE name = $1 LIMIT 1`
+
+	var ns Namespace
+	err := Pool.QueryRow(ctx, query, name).Scan(
+		&ns.ID, &ns.Name, &ns.UID, &ns.Phase,
+		&ns.Labels, &ns.Annotations,
+		&ns.CreatedAt, &ns.UpdatedAt, &ns.SyncedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("namespace %s not found", name)
+		}
+		return nil, fmt.Errorf("failed to query namespace by name: %w", err)
+	}
+
+	return &ns, nil
+}
+
 // Deletes namespaces that haven't been synced since the specified time
 func DeleteNamespacesNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")

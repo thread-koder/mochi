@@ -71,6 +71,43 @@ func UpsertDaemonSetsBatch(ctx context.Context, daemonsets []*DaemonSet) error {
 	return nil
 }
 
+// Gets all daemonsets in a namespace
+func GetDaemonSetsByNamespace(ctx context.Context, namespace string) ([]*DaemonSet, error) {
+	query := `
+		SELECT id, name, namespace, uid, desired_number_scheduled, number_ready, number_available,
+		       labels, annotations, created_at, updated_at, synced_at
+		FROM daemonsets
+		WHERE namespace = $1
+		ORDER BY name ASC
+	`
+
+	rows, err := Pool.Query(ctx, query, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query daemonsets by namespace: %w", err)
+	}
+	defer rows.Close()
+
+	daemonsets := make([]*DaemonSet, 0)
+	for rows.Next() {
+		var ds DaemonSet
+		if err := rows.Scan(
+			&ds.ID, &ds.Name, &ds.Namespace, &ds.UID,
+			&ds.DesiredNumberScheduled, &ds.NumberReady, &ds.NumberAvailable,
+			&ds.Labels, &ds.Annotations,
+			&ds.CreatedAt, &ds.UpdatedAt, &ds.SyncedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan daemonset: %w", err)
+		}
+		daemonsets = append(daemonsets, &ds)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating daemonsets: %w", err)
+	}
+
+	return daemonsets, nil
+}
+
 // Deletes daemonsets that haven't been synced since the specified time
 func DeleteDaemonSetsNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")

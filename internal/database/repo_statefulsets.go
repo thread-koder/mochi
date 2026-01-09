@@ -70,6 +70,43 @@ func UpsertStatefulSetsBatch(ctx context.Context, statefulsets []*StatefulSet) e
 	return nil
 }
 
+// Gets all statefulsets in a namespace
+func GetStatefulSetsByNamespace(ctx context.Context, namespace string) ([]*StatefulSet, error) {
+	query := `
+		SELECT id, name, namespace, uid, replicas, ready_replicas,
+		       labels, annotations, created_at, updated_at, synced_at
+		FROM statefulsets
+		WHERE namespace = $1
+		ORDER BY name ASC
+	`
+
+	rows, err := Pool.Query(ctx, query, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query statefulsets by namespace: %w", err)
+	}
+	defer rows.Close()
+
+	statefulsets := make([]*StatefulSet, 0)
+	for rows.Next() {
+		var sts StatefulSet
+		if err := rows.Scan(
+			&sts.ID, &sts.Name, &sts.Namespace, &sts.UID,
+			&sts.Replicas, &sts.ReadyReplicas,
+			&sts.Labels, &sts.Annotations,
+			&sts.CreatedAt, &sts.UpdatedAt, &sts.SyncedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan statefulset: %w", err)
+		}
+		statefulsets = append(statefulsets, &sts)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating statefulsets: %w", err)
+	}
+
+	return statefulsets, nil
+}
+
 // Deletes statefulsets that haven't been synced since the specified time
 func DeleteStatefulSetsNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")

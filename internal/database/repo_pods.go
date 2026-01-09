@@ -141,6 +141,44 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 	return pods, nil
 }
 
+// Gets standalone pods (pods without owner) in a namespace
+func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod, error) {
+	query := `
+		SELECT id, name, namespace, uid, node_name, phase, restart_policy,
+		       labels, annotations, owner_kind, owner_name,
+		       created_at, updated_at, synced_at
+		FROM pods
+		WHERE namespace = $1 AND (owner_kind IS NULL OR owner_kind = '')
+		ORDER BY name
+	`
+
+	rows, err := Pool.Query(ctx, query, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query standalone pods by namespace: %w", err)
+	}
+	defer rows.Close()
+
+	pods := make([]*Pod, 0)
+	for rows.Next() {
+		var p Pod
+		err := rows.Scan(
+			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.NodeName, &p.Phase, &p.RestartPolicy,
+			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan pod: %w", err)
+		}
+		pods = append(pods, &p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating pods: %w", err)
+	}
+
+	return pods, nil
+}
+
 // Deletes pods that haven't been synced since the specified time
 func DeletePodsNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")

@@ -71,6 +71,43 @@ func UpsertDeploymentsBatch(ctx context.Context, deployments []*Deployment) erro
 	return nil
 }
 
+// Gets all deployments in a namespace
+func GetDeploymentsByNamespace(ctx context.Context, namespace string) ([]*Deployment, error) {
+	query := `
+		SELECT id, name, namespace, uid, replicas, ready_replicas, available_replicas,
+		       labels, annotations, created_at, updated_at, synced_at
+		FROM deployments
+		WHERE namespace = $1
+		ORDER BY name ASC
+	`
+
+	rows, err := Pool.Query(ctx, query, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query deployments by namespace: %w", err)
+	}
+	defer rows.Close()
+
+	deployments := make([]*Deployment, 0)
+	for rows.Next() {
+		var dep Deployment
+		if err := rows.Scan(
+			&dep.ID, &dep.Name, &dep.Namespace, &dep.UID,
+			&dep.Replicas, &dep.ReadyReplicas, &dep.AvailableReplicas,
+			&dep.Labels, &dep.Annotations,
+			&dep.CreatedAt, &dep.UpdatedAt, &dep.SyncedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan deployment: %w", err)
+		}
+		deployments = append(deployments, &dep)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating deployments: %w", err)
+	}
+
+	return deployments, nil
+}
+
 // Deletes deployments that haven't been synced since the specified time
 func DeleteDeploymentsNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")
