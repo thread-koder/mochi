@@ -65,6 +65,36 @@ func UpsertNamespacesBatch(ctx context.Context, namespaces []*Namespace) error {
 	return nil
 }
 
+// Gets all namespaces from the database
+func GetNamespaces(ctx context.Context) ([]*Namespace, error) {
+	query := `SELECT id, name, uid, phase, labels, annotations, created_at, updated_at, synced_at FROM namespaces ORDER BY name ASC`
+
+	rows, err := Pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query namespaces: %w", err)
+	}
+	defer rows.Close()
+
+	namespaces := make([]*Namespace, 0)
+	for rows.Next() {
+		var ns Namespace
+		if err := rows.Scan(
+			&ns.ID, &ns.Name, &ns.UID, &ns.Phase,
+			&ns.Labels, &ns.Annotations,
+			&ns.CreatedAt, &ns.UpdatedAt, &ns.SyncedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan namespace: %w", err)
+		}
+		namespaces = append(namespaces, &ns)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating namespaces: %w", err)
+	}
+
+	return namespaces, nil
+}
+
 // Deletes namespaces that haven't been synced since the specified time
 func DeleteNamespacesNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")

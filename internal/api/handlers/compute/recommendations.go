@@ -157,8 +157,8 @@ func GenerateRecommendations(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendation)
 }
 
-// Lists compute recommendations with optional filters
-func ListRecommendations(c *gin.Context) {
+// Gets compute recommendations with optional filters
+func GetRecommendations(c *gin.Context) {
 	namespace := c.Query("namespace")
 	status := c.Query("status")
 	mode := c.Query("mode")

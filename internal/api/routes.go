@@ -28,6 +28,7 @@ func setupRoutes(router *gin.Engine) {
 		// Web UI API endpoints
 		v1.GET("/stats", webHandlers.GetStats)
 		v1.GET("/activity", webHandlers.GetActivity)
+		v1.GET("/namespaces", webHandlers.GetNamespaces)
 
 		// Compute domain
 		compute := v1.Group("/compute")
@@ -38,7 +39,7 @@ func setupRoutes(router *gin.Engine) {
 
 			// Recommendation endpoints
 			compute.POST("/recommendations/generate/:workloadType/:workloadName", computeHandlers.GenerateRecommendations)
-			compute.GET("/recommendations", computeHandlers.ListRecommendations)
+			compute.GET("/recommendations", computeHandlers.GetRecommendations)
 			compute.GET("/recommendations/:id", computeHandlers.GetRecommendationByID)
 			compute.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestWorkloadRecommendation)
 			compute.POST("/recommendations/apply", computeHandlers.ApplyRecommendation)
