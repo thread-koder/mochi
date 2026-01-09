@@ -46,19 +46,19 @@ func Home(c *gin.Context) {
 	}
 
 	// Get cluster info for name
-	if info, err := kubernetes.GetClusterInfo(ctx); err == nil {
+	if info, err := kubernetes.GetClusterInfo(ctx); err != nil {
+		c.Error(fmt.Errorf("failed to get cluster info: %w", err))
+	} else {
 		if info.ClusterName != "" {
 			data.ClusterName = info.ClusterName
 		}
-	} else {
-		c.Error(fmt.Errorf("failed to get cluster info: %w", err))
 	}
 
 	// Get stats
-	if stats, err := GetStatsData(ctx); err == nil {
-		data.Stats = stats
-	} else {
+	if stats, err := GetStatsData(ctx); err != nil {
 		c.Error(fmt.Errorf("failed to get stats: %w", err))
+	} else {
+		data.Stats = stats
 	}
 
 	// Get health checks
@@ -77,7 +77,9 @@ func Home(c *gin.Context) {
 	data.Stats.HealthScore = (healthyCount * 100) / len(data.HealthChecks)
 
 	// Get recent activity
-	if activities, err := GetActivityItems(ctx, 10); err == nil {
+	if activities, err := GetActivityItems(ctx, 10); err != nil {
+		c.Error(fmt.Errorf("failed to get activity items: %w", err))
+	} else {
 		// Format activities for display
 		displayActivities := make([]ActivityItemDisplay, 0, len(activities))
 		for _, activity := range activities {
@@ -102,8 +104,6 @@ func Home(c *gin.Context) {
 			displayActivities = append(displayActivities, display)
 		}
 		data.Activities = displayActivities
-	} else {
-		c.Error(fmt.Errorf("failed to get activity items: %w", err))
 	}
 
 	c.HTML(http.StatusOK, "home.html", data)
