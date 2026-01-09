@@ -19,15 +19,7 @@
                 <h3 class="text-gray-400 text-sm">Total Namespaces</h3>
                 <span class="text-2xl">📦</span>
             </div>
-            <p class="text-3xl font-bold text-purple-400" x-data="{ count: 0, target: {{.Stats.Namespaces}} }" x-init="
-                let interval = setInterval(() => {
-                    if (count < target) {
-                        count++;
-                    } else {
-                        clearInterval(interval);
-                    }
-                }, 50);
-            " x-text="count">{{.Stats.Namespaces}}</p>
+            <p class="text-3xl font-bold text-purple-400" x-data="counter({{.Stats.Namespaces}})" x-text="count">{{.Stats.Namespaces}}</p>
         </div>
         
         <!-- Total Workloads -->
@@ -36,15 +28,7 @@
                 <h3 class="text-gray-400 text-sm">Total Workloads</h3>
                 <span class="text-2xl">⚙️</span>
             </div>
-            <p class="text-3xl font-bold text-cyan-400" x-data="{ count: 0, target: {{.Stats.Workloads}} }" x-init="
-                let interval = setInterval(() => {
-                    if (count < target) {
-                        count++;
-                    } else {
-                        clearInterval(interval);
-                    }
-                }, 50);
-            " x-text="count">{{.Stats.Workloads}}</p>
+            <p class="text-3xl font-bold text-cyan-400" x-data="counter({{.Stats.Workloads}})" x-text="count">{{.Stats.Workloads}}</p>
         </div>
         
         <!-- Total Pods -->
@@ -53,15 +37,7 @@
                 <h3 class="text-gray-400 text-sm">Total Pods</h3>
                 <span class="text-2xl">🚀</span>
             </div>
-            <p class="text-3xl font-bold text-pink-400" x-data="{ count: 0, target: {{.Stats.Pods}} }" x-init="
-                let interval = setInterval(() => {
-                    if (count < target) {
-                        count++;
-                    } else {
-                        clearInterval(interval);
-                    }
-                }, 50);
-            " x-text="count">{{.Stats.Pods}}</p>
+            <p class="text-3xl font-bold text-pink-400" x-data="counter({{.Stats.Pods}})" x-text="count">{{.Stats.Pods}}</p>
         </div>
         
         <!-- System Health -->
@@ -70,15 +46,7 @@
                 <h3 class="text-gray-400 text-sm">System Health</h3>
                 <span class="text-2xl">💚</span>
             </div>
-            <p class="text-3xl font-bold text-green-400" x-data="{ count: 0, target: {{.Stats.HealthScore}} }" x-init="
-                let interval = setInterval(() => {
-                    if (count < target) {
-                        count++;
-                    } else {
-                        clearInterval(interval);
-                    }
-                }, 30);
-            " x-text="count + '%'">{{.Stats.HealthScore}}%</p>
+            <p class="text-3xl font-bold text-green-400" x-data="counter({{.Stats.HealthScore}}, 30)" x-text="count + '%'">{{.Stats.HealthScore}}%</p>
         </div>
     </div>
     
@@ -178,4 +146,22 @@
         </div>
     </div>
 </div>
+
+<!-- Counter Component -->
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('counter', (target, intervalMs = 50) => ({
+            count: 0,
+            init() {
+                const interval = setInterval(() => {
+                    if (this.count < target) {
+                        this.count++;
+                    } else {
+                        clearInterval(interval);
+                    }
+                }, intervalMs);
+            }
+        }));
+    });
+</script>
 {{end}}
