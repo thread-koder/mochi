@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Mochi</title>
+    
+    <!-- Tailwind CSS v4 -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- HTMX v2 -->
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2/dist/htmx.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Custom Theme -->
+    <style type="text/tailwindcss">
+        @theme {
+            --color-bg-primary: #0a0e27;
+            --color-bg-secondary: #1a1f3a;
+            --color-bg-card: rgba(26, 31, 58, 0.8);
+            --color-accent-primary: #8b5cf6;
+            --color-accent-secondary: #06b6d4;
+            --color-accent-tertiary: #ec4899;
+        }
+    </style>
+    
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a1f3a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #8b5cf6;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #7c3aed;
+        }
+        
+        /* Glassmorphism effect */
+        .glass {
+            background: var(--color-bg-card);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+        
+        /* Transitions */
+        * {
+            transition: all 0.2s ease;
+        }
+    </style>
+</head>
+<body class="bg-[var(--color-bg-primary)] text-gray-100 min-h-screen">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 glass border-r border-purple-500/20 flex flex-col">
+            <!-- Logo -->
+            <div class="p-6 border-b border-purple-500/20">
+                <h1 class="text-2xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                    Mochi
+                </h1>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <a href="/" class="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-purple-500/10 {{if eq .Page "home"}}bg-purple-500/20{{end}}">
+                    <span>🏠</span>
+                    <span>Home</span>
+                </a>
+                
+                <!-- Namespaces (expandable) -->
+                <div x-data="namespacesNavItems" class="space-y-2">
+                    <button @click="open = !open; if (open) loadNamespaces()" class="flex items-center justify-between w-full px-4 py-2 rounded-lg hover:bg-purple-500/10 cursor-pointer">
+                        <div class="flex items-center space-x-3">
+                            <span>📦</span>
+                            <span>Namespaces</span>
+                        </div>
+                        <span x-show="!open" x-cloak>▶</span>
+                        <span x-show="open" x-cloak>▼</span>
+                    </button>
+                    <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform -translate-y-2" x-transition:enter-end="opacity-100 transform translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 transform translate-y-0" x-transition:leave-end="opacity-0 transform -translate-y-2" class="pl-8 space-y-1">
+                        <template x-if="loading">
+                            <div class="text-sm text-gray-400 px-4 py-2">Loading...</div>
+                        </template>
+                        <template x-if="error">
+                            <div class="text-sm text-red-400 px-4 py-2" x-text="error"></div>
+                        </template>
+                        <template x-if="!loading && !error && namespaces.length === 0">
+                            <div class="text-sm text-gray-400 px-4 py-2">No namespaces found</div>
+                        </template>
+                        <template x-for="ns in namespaces" :key="ns.name">
+                            <a :href="'/namespaces/' + ns.name" 
+                               :class="isActive(ns.name) ? 'flex items-center justify-between px-4 py-2 rounded-lg bg-purple-500/20' : 'flex items-center justify-between px-4 py-2 rounded-lg hover:bg-purple-500/10'">
+                                <span x-text="ns.name"></span>
+                                <span :class="'w-2 h-2 rounded-full ' + getPhaseColor(ns.phase)" 
+                                      :title="ns.phase"></span>
+                            </a>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- Recommendations (expandable) -->
+                <div x-data="{ open: false }" class="space-y-2">
+                    <button @click="open = !open" class="flex items-center justify-between w-full px-4 py-2 rounded-lg hover:bg-purple-500/10 cursor-pointer">
+                        <div class="flex items-center space-x-3">
+                            <span>💡</span>
+                            <span>Recommendations</span>
+                        </div>
+                        <span x-show="!open" x-cloak>▶</span>
+                        <span x-show="open" x-cloak>▼</span>
+                    </button>
+                    <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform -translate-y-2" x-transition:enter-end="opacity-100 transform translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 transform translate-y-0" x-transition:leave-end="opacity-0 transform -translate-y-2" class="pl-8 space-y-1">
+                        <a href="/recommendations/compute" class="block px-4 py-2 rounded-lg hover:bg-purple-500/10 {{if eq .Page "recommendations-compute"}}bg-purple-500/20{{end}}">
+                            Compute
+                        </a>
+                    </div>
+                </div>
+            </nav>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto">
+            {{block "content" .}}{{end}}
+        </main>
+    </div>
+    
+    <!-- Alpine.js Components -->
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('namespacesNavItems', () => ({
+                open: true,
+                namespaces: [],
+                loading: false,
+                error: null,
+                
+                init() {
+                    if (this.open) {
+                        this.loadNamespaces();
+                    }
+                },
+                
+                async loadNamespaces() {
+                    if (this.namespaces.length > 0) return;
+                    this.loading = true;
+                    this.error = null;
+                    try {
+                        const response = await fetch('/api/v1/namespaces');
+                        if (!response.ok) throw new Error('Failed to load namespaces');
+                        const data = await response.json();
+                        this.namespaces = data.namespaces || [];
+                    } catch (err) {
+                        this.error = err.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                isActive(namespace) {
+                    return window.location.pathname === '/namespaces/' + namespace;
+                },
+                
+                getPhaseColor(phase) {
+                    switch(phase.toLowerCase()) {
+                        case 'active':
+                            return 'bg-green-400';
+                        case 'terminating':
+                            return 'bg-yellow-400';
+                        default:
+                            return 'bg-gray-400';
+                    }
+                }
+            }));
+        });
+    </script>
+</body>
+</html>
