@@ -46,30 +46,6 @@ func BuildPodMemoryQuery(namespace, pod, container string) string {
 	return query
 }
 
-// Builds a PromQL query for node CPU usage
-func BuildNodeCPUQuery(node string, rangeDuration string) string {
-	if rangeDuration == "" {
-		rangeDuration = "5m"
-	}
-
-	query := `1 - avg(rate(node_cpu_seconds_total{mode="idle"`
-	if node != "" {
-		query += fmt.Sprintf(`,instance=~".*%s.*"`, node)
-	}
-	query += fmt.Sprintf(`}[%s]))`, rangeDuration)
-
-	return query
-}
-
-// Builds a PromQL query for node memory usage
-func BuildNodeMemoryQuery(node string) string {
-	query := `(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100`
-	if node != "" {
-		query = fmt.Sprintf(`(1 - (node_memory_MemAvailable_bytes{instance=~".*%s.*"} / node_memory_MemTotal_bytes{instance=~".*%s.*"})) * 100`, node, node)
-	}
-	return query
-}
-
 // Builds a PromQL query for namespace CPU aggregation
 func BuildNamespaceCPUQuery(namespace string, rangeDuration string) string {
 	if rangeDuration == "" {

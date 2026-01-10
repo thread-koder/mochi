@@ -16,7 +16,7 @@ import (
 	"github.com/thread_koder/mochi/internal/redis"
 )
 
-// Holds options for executing Prometheus queries
+// Represents options for executing Prometheus queries
 type QueryOptions struct {
 	// Determines if the query result should be cached
 	UseCache bool
@@ -34,7 +34,7 @@ type QueryOptions struct {
 	RangeDuration string
 }
 
-// Holds pod-level metric results
+// Represents pod-level metric results
 type PodMetricResult struct {
 	Pod       string    `json:"pod"`
 	Namespace string    `json:"namespace"`
@@ -44,14 +44,7 @@ type PodMetricResult struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Holds node-level metric results
-type NodeMetricResult struct {
-	Node      string    `json:"node"`
-	Value     float64   `json:"value"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-// Holds namespace-level aggregated metric results
+// Represents namespace-level aggregated metric results
 type NamespaceMetricResult struct {
 	Namespace string    `json:"namespace"`
 	Value     float64   `json:"value"`
@@ -149,40 +142,6 @@ func QueryPodCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model
 // Queries pod memory usage metrics over a time range
 func QueryPodMemoryRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query := BuildPodMemoryQuery(opts.Namespace, opts.Pod, opts.Container)
-
-	result, warnings, err := QueryRangeWithCache(ctx, query, r, opts)
-	if err != nil {
-		return nil, warnings, err
-	}
-
-	matrix, ok := result.(model.Matrix)
-	if !ok {
-		return nil, warnings, fmt.Errorf("query result is not a matrix, got %T", result)
-	}
-
-	return matrix, warnings, nil
-}
-
-// Queries node CPU usage metrics over a time range
-func QueryNodeCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query := BuildNodeCPUQuery(opts.Node, opts.RangeDuration)
-
-	result, warnings, err := QueryRangeWithCache(ctx, query, r, opts)
-	if err != nil {
-		return nil, warnings, err
-	}
-
-	matrix, ok := result.(model.Matrix)
-	if !ok {
-		return nil, warnings, fmt.Errorf("query result is not a matrix, got %T", result)
-	}
-
-	return matrix, warnings, nil
-}
-
-// Queries node memory usage metrics over a time range
-func QueryNodeMemoryRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query := BuildNodeMemoryQuery(opts.Node)
 
 	result, warnings, err := QueryRangeWithCache(ctx, query, r, opts)
 	if err != nil {
