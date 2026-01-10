@@ -14,7 +14,7 @@
     <!-- Quick Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <!-- Total Namespaces -->
-        <div class="glass rounded-xl p-6 hover:border-purple-500/50">
+        <div class="glass glass-card-hover rounded-xl p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-gray-400 text-sm">Total Namespaces</h3>
                 <span class="text-2xl">📦</span>
@@ -23,7 +23,7 @@
         </div>
         
         <!-- Total Workloads -->
-        <div class="glass rounded-xl p-6 hover:border-purple-500/50">
+        <div class="glass glass-card-hover rounded-xl p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-gray-400 text-sm">Total Workloads</h3>
                 <span class="text-2xl">⚙️</span>
@@ -32,7 +32,7 @@
         </div>
         
         <!-- Total Pods -->
-        <div class="glass rounded-xl p-6 hover:border-purple-500/50">
+        <div class="glass glass-card-hover rounded-xl p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-gray-400 text-sm">Total Pods</h3>
                 <span class="text-2xl">🚀</span>
@@ -41,7 +41,7 @@
         </div>
         
         <!-- System Health -->
-        <div class="glass rounded-xl p-6 hover:border-purple-500/50">
+        <div class="glass glass-card-hover rounded-xl p-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-gray-400 text-sm">System Health</h3>
                 <span class="text-2xl">💚</span>
@@ -56,7 +56,7 @@
         <div class="space-y-3">
             {{if .Activities}}
                 {{range .Activities}}
-                <div class="flex items-center space-x-3 p-3 rounded-lg hover:bg-purple-500/10">
+                <div class="flex items-center space-x-3 p-3 rounded-lg glass-item-hover">
                     <span class="{{.IconColor}}">{{.Icon}}</span>
                     <span>{{.Message}}</span>
                     <span class="text-gray-400 text-sm ml-auto">{{.TimeAgo}}</span>
