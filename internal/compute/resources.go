@@ -9,11 +9,11 @@ import (
 
 // Represents recommended resource values
 type ResourceRecommendation struct {
-	CPURequest    *string // Recommended CPU request (e.g., "100m", "0.5")
-	CPULimit      *string // Recommended CPU limit
-	MemoryRequest *string // Recommended memory request (e.g., "128Mi", "1Gi")
-	MemoryLimit   *string // Recommended memory limit
-	Confidence    float64 // Overall confidence score (0-1)
+	CPURequest    *string `json:"cpu_request"`    // Recommended CPU request (e.g., "100m", "0.5")
+	CPULimit      *string `json:"cpu_limit"`      // Recommended CPU limit
+	MemoryRequest *string `json:"memory_request"` // Recommended memory request (e.g., "128Mi", "1Gi")
+	MemoryLimit   *string `json:"memory_limit"`   // Recommended memory limit
+	Confidence    float64 `json:"confidence"`     // Overall confidence score (0-1)
 }
 
 // Represents the reason for a recommendation

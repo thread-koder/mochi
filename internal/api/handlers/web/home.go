@@ -25,11 +25,11 @@ type HomeData struct {
 
 // Represents activity item with formatted time
 type ActivityItemDisplay struct {
-	Type      string
-	Message   string
-	TimeAgo   string
-	Icon      string
-	IconColor string
+	Type      string `json:"type"`
+	Message   string `json:"message"`
+	TimeAgo   string `json:"time_ago"`
+	Icon      string `json:"icon"`
+	IconColor string `json:"icon_color"`
 }
 
 // Renders the home page

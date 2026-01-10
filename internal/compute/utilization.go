@@ -6,30 +6,30 @@ import (
 
 // Represents resource utilization metrics
 type ResourceMetrics struct {
-	CPU    []DataPoint
-	Memory []DataPoint
+	CPU    []DataPoint `json:"cpu"`
+	Memory []DataPoint `json:"memory"`
 }
 
 // Represents CPU utilization analysis results
 type CPUUtilization struct {
-	Current   float64       // Most recent value
-	Stats     StatsResult   // Contains Mean (average), Max (peak), Min, etc.
-	Trend     TrendResult   // Trend analysis (increasing/decreasing/stable)
-	Anomalies AnomalyResult // Detected anomalies (outliers)
+	Current   float64       `json:"current"`   // Most recent value
+	Stats     StatsResult   `json:"stats"`     // Contains Mean (average), Max (peak), Min, etc.
+	Trend     TrendResult   `json:"trend"`     // Trend analysis (increasing/decreasing/stable)
+	Anomalies AnomalyResult `json:"anomalies"` // Detected anomalies (outliers)
 }
 
 // Represents memory utilization analysis results
 type MemoryUtilization struct {
-	Current   float64       // Most recent value (bytes)
-	Stats     StatsResult   // Contains Mean (average), Max (peak), Min, etc.
-	Trend     TrendResult   // Trend analysis (increasing/decreasing/stable)
-	Anomalies AnomalyResult // Detected anomalies (outliers)
+	Current   float64       `json:"current"`   // Most recent value (bytes)
+	Stats     StatsResult   `json:"stats"`     // Contains Mean (average), Max (peak), Min, etc.
+	Trend     TrendResult   `json:"trend"`     // Trend analysis (increasing/decreasing/stable)
+	Anomalies AnomalyResult `json:"anomalies"` // Detected anomalies (outliers)
 }
 
 // Represents overall utilization analysis results
 type UtilizationResult struct {
-	CPU    CPUUtilization
-	Memory MemoryUtilization
+	CPU    CPUUtilization    `json:"cpu"`
+	Memory MemoryUtilization `json:"memory"`
 }
 
 // Analyzes CPU utilization from time series data

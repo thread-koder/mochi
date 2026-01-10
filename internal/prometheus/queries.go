@@ -36,26 +36,26 @@ type QueryOptions struct {
 
 // Holds pod-level metric results
 type PodMetricResult struct {
-	Pod       string
-	Namespace string
-	Container string
-	Node      string
-	Value     float64
-	Timestamp time.Time
+	Pod       string    `json:"pod"`
+	Namespace string    `json:"namespace"`
+	Container string    `json:"container"`
+	Node      string    `json:"node"`
+	Value     float64   `json:"value"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // Holds node-level metric results
 type NodeMetricResult struct {
-	Node      string
-	Value     float64
-	Timestamp time.Time
+	Node      string    `json:"node"`
+	Value     float64   `json:"value"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // Holds namespace-level aggregated metric results
 type NamespaceMetricResult struct {
-	Namespace string
-	Value     float64
-	Timestamp time.Time
+	Namespace string    `json:"namespace"`
+	Value     float64   `json:"value"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // Builds a cache key from a query string

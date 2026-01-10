@@ -12,39 +12,39 @@ import (
 
 // Represents compute resource recommendations for a workload
 type Recommendation struct {
-	WorkloadType       string // "deployment", "statefulset", "daemonset", "pod"
-	WorkloadName       string
-	Namespace          string
-	RecommendationMode string // "burstable" or "guaranteed"
-	Recommendations    []ContainerRecommendation
+	WorkloadType       string                    `json:"workload_type"` // "deployment", "statefulset", "daemonset", "pod"
+	WorkloadName       string                    `json:"workload_name"`
+	Namespace          string                    `json:"namespace"`
+	RecommendationMode string                    `json:"recommendation_mode"` // "burstable" or "guaranteed"
+	Recommendations    []ContainerRecommendation `json:"recommendations"`
 }
 
 // Represents a container recommendation
 type ContainerRecommendation struct {
-	ContainerName   string
-	CPU             CPURecommendation
-	Memory          MemoryRecommendation
-	ConfidenceScore float64
+	ContainerName   string               `json:"container_name"`
+	CPU             CPURecommendation    `json:"cpu"`
+	Memory          MemoryRecommendation `json:"memory"`
+	ConfidenceScore float64              `json:"confidence_score"`
 }
 
 // Represents CPU resource recommendations
 type CPURecommendation struct {
-	CurrentRequest       *string
-	RecommendedRequest   *string
-	RequestChangePercent *float64 // Rounded to 1 decimal
-	CurrentLimit         *string
-	RecommendedLimit     *string
-	LimitChangePercent   *float64 // Rounded to 1 decimal
+	CurrentRequest       *string  `json:"current_request"`
+	RecommendedRequest   *string  `json:"recommended_request"`
+	RequestChangePercent *float64 `json:"request_change_percent"` // Rounded to 1 decimal
+	CurrentLimit         *string  `json:"current_limit"`
+	RecommendedLimit     *string  `json:"recommended_limit"`
+	LimitChangePercent   *float64 `json:"limit_change_percent"` // Rounded to 1 decimal
 }
 
 // Represents memory resource recommendations
 type MemoryRecommendation struct {
-	CurrentRequest       *string
-	RecommendedRequest   *string
-	RequestChangePercent *float64 // Rounded to 1 decimal
-	CurrentLimit         *string
-	RecommendedLimit     *string
-	LimitChangePercent   *float64 // Rounded to 1 decimal
+	CurrentRequest       *string  `json:"current_request"`
+	RecommendedRequest   *string  `json:"recommended_request"`
+	RequestChangePercent *float64 `json:"request_change_percent"` // Rounded to 1 decimal
+	CurrentLimit         *string  `json:"current_limit"`
+	RecommendedLimit     *string  `json:"recommended_limit"`
+	LimitChangePercent   *float64 `json:"limit_change_percent"` // Rounded to 1 decimal
 }
 
 // Generates a resource recommendation for a container based on analysis results

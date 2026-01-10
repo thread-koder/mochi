@@ -24,10 +24,10 @@ var (
 
 // Holds information about the connected Kubernetes cluster
 type ClusterInfo struct {
-	ServerVersion string
-	ClusterName   string
-	ContextName   string
-	APIServerURL  string
+	ServerVersion string `json:"server_version"`
+	ClusterName   string `json:"cluster_name"`
+	ContextName   string `json:"context_name"`
+	APIServerURL  string `json:"api_server_url"`
 }
 
 // Initializes the Kubernetes client with the provided configuration

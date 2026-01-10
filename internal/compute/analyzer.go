@@ -43,32 +43,32 @@ func (opts AnalysisOptions) Validate() error {
 
 // Represents analysis results for a container
 type ContainerAnalysis struct {
-	ContainerName string
-	Utilization   UtilizationResult
-	Provisioning  ProvisioningResult
+	ContainerName string             `json:"container_name"`
+	Utilization   UtilizationResult  `json:"utilization"`
+	Provisioning  ProvisioningResult `json:"provisioning"`
 }
 
 // Represents analysis results for a pod
 type PodAnalysis struct {
-	PodUID      string
-	PodName     string
-	Containers  []ContainerAnalysis // Individual container analyses
-	Utilization UtilizationResult   // Aggregated from containers
+	PodUID      string              `json:"pod_uid"`
+	PodName     string              `json:"pod_name"`
+	Containers  []ContainerAnalysis `json:"containers"`  // Individual container analyses
+	Utilization UtilizationResult   `json:"utilization"` // Aggregated from containers
 }
 
 // Represents analysis results for a workload
 type WorkloadAnalysis struct {
-	WorkloadType string
-	WorkloadName string
-	Namespace    string
-	Pods         []PodAnalysis // Individual pod analyses
-	Utilization  UtilizationResult
+	WorkloadType string            `json:"workload_type"`
+	WorkloadName string            `json:"workload_name"`
+	Namespace    string            `json:"namespace"`
+	Pods         []PodAnalysis     `json:"pods"` // Individual pod analyses
+	Utilization  UtilizationResult `json:"utilization"`
 }
 
 // Represents analysis results for a namespace
 type NamespaceAnalysis struct {
-	Namespace   string
-	Utilization UtilizationResult // Aggregated from all workloads/pods
+	Namespace   string            `json:"namespace"`
+	Utilization UtilizationResult `json:"utilization"` // Aggregated from all workloads/pods
 }
 
 // Analyzes a single container's resource utilization and provisioning

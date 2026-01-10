@@ -9,16 +9,16 @@ import (
 
 // Holds basic information about cluster resources
 type ClusterResources struct {
-	Namespaces        int
-	Nodes             int
-	Pods              int
-	Services          int
-	Deployments       int
-	StatefulSets      int
-	DaemonSets        int
-	ConfigMaps        int
-	Secrets           int
-	PersistentVolumes int
+	Namespaces        int `json:"namespaces"`
+	Nodes             int `json:"nodes"`
+	Pods              int `json:"pods"`
+	Services          int `json:"services"`
+	Deployments       int `json:"deployments"`
+	StatefulSets      int `json:"statefulsets"`
+	DaemonSets        int `json:"daemonsets"`
+	ConfigMaps        int `json:"configmaps"`
+	Secrets           int `json:"secrets"`
+	PersistentVolumes int `json:"persistentvolumes"`
 }
 
 // Performs cluster discovery and returns resource counts

@@ -7,37 +7,37 @@ import (
 
 // Represents resource specifications (requests and limits)
 type ResourceSpecs struct {
-	CPURequest    *float64 // CPU cores (e.g., 0.1 for "100m")
-	CPULimit      *float64 // CPU cores
-	MemoryRequest *float64 // Memory in bytes
-	MemoryLimit   *float64 // Memory in bytes
+	CPURequest    *float64 `json:"cpu_request"`    // CPU cores (e.g., 0.1 for "100m")
+	CPULimit      *float64 `json:"cpu_limit"`      // CPU cores
+	MemoryRequest *float64 `json:"memory_request"` // Memory in bytes
+	MemoryLimit   *float64 `json:"memory_limit"`   // Memory in bytes
 }
 
 // Represents CPU provisioning analysis results
 type CPUProvisioning struct {
-	RequestUtilization float64 // usage / request (0-1+)
-	LimitUtilization   float64 // usage / limit (0-1+)
-	IsOverProvisioned  bool
-	IsUnderProvisioned bool
-	Efficiency         float64 // 0-1 score (higher is better)
-	Confidence         float64 // 0-1 score based on data quality
+	RequestUtilization float64 `json:"request_utilization"` // usage / request (0-1+)
+	LimitUtilization   float64 `json:"limit_utilization"`   // usage / limit (0-1+)
+	IsOverProvisioned  bool    `json:"is_over_provisioned"`
+	IsUnderProvisioned bool    `json:"is_under_provisioned"`
+	Efficiency         float64 `json:"efficiency"` // 0-1 score (higher is better)
+	Confidence         float64 `json:"confidence"` // 0-1 score based on data quality
 }
 
 // Represents memory provisioning analysis results
 type MemoryProvisioning struct {
-	RequestUtilization float64 // usage / request (0-1+)
-	LimitUtilization   float64 // usage / limit (0-1+)
-	IsOverProvisioned  bool
-	IsUnderProvisioned bool
-	Efficiency         float64 // 0-1 score (higher is better)
-	Confidence         float64 // 0-1 score based on data quality
+	RequestUtilization float64 `json:"request_utilization"` // usage / request (0-1+)
+	LimitUtilization   float64 `json:"limit_utilization"`   // usage / limit (0-1+)
+	IsOverProvisioned  bool    `json:"is_over_provisioned"`
+	IsUnderProvisioned bool    `json:"is_under_provisioned"`
+	Efficiency         float64 `json:"efficiency"` // 0-1 score (higher is better)
+	Confidence         float64 `json:"confidence"` // 0-1 score based on data quality
 }
 
 // Represents overall provisioning analysis results
 type ProvisioningResult struct {
-	CPU        CPUProvisioning
-	Memory     MemoryProvisioning
-	Efficiency float64 // Overall efficiency score (0-1)
+	CPU        CPUProvisioning    `json:"cpu"`
+	Memory     MemoryProvisioning `json:"memory"`
+	Efficiency float64            `json:"efficiency"` // Overall efficiency score (0-1)
 }
 
 // Thresholds for provisioning detection
