@@ -165,9 +165,6 @@ func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	if err := database.DeleteContainersNotSyncedSince(ctx, staleThreshold); err != nil {
 		log.Warn().Err(err).Msg("Failed to delete stale containers")
 	}
-	log.Info().Msg("Stale resource cleanup completed")
-
-	log.Info().Msg("Starting compute recommendations cleanup")
 	oldRecommendationsThreshold := time.Now().Add(-90 * 24 * time.Hour) // 90 days
 	if err := database.DeleteComputeRecommendationsOlderThan(ctx, oldRecommendationsThreshold); err != nil {
 		log.Warn().Err(err).Msg("Failed to delete old compute recommendations")
@@ -175,7 +172,6 @@ func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	if err := database.CleanupComputeRecommendationsForDeletedWorkloads(ctx); err != nil {
 		log.Warn().Err(err).Msg("Failed to cleanup compute recommendations for deleted workloads")
 	}
-	log.Info().Msg("Compute recommendations cleanup completed")
 
 	log.Info().Msg("Resource cleanup completed")
 }
