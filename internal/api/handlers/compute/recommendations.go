@@ -14,7 +14,7 @@ import (
 
 // Generates compute resource recommendations for a workload
 func GenerateRecommendations(c *gin.Context) {
-	workloadType := strings.ToLower(c.Param("workloadType"))
+	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
 	timeRangeStr := c.Query("timeRange")
@@ -22,13 +22,13 @@ func GenerateRecommendations(c *gin.Context) {
 
 	// Validate workload type
 	validTypes := map[string]bool{
-		"deployment":  true,
-		"statefulset": true,
-		"daemonset":   true,
-		"pod":         true, // For standalone pods
+		"Deployment":  true,
+		"StatefulSet": true,
+		"DaemonSet":   true,
+		"Pod":         true, // For standalone pods
 	}
 	if !validTypes[workloadType] {
-		err := fmt.Errorf("workload type must be one of: deployment, statefulset, daemonset, pod")
+		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
 		c.Error(err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid workload type",
@@ -86,7 +86,7 @@ func GenerateRecommendations(c *gin.Context) {
 	var pods []*database.Pod
 
 	// Handle standalone pods differently
-	if workloadType == "pod" {
+	if workloadType == "Pod" {
 		// Get the standalone pod by name
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
 		if err != nil {
@@ -98,10 +98,10 @@ func GenerateRecommendations(c *gin.Context) {
 			return
 		}
 
-		// Validate it's actually a standalone pod (no owner)
-		if pod.OwnerKind != nil && *pod.OwnerKind != "" {
+		// Validate it's a standalone pod (no owner) or a system pod (Node-owned)
+		if pod.OwnerKind != nil && *pod.OwnerKind != "" && *pod.OwnerKind != "Node" {
 			err := fmt.Errorf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
-				workloadName, *pod.OwnerKind, *pod.OwnerName, strings.ToLower(*pod.OwnerKind))
+				workloadName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind)
 			c.Error(err)
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":   "pod belongs to a workload",
@@ -112,7 +112,7 @@ func GenerateRecommendations(c *gin.Context) {
 
 		pods = []*database.Pod{pod}
 	} else {
-		// Get pods for this workload (deployment/statefulset/daemonset)
+		// Get pods for this workload (Deployment, StatefulSet, DaemonSet)
 		podsList, err := database.GetPodsByWorkload(ctx, workloadType, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
@@ -164,6 +164,23 @@ func GetRecommendations(c *gin.Context) {
 	mode := c.Query("mode")
 	workloadType := c.Query("workloadType")
 	workloadName := c.Query("workloadName")
+
+	// Validate workload type
+	validTypes := map[string]bool{
+		"Deployment":  true,
+		"StatefulSet": true,
+		"DaemonSet":   true,
+		"Pod":         true, // For standalone pods
+	}
+	if !validTypes[workloadType] {
+		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
+		c.Error(err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid workload type",
+			"details": err.Error(),
+		})
+		return
+	}
 
 	// Parse pagination parameters
 	limit := 100 // Default limit
@@ -266,19 +283,19 @@ func GetRecommendationByID(c *gin.Context) {
 
 // Gets the latest compute recommendation for a workload
 func GetLatestWorkloadRecommendation(c *gin.Context) {
-	workloadType := strings.ToLower(c.Param("workloadType"))
+	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
 
 	// Validate workload type
 	validTypes := map[string]bool{
-		"deployment":  true,
-		"statefulset": true,
-		"daemonset":   true,
-		"pod":         true, // For standalone pods
+		"Deployment":  true,
+		"StatefulSet": true,
+		"DaemonSet":   true,
+		"Pod":         true, // For standalone pods
 	}
 	if !validTypes[workloadType] {
-		err := fmt.Errorf("workload type must be one of: deployment, statefulset, daemonset, pod")
+		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
 		c.Error(err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid workload type",
@@ -389,9 +406,26 @@ func ApplyRecommendation(c *gin.Context) {
 			return
 		}
 
+		validTypes := map[string]bool{
+			"Deployment":  true,
+			"StatefulSet": true,
+			"DaemonSet":   true,
+			"Pod":         true, // For standalone pods
+		}
+		// Validate workload type
+		if !validTypes[bodyRec.WorkloadType] {
+			err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
+			c.Error(err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "invalid workload type",
+				"details": err.Error(),
+			})
+			return
+		}
+
 		// Validate required fields
-		if bodyRec.WorkloadType == "" || bodyRec.WorkloadName == "" || bodyRec.Namespace == "" {
-			err := fmt.Errorf("workload_type, workload_name, and namespace are required")
+		if bodyRec.WorkloadName == "" || bodyRec.Namespace == "" {
+			err := fmt.Errorf("workload_name and namespace are required")
 			c.Error(err)
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":   "missing required fields",

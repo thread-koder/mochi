@@ -12,7 +12,7 @@ import (
 
 // Represents compute resource recommendations for a workload
 type Recommendation struct {
-	WorkloadType       string                    `json:"workload_type"` // "deployment", "statefulset", "daemonset", "pod"
+	WorkloadType       string                    `json:"workload_type"` // Deployment, StatefulSet, DaemonSet, Pod
 	WorkloadName       string                    `json:"workload_name"`
 	Namespace          string                    `json:"namespace"`
 	RecommendationMode string                    `json:"recommendation_mode"` // "burstable" or "guaranteed"

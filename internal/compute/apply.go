@@ -36,15 +36,14 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 		return fmt.Errorf("no container recommendations to apply")
 	}
 
-	// Route to appropriate apply function based on workload type
 	switch rec.WorkloadType {
-	case "deployment":
+	case "Deployment":
 		return applyToDeployment(ctx, rec.Namespace, rec.WorkloadName, containerRecs)
-	case "statefulset":
+	case "StatefulSet":
 		return applyToStatefulSet(ctx, rec.Namespace, rec.WorkloadName, containerRecs)
-	case "daemonset":
+	case "DaemonSet":
 		return applyToDaemonSet(ctx, rec.Namespace, rec.WorkloadName, containerRecs)
-	case "pod":
+	case "Pod":
 		return applyToPod()
 	default:
 		return fmt.Errorf("unsupported workload type: %s", rec.WorkloadType)

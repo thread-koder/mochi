@@ -302,22 +302,22 @@ func CleanupComputeRecommendationsForDeletedWorkloads(ctx context.Context) error
 		WHERE NOT EXISTS (
 			SELECT 1 FROM deployments d
 			WHERE d.namespace = cr.namespace AND d.name = cr.workload_name
-			AND cr.workload_type = 'deployment'
+			AND cr.workload_type = 'Deployment'
 		)
 		AND NOT EXISTS (
 			SELECT 1 FROM statefulsets s
 			WHERE s.namespace = cr.namespace AND s.name = cr.workload_name
-			AND cr.workload_type = 'statefulset'
+			AND cr.workload_type = 'StatefulSet'
 		)
 		AND NOT EXISTS (
 			SELECT 1 FROM daemonsets ds
 			WHERE ds.namespace = cr.namespace AND ds.name = cr.workload_name
-			AND cr.workload_type = 'daemonset'
+			AND cr.workload_type = 'DaemonSet'
 		)
 		AND NOT EXISTS (
 			SELECT 1 FROM pods p
 			WHERE p.namespace = cr.namespace AND p.name = cr.workload_name
-			AND cr.workload_type = 'pod'
+			AND cr.workload_type = 'Pod'
 			AND (p.owner_kind IS NULL OR p.owner_name IS NULL)
 		)
 	`
