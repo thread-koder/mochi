@@ -109,6 +109,23 @@ type StatefulSet struct {
 	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
 }
 
+// Represents replicaset metadata
+type ReplicaSet struct {
+	ID            int64           `json:"id" db:"id"`
+	Name          string          `json:"name" db:"name"`
+	Namespace     string          `json:"namespace" db:"namespace"`
+	UID           string          `json:"uid" db:"uid"`
+	Replicas      int             `json:"replicas" db:"replicas"`
+	ReadyReplicas int             `json:"ready_replicas" db:"ready_replicas"`
+	OwnerKind     *string         `json:"owner_kind" db:"owner_kind"`
+	OwnerName     *string         `json:"owner_name" db:"owner_name"`
+	Labels        json.RawMessage `json:"labels" db:"labels"`
+	Annotations   json.RawMessage `json:"annotations" db:"annotations"`
+	CreatedAt     time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at" db:"updated_at"`
+	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
+}
+
 // Represents daemonset metadata
 type DaemonSet struct {
 	ID                     int64           `json:"id" db:"id"`
