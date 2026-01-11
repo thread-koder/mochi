@@ -33,6 +33,11 @@ func SyncAllResources(ctx context.Context) error {
 		return fmt.Errorf("failed to sync deployments: %w", err)
 	}
 
+	// Sync replicasets
+	if err := SyncReplicaSets(ctx); err != nil {
+		return fmt.Errorf("failed to sync replicasets: %w", err)
+	}
+
 	// Sync statefulsets
 	if err := SyncStatefulSets(ctx); err != nil {
 		return fmt.Errorf("failed to sync statefulsets: %w", err)
@@ -238,6 +243,74 @@ func SyncDeployments(ctx context.Context) error {
 	}
 
 	log.Debug().Int("count", len(dbDeployments)).Msg("Deployments synced successfully")
+	return nil
+}
+
+// Syncs replicasets to PostgreSQL
+func SyncReplicaSets(ctx context.Context) error {
+	log := logger.WithComponent("kubernetes")
+
+	if Clientset == nil {
+		return fmt.Errorf("Kubernetes client not initialized")
+	}
+
+	replicasets, err := Clientset.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list replicasets: %w", err)
+	}
+
+	log.Debug().Int("count", len(replicasets.Items)).Msg("Syncing replicasets")
+
+	dbReplicaSets := make([]*database.ReplicaSet, 0, len(replicasets.Items))
+	now := time.Now()
+
+	for _, rs := range replicasets.Items {
+		// Only sync active ReplicaSets
+		if rs.Status.Replicas == 0 {
+			continue
+		}
+
+		labelsJSON, _ := mapToJSON(rs.Labels)
+		annotationsJSON, _ := mapToJSON(rs.Annotations)
+
+		// Desired replicas
+		replicas := int32(0)
+		if rs.Spec.Replicas != nil {
+			replicas = *rs.Spec.Replicas
+		}
+
+		// Extract owner information (Deployment)
+		var ownerKind, ownerName *string
+		for _, owner := range rs.OwnerReferences {
+			kind := owner.Kind
+			name := owner.Name
+			ownerKind = &kind
+			ownerName = &name
+			break // Take first owner (Deployment)
+		}
+
+		dbReplicaSet := &database.ReplicaSet{
+			Name:          rs.Name,
+			Namespace:     rs.Namespace,
+			UID:           string(rs.UID),
+			Replicas:      int(replicas),
+			ReadyReplicas: int(rs.Status.ReadyReplicas),
+			OwnerKind:     ownerKind,
+			OwnerName:     ownerName,
+			Labels:        labelsJSON,
+			Annotations:   annotationsJSON,
+			CreatedAt:     rs.CreationTimestamp.Time,
+			SyncedAt:      now,
+		}
+
+		dbReplicaSets = append(dbReplicaSets, dbReplicaSet)
+	}
+
+	if err := database.UpsertReplicaSetsBatch(ctx, dbReplicaSets); err != nil {
+		return fmt.Errorf("failed to upsert replicasets: %w", err)
+	}
+
+	log.Debug().Int("count", len(dbReplicaSets)).Msg("Replicasets synced successfully")
 	return nil
 }
 

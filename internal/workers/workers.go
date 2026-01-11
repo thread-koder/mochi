@@ -150,6 +150,9 @@ func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	if err := database.DeleteDeploymentsNotSyncedSince(ctx, staleThreshold); err != nil {
 		log.Warn().Err(err).Msg("Failed to delete stale deployments")
 	}
+	if err := database.DeleteReplicaSetsNotSyncedSince(ctx, staleThreshold); err != nil {
+		log.Warn().Err(err).Msg("Failed to delete stale replicasets")
+	}
 	if err := database.DeleteStatefulSetsNotSyncedSince(ctx, staleThreshold); err != nil {
 		log.Warn().Err(err).Msg("Failed to delete stale statefulsets")
 	}
