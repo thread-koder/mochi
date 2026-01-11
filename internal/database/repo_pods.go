@@ -105,6 +105,12 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 
 // Gets all pods for a specific workload (by owner kind and name)
 func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName string, namespace string) ([]*Pod, error) {
+	// For Deployment we need to get their ReplicaSets and then get their pods
+	if workloadType == "Deployment" {
+		return getPodsByDeployment(ctx, workloadName, namespace)
+	}
+
+	// Direct query for other owner kinds
 	query := `
 		SELECT id, name, namespace, uid, node_name, phase, restart_policy,
 		       labels, annotations, owner_kind, owner_name,
@@ -233,4 +239,29 @@ func DeletePodsNotSyncedSince(ctx context.Context, since time.Time) error {
 	}
 
 	return nil
+}
+
+// Gets all pods for a deployment
+func getPodsByDeployment(ctx context.Context, deploymentName, namespace string) ([]*Pod, error) {
+	// First, get all ReplicaSets owned by this Deployment
+	replicasets, err := GetReplicaSetsByDeployment(ctx, deploymentName, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get replicasets for deployment: %w", err)
+	}
+
+	if len(replicasets) == 0 {
+		return []*Pod{}, nil
+	}
+
+	// Collect all pods owned by these ReplicaSets
+	allPods := make([]*Pod, 0)
+	for _, rs := range replicasets {
+		pods, err := GetPodsByWorkload(ctx, "ReplicaSet", rs.Name, namespace)
+		if err != nil {
+			continue
+		}
+		allPods = append(allPods, pods...)
+	}
+
+	return allPods, nil
 }
