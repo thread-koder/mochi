@@ -5,10 +5,14 @@ import (
 	"github.com/thread_koder/mochi/internal/api/handlers"
 	computeHandlers "github.com/thread_koder/mochi/internal/api/handlers/compute"
 	webHandlers "github.com/thread_koder/mochi/internal/api/handlers/web"
+	"github.com/thread_koder/mochi/internal/api/middleware"
+	"github.com/thread_koder/mochi/internal/config"
+	"github.com/thread_koder/mochi/internal/redis"
 )
 
 // Configures all API routes
 func setupRoutes(router *gin.Engine) {
+	cacheTTL := redis.GetDefaultTTL(&config.AppConfig.Redis)
 	// Health check endpoints
 	router.GET("/health", handlers.Health)
 	router.GET("/health/database", handlers.DatabaseHealth)
@@ -24,9 +28,13 @@ func setupRoutes(router *gin.Engine) {
 	v1 := router.Group("/api/v1")
 	{
 		// Cluster info
-		v1.GET("/cluster/info", handlers.ClusterInfo)
+		clusterInfoGroup := v1.Group("")
+		clusterInfoGroup.Use(middleware.CacheMiddleware(cacheTTL))
+		{
+			clusterInfoGroup.GET("/cluster/info", handlers.ClusterInfo)
+		}
 
-		// Web UI API endpoints
+		// Web UI API endpoints (no caching)
 		v1.GET("/stats", webHandlers.GetStats)
 		v1.GET("/activity", webHandlers.GetActivity)
 		v1.GET("/namespaces", webHandlers.GetNamespaces)
@@ -34,15 +42,25 @@ func setupRoutes(router *gin.Engine) {
 		// Compute domain
 		compute := v1.Group("/compute")
 		{
-			// Analysis endpoints
-			compute.GET("/analyze/namespaces/:namespace", computeHandlers.AnalyzeNamespace)
-			compute.GET("/analyze/workloads/:workloadType/:workloadName", computeHandlers.AnalyzeWorkload)
+			// Analysis endpoints (cached)
+			analysisGroup := compute.Group("")
+			analysisGroup.Use(middleware.CacheMiddleware(cacheTTL))
+			{
+				analysisGroup.GET("/analyze/namespaces/:namespace", computeHandlers.AnalyzeNamespace)
+				analysisGroup.GET("/analyze/workloads/:workloadType/:workloadName", computeHandlers.AnalyzeWorkload)
+			}
 
-			// Recommendation endpoints
+			// Recommendation endpoints (cached)
+			recommendationsGroup := compute.Group("")
+			recommendationsGroup.Use(middleware.CacheMiddleware(cacheTTL))
+			{
+				recommendationsGroup.GET("/recommendations", computeHandlers.GetRecommendations)
+				recommendationsGroup.GET("/recommendations/:id", computeHandlers.GetRecommendationByID)
+				recommendationsGroup.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestWorkloadRecommendation)
+			}
+
+			// POST endpoints (no caching)
 			compute.POST("/recommendations/generate/:workloadType/:workloadName", computeHandlers.GenerateRecommendations)
-			compute.GET("/recommendations", computeHandlers.GetRecommendations)
-			compute.GET("/recommendations/:id", computeHandlers.GetRecommendationByID)
-			compute.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestWorkloadRecommendation)
 			compute.POST("/recommendations/apply", computeHandlers.ApplyRecommendation)
 		}
 	}
