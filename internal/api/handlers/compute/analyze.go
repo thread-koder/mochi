@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,9 +15,12 @@ import (
 func AnalyzeNamespace(c *gin.Context) {
 	namespace := c.Param("namespace")
 	timeRangeStr := c.Query("timeRange")
+	includeTimeSeries := c.Query("includeTimeSeries") == "true"
+	includeWorkloads := c.Query("includeWorkloads") == "true"
 
 	// Parse analysis options
 	opts := compute.DefaultAnalysisOptions()
+	opts.IncludeTimeSeries = includeTimeSeries
 
 	if timeRangeStr != "" {
 		timeRange, err := parseTimeRange(timeRangeStr)
@@ -34,11 +36,11 @@ func AnalyzeNamespace(c *gin.Context) {
 	}
 
 	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	// Perform analysis
-	analysis, err := compute.AnalyzeNamespace(ctx, namespace, opts)
+	analysis, err := compute.AnalyzeNamespace(ctx, namespace, opts, includeWorkloads)
 	if err != nil {
 		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -53,20 +55,21 @@ func AnalyzeNamespace(c *gin.Context) {
 
 // Analyzes a workload (deployment, statefulset, daemonset, or standalone pod)
 func AnalyzeWorkload(c *gin.Context) {
-	workloadType := strings.ToLower(c.Param("workloadType"))
+	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
+	includeTimeSeries := c.Query("includeTimeSeries") == "true"
 	timeRangeStr := c.Query("timeRange")
 
 	// Validate workload type
 	validTypes := map[string]bool{
-		"deployment":  true,
-		"statefulset": true,
-		"daemonset":   true,
-		"pod":         true, // For standalone pods
+		"Deployment":  true,
+		"StatefulSet": true,
+		"DaemonSet":   true,
+		"Pod":         true, // For standalone pods
 	}
 	if !validTypes[workloadType] {
-		err := fmt.Errorf("workload type must be one of: deployment, statefulset, daemonset, pod")
+		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
 		c.Error(err)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "invalid workload type",
@@ -88,6 +91,7 @@ func AnalyzeWorkload(c *gin.Context) {
 
 	// Parse analysis options
 	opts := compute.DefaultAnalysisOptions()
+	opts.IncludeTimeSeries = includeTimeSeries
 	if timeRangeStr != "" {
 		timeRange, err := parseTimeRange(timeRangeStr)
 		if err != nil {
@@ -108,7 +112,7 @@ func AnalyzeWorkload(c *gin.Context) {
 	var pods []*database.Pod
 
 	// Handle standalone pods differently
-	if workloadType == "pod" {
+	if workloadType == "Pod" {
 		// Get the standalone pod by name
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
 		if err != nil {
@@ -120,10 +124,10 @@ func AnalyzeWorkload(c *gin.Context) {
 			return
 		}
 
-		// Validate it's actually a standalone pod (no owner)
-		if pod.OwnerKind != nil && *pod.OwnerKind != "" {
+		// Validate it's a standalone pod (no owner) or a system pod (Node-owned)
+		if pod.OwnerKind != nil && *pod.OwnerKind != "" && *pod.OwnerKind != "Node" {
 			err := fmt.Errorf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
-				workloadName, *pod.OwnerKind, *pod.OwnerName, strings.ToLower(*pod.OwnerKind))
+				workloadName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind)
 			c.Error(err)
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":   "pod belongs to a workload",
@@ -134,7 +138,7 @@ func AnalyzeWorkload(c *gin.Context) {
 
 		pods = []*database.Pod{pod}
 	} else {
-		// Get pods for this workload (deployment/statefulset/daemonset)
+		// Get pods for this workload (Deployment, StatefulSet, DaemonSet)
 		podsList, err := database.GetPodsByWorkload(ctx, workloadType, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
