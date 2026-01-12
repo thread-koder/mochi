@@ -27,13 +27,6 @@ func setupRoutes(router *gin.Engine) {
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
-		// Cluster info
-		clusterInfoGroup := v1.Group("")
-		clusterInfoGroup.Use(middleware.CacheMiddleware(cacheTTL))
-		{
-			clusterInfoGroup.GET("/cluster/info", handlers.ClusterInfo)
-		}
-
 		// Web UI API endpoints (no caching)
 		v1.GET("/stats", webHandlers.GetStats)
 		v1.GET("/activity", webHandlers.GetActivity)
