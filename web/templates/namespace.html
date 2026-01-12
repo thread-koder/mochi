@@ -1,0 +1,696 @@
+{{template "base.html" .}}
+
+{{define "namespace-content"}}
+<div class="p-8">
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h1 class="text-4xl font-bold mb-2">{{.Namespace.Name}}</h1>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-400">Namespace</span>
+                    {{if eq .Namespace.Phase "Active"}}
+                    <span class="px-3 py-1 rounded-full text-xs bg-green-500/20 text-green-400 border border-green-500/30">
+                        {{.Namespace.Phase}}
+                    </span>
+                    {{else}}
+                    <span class="px-3 py-1 rounded-full text-xs bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                        {{.Namespace.Phase}}
+                    </span>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div x-data="{ activeTab: 'overview', namespace: '{{.Namespace.Name}}' }" class="mb-6">
+        <div class="flex space-x-4 border-b border-purple-500/20">
+            <button @click="activeTab = 'overview'" 
+                    :class="activeTab === 'overview' ? 'px-4 py-2 border-b-2 border-purple-400 text-purple-400 font-semibold cursor-pointer' : 'px-4 py-2 text-gray-400 hover:text-gray-200 cursor-pointer'">
+                Overview
+            </button>
+            <button @click="activeTab = 'compute'" 
+                    :class="activeTab === 'compute' ? 'px-4 py-2 border-b-2 border-purple-400 text-purple-400 font-semibold cursor-pointer' : 'px-4 py-2 text-gray-400 hover:text-gray-200 cursor-pointer'">
+                Compute
+            </button>
+        </div>
+
+        <!-- Overview Tab -->
+        <div x-show="activeTab === 'overview'" x-transition class="mt-6">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="glass glass-card-hover rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-gray-400 text-sm">Workloads</h3>
+                        <span class="text-2xl">⚙️</span>
+                    </div>
+                    <p class="text-3xl font-bold text-purple-400" x-data="counter({{.Stats.Workloads}})" x-text="count">{{.Stats.Workloads}}</p>
+                </div>
+                
+                <div class="glass glass-card-hover rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-gray-400 text-sm">Pods</h3>
+                        <span class="text-2xl">🚀</span>
+                    </div>
+                    <p class="text-3xl font-bold text-cyan-400" x-data="counter({{.Stats.Pods}})" x-text="count">{{.Stats.Pods}}</p>
+                </div>
+                
+                <div class="glass glass-card-hover rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-gray-400 text-sm">Containers</h3>
+                        <span class="text-2xl">📦</span>
+                    </div>
+                    <p class="text-3xl font-bold text-pink-400" x-data="counter({{.Stats.Containers}})" x-text="count">{{.Stats.Containers}}</p>
+                </div>
+            </div>
+
+            <!-- Workloads List -->
+            <div class="glass rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Workloads</h2>
+                {{if .Workloads}}
+                <div class="space-y-2">
+                    {{range .Workloads}}
+                    <a href="/namespaces/{{$.Namespace.Name}}/workloads/{{.Type}}/{{.Name}}" 
+                       class="flex items-center space-x-4 glass glass-item-hover rounded-lg p-4 transition">
+                        <span class="px-2 py-1 rounded text-xs bg-purple-500/20 text-purple-400">
+                            {{.Type}}
+                        </span>
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-lg">{{.Name}}</h3>
+                            <div class="text-sm text-gray-400 mt-1">
+                                <span>Replicas: <span class="text-gray-200">{{.Ready}}/{{.Replicas}}</span></span>
+                                <span class="mx-2">•</span>
+                                <span>Created: <span class="text-gray-200">{{.CreatedAt}}</span></span>
+                            </div>
+                        </div>
+                    </a>
+                    {{end}}
+                </div>
+                {{else}}
+                <div class="text-gray-400 text-center py-8">No workloads found</div>
+                {{end}}
+            </div>
+
+            <!-- Standalone Pods -->
+            {{if .Standalone}}
+            <div class="glass rounded-xl p-6 mb-6">
+                <h2 class="text-2xl font-bold mb-4">Standalone Pods</h2>
+                <div class="space-y-2">
+                    {{range .Standalone}}
+                    <a href="/namespaces/{{$.Namespace.Name}}/workloads/pod/{{.Name}}" 
+                       class="flex items-center space-x-4 glass glass-item-hover rounded-lg p-4 transition">
+                        <span class="px-2 py-1 rounded text-xs bg-cyan-500/20 text-cyan-400">
+                            Pod
+                        </span>
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-lg">{{.Name}}</h3>
+                            <div class="text-sm text-gray-400 mt-1">
+                                <span>Phase: <span class="text-gray-200">{{.Phase}}</span></span>
+                                {{if .Node}}
+                                <span class="mx-2">•</span>
+                                <span>Node: <span class="text-gray-200">{{.Node}}</span></span>
+                                {{end}}
+                                <span class="mx-2">•</span>
+                                <span>Created: <span class="text-gray-200">{{.CreatedAt}}</span></span>
+                            </div>
+                        </div>
+                    </a>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+
+            <!-- System Pods -->
+            {{if .System}}
+            <div class="glass rounded-xl p-6">
+                <h2 class="text-2xl font-bold mb-4">System Pods</h2>
+                <div class="space-y-2">
+                    {{range .System}}
+                    <a href="/namespaces/{{$.Namespace.Name}}/workloads/pod/{{.Name}}" 
+                       class="flex items-center space-x-4 glass glass-item-hover rounded-lg p-4 transition">
+                        <span class="px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-400">
+                            System
+                        </span>
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-lg">{{.Name}}</h3>
+                            <div class="text-sm text-gray-400 mt-1">
+                                <span>Phase: <span class="text-gray-200">{{.Phase}}</span></span>
+                                {{if .Node}}
+                                <span class="mx-2">•</span>
+                                <span>Node: <span class="text-gray-200">{{.Node}}</span></span>
+                                {{end}}
+                                <span class="mx-2">•</span>
+                                <span>Created: <span class="text-gray-200">{{.CreatedAt}}</span></span>
+                            </div>
+                        </div>
+                    </a>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Compute Tab -->
+        <template x-if="activeTab === 'compute'">
+            <div x-transition class="mt-6">
+                <div x-data="compute(namespace)" x-init="loadAnalysis()">
+                <!-- Time Range Selector -->
+                <div class="glass rounded-xl p-4 mb-6">
+                    <div class="flex items-center justify-between flex-wrap gap-4">
+                        <label class="text-sm text-gray-400">Analysis Time Range:</label>
+                        <div class="flex items-center gap-2">
+                            <select x-model="timeRange" @change="handleTimeRangeChange()" x-ref="timeRangeSelect" 
+                                    class="bg-[var(--color-bg-secondary)] border border-purple-500/20 rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:border-purple-500/50">
+                                <option value="1h">Last Hour</option>
+                                <option value="6h">Last 6 Hours</option>
+                                <option value="12h">Last 12 Hours</option>
+                                <option value="24h" selected>Last 24 Hours</option>
+                                <option value="3d">Last 3 Days</option>
+                                <option value="7d">Last 7 Days</option>
+                                <option value="30d">Last 30 Days</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                            <div x-show="timeRange === 'custom'" class="flex items-center gap-2">
+                                <input type="text" x-model="customTimeRange" placeholder="e.g., 2h, 48h, 5d" 
+                                       class="bg-[var(--color-bg-secondary)] border border-purple-500/20 rounded-lg px-3 py-2 text-gray-200 focus:outline-none focus:border-purple-500/50 w-32"
+                                       @keyup.enter="applyCustomTimeRange()">
+                                <button @click="applyCustomTimeRange()" 
+                                        class="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-lg transition">
+                                    Apply
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="loading" class="text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
+                    <p class="mt-4 text-gray-400">Analyzing namespace...</p>
+                </div>
+                
+                <div x-show="error" class="glass rounded-xl p-6 mb-6">
+                    <div class="text-red-400">
+                        <p class="font-semibold mb-2">Error</p>
+                        <p x-text="error"></p>
+                    </div>
+                </div>
+
+                <div x-show="!loading && !error && analysis" class="space-y-6">
+                    <!-- Summary Metrics -->
+                    <div class="glass rounded-xl p-6">
+                        <h2 class="text-2xl font-bold mb-4">Summary</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- CPU Metrics -->
+                            <div class="space-y-3">
+                                <p class="text-base text-gray-400 font-medium">CPU Utilization</p>
+                                <div>
+                                    <p class="text-sm text-gray-500 mb-1">Current</p>
+                                    <p class="text-2xl font-bold text-purple-400" x-text="formatCPU(analysis?.utilization?.cpu?.current)"></p>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <p class="text-gray-500 mb-1">Mean</p>
+                                        <p class="text-purple-300 font-medium" x-text="formatCPU(analysis?.utilization?.cpu?.stats?.mean)"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 mb-1">Median</p>
+                                        <p class="text-purple-300 font-medium" x-text="formatCPU(analysis?.utilization?.cpu?.stats?.median)"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 mb-1">P95</p>
+                                        <p class="text-purple-300 font-medium" x-text="formatCPU(analysis?.utilization?.cpu?.stats?.percentile?.p95)"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 mb-1">Max</p>
+                                        <p class="text-purple-300 font-medium" x-text="formatCPU(analysis?.utilization?.cpu?.stats?.max)"></p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 pt-2">
+                                    <span class="text-sm text-gray-500">Trend:</span>
+                                    <span x-show="analysis?.utilization?.cpu?.trend?.direction === 'increasing'" class="text-sm text-red-400">↗ Increasing</span>
+                                    <span x-show="analysis?.utilization?.cpu?.trend?.direction === 'decreasing'" class="text-sm text-green-400">↘ Decreasing</span>
+                                    <span x-show="analysis?.utilization?.cpu?.trend?.direction === 'stable'" class="text-sm text-gray-400">→ Stable</span>
+                                </div>
+                                <div x-show="analysis?.utilization?.cpu?.anomalies?.anomaly_count > 0" class="flex items-center gap-2">
+                                    <span class="text-sm text-gray-500">Anomalies:</span>
+                                    <span class="text-sm bg-red-500/20 text-red-400 px-2 py-1 rounded" 
+                                          x-text="analysis?.utilization?.cpu?.anomalies?.anomaly_count + ' detected'"></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Memory Metrics -->
+                            <div class="space-y-3">
+                                <p class="text-base text-gray-400 font-medium">Memory Utilization</p>
+                                <div>
+                                    <p class="text-sm text-gray-500 mb-1">Current</p>
+                                    <p class="text-2xl font-bold text-cyan-400" x-text="formatBytes(analysis?.utilization?.memory?.current)"></p>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <p class="text-gray-500 mb-1">Mean</p>
+                                        <p class="text-cyan-300 font-medium" x-text="formatBytes(analysis?.utilization?.memory?.stats?.mean)"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 mb-1">Median</p>
+                                        <p class="text-cyan-300 font-medium" x-text="formatBytes(analysis?.utilization?.memory?.stats?.median)"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 mb-1">P95</p>
+                                        <p class="text-cyan-300 font-medium" x-text="formatBytes(analysis?.utilization?.memory?.stats?.percentile?.p95)"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-gray-500 mb-1">Max</p>
+                                        <p class="text-cyan-300 font-medium" x-text="formatBytes(analysis?.utilization?.memory?.stats?.max)"></p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 pt-2">
+                                    <span class="text-sm text-gray-500">Trend:</span>
+                                    <span x-show="analysis?.utilization?.memory?.trend?.direction === 'increasing'" class="text-sm text-red-400">↗ Increasing</span>
+                                    <span x-show="analysis?.utilization?.memory?.trend?.direction === 'decreasing'" class="text-sm text-green-400">↘ Decreasing</span>
+                                    <span x-show="analysis?.utilization?.memory?.trend?.direction === 'stable'" class="text-sm text-gray-400">→ Stable</span>
+                                </div>
+                                <div x-show="analysis?.utilization?.memory?.anomalies?.anomaly_count > 0" class="flex items-center gap-2">
+                                    <span class="text-sm text-gray-500">Anomalies:</span>
+                                    <span class="text-sm bg-red-500/20 text-red-400 px-2 py-1 rounded" 
+                                          x-text="analysis?.utilization?.memory?.anomalies?.anomaly_count + ' detected'"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Resource Utilization Charts -->
+                    <div x-show="analysis?.time_series" class="glass rounded-xl p-6">
+                        <h2 class="text-2xl font-bold mb-4">Resource Utilization</h2>
+                        <div class="space-y-6">
+                            <!-- CPU Chart -->
+                            <div>
+                                <h3 class="text-lg font-semibold mb-2 text-purple-400">CPU Utilization Over Time</h3>
+                                <div class="h-80 relative">
+                                    <canvas x-ref="cpuChart" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                            <!-- Memory Chart -->
+                            <div>
+                                <h3 class="text-lg font-semibold mb-2 text-cyan-400">Memory Utilization Over Time</h3>
+                                <div class="h-80 relative">
+                                    <canvas x-ref="memoryChart" class="w-full h-full"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top Workloads -->
+                    <div x-show="analysis?.workloads && analysis.workloads.length > 0" class="glass rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-2xl font-bold">Top Workloads by Usage</h2>
+                            <div class="flex items-center gap-2">
+                                <select x-model="workloadSortMetric" @change="sortWorkloads()" 
+                                        class="bg-[var(--color-bg-secondary)] border border-purple-500/20 rounded-lg px-3 py-1 text-sm text-gray-200 focus:outline-none focus:border-purple-500/50">
+                                    <option value="current">Current</option>
+                                    <option value="p95">P95</option>
+                                    <option value="mean">Mean</option>
+                                    <option value="max">Max</option>
+                                </select>
+                                <select x-model="workloadSortResource" @change="sortWorkloads()" 
+                                        class="bg-[var(--color-bg-secondary)] border border-purple-500/20 rounded-lg px-3 py-1 text-sm text-gray-200 focus:outline-none focus:border-purple-500/50">
+                                    <option value="cpu">CPU</option>
+                                    <option value="memory">Memory</option>
+                                </select>
+                                <select x-model="workloadFilterType" @change="filterWorkloads()" 
+                                        class="bg-[var(--color-bg-secondary)] border border-purple-500/20 rounded-lg px-3 py-1 text-sm text-gray-200 focus:outline-none focus:border-purple-500/50">
+                                    <option value="all">All Types</option>
+                                    <option value="deployment">Deployment</option>
+                                    <option value="statefulset">StatefulSet</option>
+                                    <option value="daemonset">DaemonSet</option>
+                                    <option value="pod">Pod</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-purple-500/20">
+                                        <th class="text-left py-2 px-4 text-sm text-gray-400">Workload</th>
+                                        <th class="text-left py-2 px-4 text-sm text-gray-400">Type</th>
+                                        <th class="text-right py-2 px-4 text-sm text-gray-400">Current</th>
+                                        <th class="text-right py-2 px-4 text-sm text-gray-400">P95</th>
+                                        <th class="text-right py-2 px-4 text-sm text-gray-400">Mean</th>
+                                        <th class="text-right py-2 px-4 text-sm text-gray-400">Max</th>
+                                        <th class="text-center py-2 px-4 text-sm text-gray-400">Trend</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-if="filteredWorkloads.length === 0">
+                                        <tr>
+                                            <td colspan="7" class="py-8 px-4 text-center text-gray-400">
+                                                No workloads found
+                                                <span x-show="workloadFilterType !== 'all'">
+                                                    for type: <span class="text-purple-400 capitalize" x-text="workloadFilterType"></span>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <template x-for="workload in filteredWorkloads" :key="workload.workload_name">
+                                        <tr class="border-b border-purple-500/10 hover:bg-purple-500/5 transition">
+                                            <td class="py-3 px-4">
+                                                <a :href="`/namespaces/${namespace}/workloads/${workload.workload_type}/${workload.workload_name}`" 
+                                                   class="text-purple-400 hover:text-purple-300 font-semibold text-sm">
+                                                    <span x-text="workload.workload_name"></span>
+                                                </a>
+                                            </td>
+                                            <td class="py-3 px-4">
+                                                <span class="px-2 py-1 rounded text-xs bg-purple-500/20 text-purple-400" 
+                                                      x-text="workload.workload_type"></span>
+                                            </td>
+                                            <td class="py-3 px-4 text-right">
+                                                <div class="text-sm">
+                                                    <div class="text-purple-400" x-text="formatCPU(workload.utilization.cpu.current)"></div>
+                                                    <div class="text-cyan-400 text-sm" x-text="formatBytes(workload.utilization.memory.current)"></div>
+                                                </div>
+                                            </td>
+                                            <td class="py-3 px-4 text-right">
+                                                <div class="text-sm">
+                                                    <div class="text-purple-400" x-text="formatCPU(workload.utilization.cpu.stats.percentile.p95)"></div>
+                                                    <div class="text-cyan-400 text-sm" x-text="formatBytes(workload.utilization.memory.stats.percentile.p95)"></div>
+                                                </div>
+                                            </td>
+                                            <td class="py-3 px-4 text-right">
+                                                <div class="text-sm">
+                                                    <div class="text-purple-400" x-text="formatCPU(workload.utilization.cpu.stats.mean)"></div>
+                                                    <div class="text-cyan-400 text-sm" x-text="formatBytes(workload.utilization.memory.stats.mean)"></div>
+                                                </div>
+                                            </td>
+                                            <td class="py-3 px-4 text-right">
+                                                <div class="text-sm">
+                                                    <div class="text-purple-400" x-text="formatCPU(workload.utilization.cpu.stats.max)"></div>
+                                                    <div class="text-cyan-400 text-sm" x-text="formatBytes(workload.utilization.memory.stats.max)"></div>
+                                                </div>
+                                            </td>
+                                            <td class="py-3 px-4 text-center">
+                                                <span x-show="workload.utilization.cpu.trend.direction === 'increasing'" class="text-xs text-red-400">↗</span>
+                                                <span x-show="workload.utilization.cpu.trend.direction === 'decreasing'" class="text-xs text-green-400">↘</span>
+                                                <span x-show="workload.utilization.cpu.trend.direction === 'stable'" class="text-xs text-gray-400">→</span>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+
+<script>
+    // Compute tab component
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('compute', (namespace) => ({
+            namespace: namespace,
+            timeRange: '24h',
+            customTimeRange: '',
+            loading: false,
+            error: null,
+            analysis: null,
+            cpuChart: null,
+            memoryChart: null,
+            workloadSortMetric: 'p95',
+            workloadSortResource: 'cpu',
+            workloadFilterType: 'all',
+            filteredWorkloads: [],
+            
+            init() {
+                // Watch for changes to customTimeRange and timeRange to update option text
+                this.$watch('customTimeRange', () => this.updateCustomOptionText());
+                this.$watch('timeRange', () => this.updateCustomOptionText());
+                this.$nextTick(() => this.updateCustomOptionText());
+            },
+            
+            async loadAnalysis() {
+                this.loading = true;
+                this.error = null;
+                this.analysis = null;
+                if (this.cpuChart) {
+                    this.cpuChart.destroy();
+                    this.cpuChart = null;
+                }
+                if (this.memoryChart) {
+                    this.memoryChart.destroy();
+                    this.memoryChart = null;
+                }
+                
+                try {
+                    const actualTimeRange = this.timeRange === 'custom' ? this.customTimeRange.trim() : this.timeRange;
+                    
+                    // Include time series and workloads for the compute tab
+                    const url = `/api/v1/compute/analyze/namespaces/${this.namespace}?timeRange=${actualTimeRange}&includeTimeSeries=true&includeWorkloads=true`;
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(await parseErrorResponse(response, 'Failed to analyze namespace'));
+                    }
+                    this.analysis = await response.json();
+                    
+                    // Initialize charts if time series data is available
+                    this.$nextTick(() => {
+                        if (this.analysis?.time_series) {
+                            this.initCharts();
+                        }
+                    });
+                    
+                    // Initialize workload filtering and sorting
+                    if (this.analysis?.workloads) {
+                        this.filteredWorkloads = [...this.analysis.workloads];
+                        this.sortWorkloads();
+                    }
+                } catch (err) {
+                    this.error = err.message;
+                } finally {
+                    this.loading = false;
+                }
+            },
+            
+            updateCustomOptionText() {
+                // Update the "Custom" option text to show the custom value
+                this.$nextTick(() => {
+                    if (this.$refs.timeRangeSelect) {
+                        const customOption = this.$refs.timeRangeSelect.querySelector('option[value="custom"]');
+                        if (customOption) {
+                            if (this.customTimeRange.trim()) {
+                                customOption.textContent = `Custom (${this.customTimeRange.trim()})`;
+                            } else {
+                                customOption.textContent = 'Custom';
+                            }
+                        }
+                    }
+                });
+            },
+            
+            handleTimeRangeChange() {
+                if (this.timeRange !== 'custom') {
+                    // Reset custom time range when selecting a predefined option
+                    this.customTimeRange = '';
+                    this.updateCustomOptionText();
+                    this.loadAnalysis();
+                }
+            },
+            
+            applyCustomTimeRange() {
+                if (this.customTimeRange.trim()) {
+                    this.timeRange = 'custom';
+                    this.loadAnalysis();
+                }
+            },
+            
+            initCharts() {
+                if (!this.analysis?.time_series) return;
+                
+                const timeSeries = this.analysis.time_series;
+                
+                // CPU Chart
+                if (timeSeries.cpu && timeSeries.cpu.length > 0 && this.$refs.cpuChart) {
+                    const ctx = this.$refs.cpuChart.getContext('2d');
+                    const labels = timeSeries.cpu.map(dp => new Date(dp.timestamp).toLocaleTimeString());
+                    const data = timeSeries.cpu.map(dp => dp.value);
+                    
+                    const maxValue = Math.max(...data);
+                    const useMillicores = maxValue < 1;
+                    
+                    this.cpuChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: useMillicores ? 'CPU Utilization (millicores)' : 'CPU Utilization (cores)',
+                                data: data,
+                                borderColor: 'rgb(168, 85, 247)',
+                                backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    labels: { color: '#a0a0a0' }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: (context) => {
+                                            return this.formatCPU(context.parsed.y);
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: { color: '#a0a0a0' },
+                                    grid: { color: 'rgba(168, 85, 247, 0.1)' }
+                                },
+                                y: {
+                                    ticks: { 
+                                        color: '#a0a0a0',
+                                        callback: (value) => {
+                                            return this.formatCPU(value);
+                                        }
+                                    },
+                                    grid: { color: 'rgba(168, 85, 247, 0.1)' },
+                                    title: {
+                                        display: true,
+                                        text: useMillicores ? 'CPU (millicores)' : 'CPU (cores)',
+                                        color: '#a0a0a0'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                // Memory Chart
+                if (timeSeries.memory && timeSeries.memory.length > 0 && this.$refs.memoryChart) {
+                    const ctx = this.$refs.memoryChart.getContext('2d');
+                    const labels = timeSeries.memory.map(dp => new Date(dp.timestamp).toLocaleTimeString());
+                    const data = timeSeries.memory.map(dp => dp.value);
+                    
+                    this.memoryChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Memory Utilization',
+                                data: data,
+                                borderColor: 'rgb(34, 211, 238)',
+                                backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    labels: { color: '#a0a0a0' }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: (context) => {
+                                            return this.formatBytes(context.parsed.y);
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: { color: '#a0a0a0' },
+                                    grid: { color: 'rgba(34, 211, 238, 0.1)' }
+                                },
+                                y: {
+                                    ticks: { 
+                                        color: '#a0a0a0',
+                                        callback: (value) => this.formatBytes(value)
+                                    },
+                                    grid: { color: 'rgba(34, 211, 238, 0.1)' },
+                                    title: {
+                                        display: true,
+                                        text: 'Memory',
+                                        color: '#a0a0a0'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            },
+            
+            sortWorkloads() {
+                if (!this.analysis?.workloads) return;
+                
+                this.filteredWorkloads.sort((a, b) => {
+                    let aValue, bValue;
+                    const resource = this.workloadSortResource === 'cpu' ? 'cpu' : 'memory';
+                    
+                    if (this.workloadSortMetric === 'current') {
+                        aValue = a.utilization[resource].current;
+                        bValue = b.utilization[resource].current;
+                    } else if (this.workloadSortMetric === 'p95') {
+                        aValue = a.utilization[resource].stats.percentile.p95;
+                        bValue = b.utilization[resource].stats.percentile.p95;
+                    } else if (this.workloadSortMetric === 'mean') {
+                        aValue = a.utilization[resource].stats.mean;
+                        bValue = b.utilization[resource].stats.mean;
+                    } else if (this.workloadSortMetric === 'max') {
+                        aValue = a.utilization[resource].stats.max;
+                        bValue = b.utilization[resource].stats.max;
+                    }
+                    
+                    return (bValue || 0) - (aValue || 0); // Descending order
+                });
+            },
+            
+            filterWorkloads() {
+                if (!this.analysis?.workloads) return;
+                
+                if (this.workloadFilterType === 'all') {
+                    this.filteredWorkloads = [...this.analysis.workloads];
+                } else {
+                    this.filteredWorkloads = this.analysis.workloads.filter(
+                        w => w.workload_type.toLowerCase() === this.workloadFilterType.toLowerCase()
+                    );
+                }
+                this.sortWorkloads();
+            },
+            
+            formatCPU(value) {
+                if (value === null || value === undefined) return 'N/A';
+                
+                // Convert to millicores (1 core = 1000m)
+                const millicores = value * 1000;
+                
+                // If less than 1 core, show in millicores
+                if (value < 1) {
+                    return Math.round(millicores) + 'm';
+                }
+                
+                // Otherwise show in cores with 2 decimal places
+                return value.toFixed(2) + ' cores';
+            },
+            
+            formatBytes(value) {
+                if (value === null || value === undefined) return 'N/A';
+                const bytes = value;
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        }));
+    });
+</script>
+{{end}}

@@ -18,6 +18,7 @@ func setupRoutes(router *gin.Engine) {
 
 	// Web UI routes
 	router.GET("/", webHandlers.Home)
+	router.GET("/namespaces/:namespace", webHandlers.Namespace)
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
