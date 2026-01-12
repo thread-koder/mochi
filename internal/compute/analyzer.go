@@ -14,10 +14,9 @@ import (
 
 // Holds configuration for analysis
 type AnalysisOptions struct {
-	TimeRange time.Duration // How far back to analyze (default: 24h)
-	RangeStep time.Duration // Step size for range queries (default: 1m)
-	UseCache  bool          // Whether to use Prometheus query cache
-	CacheTTL  time.Duration // Cache TTL if UseCache is true
+	TimeRange         time.Duration // How far back to analyze (default: 24h)
+	RangeStep         time.Duration // Step size for range queries (default: 1m)
+	IncludeTimeSeries bool          // Whether to include raw datapoints for charting
 }
 
 // Returns default analysis options
@@ -25,8 +24,6 @@ func DefaultAnalysisOptions() AnalysisOptions {
 	return AnalysisOptions{
 		TimeRange: 24 * time.Hour,
 		RangeStep: 1 * time.Minute,
-		UseCache:  true,
-		CacheTTL:  5 * time.Minute,
 	}
 }
 
@@ -67,8 +64,10 @@ type WorkloadAnalysis struct {
 
 // Represents analysis results for a namespace
 type NamespaceAnalysis struct {
-	Namespace   string            `json:"namespace"`
-	Utilization UtilizationResult `json:"utilization"` // Aggregated from all workloads/pods
+	Namespace   string             `json:"namespace"`
+	Utilization UtilizationResult  `json:"utilization"`           // Aggregated from all workloads/pods
+	TimeSeries  *ResourceMetrics   `json:"time_series,omitempty"` // Optional: raw datapoints for charting
+	Workloads   []WorkloadAnalysis `json:"workloads,omitempty"`   // Optional: individual workload analyses
 }
 
 // Analyzes a single container's resource utilization and provisioning
@@ -216,7 +215,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 }
 
 // Analyzes a namespace
-func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOptions) (NamespaceAnalysis, error) {
+func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOptions, includeWorkloads bool) (NamespaceAnalysis, error) {
 	// Validate options
 	if err := opts.Validate(); err != nil {
 		return NamespaceAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
@@ -239,10 +238,119 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 		return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace utilization: %w", err)
 	}
 
-	return NamespaceAnalysis{
+	result := NamespaceAnalysis{
 		Namespace:   namespace,
 		Utilization: utilization,
-	}, nil
+	}
+
+	// Include time series if requested
+	if opts.IncludeTimeSeries {
+		result.TimeSeries = &metrics
+	}
+
+	// Include workloads if requested
+	if includeWorkloads {
+		// No time series for workloads
+		workloadOpts := opts
+		workloadOpts.IncludeTimeSeries = false
+		workloads, err := analyzeNamespaceWorkloads(ctx, namespace, workloadOpts)
+		if err != nil {
+			return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace workloads: %w", err)
+		}
+		result.Workloads = workloads
+	}
+
+	return result, nil
+}
+
+// Analyzes all workloads in a namespace
+func analyzeNamespaceWorkloads(ctx context.Context, namespace string, opts AnalysisOptions) ([]WorkloadAnalysis, error) {
+	workloads := make([]WorkloadAnalysis, 0)
+
+	// Get all deployments
+	deployments, err := database.GetDeploymentsByNamespace(ctx, namespace)
+	if err == nil {
+		for _, dep := range deployments {
+			pods, err := database.GetPodsByWorkload(ctx, "Deployment", dep.Name, namespace)
+			if err != nil {
+				continue
+			}
+			if len(pods) == 0 {
+				continue
+			}
+			analysis, err := AnalyzeWorkload(ctx, "Deployment", dep.Name, namespace, pods, opts)
+			if err != nil {
+				continue
+			}
+			workloads = append(workloads, analysis)
+		}
+	}
+
+	// Get all statefulsets
+	statefulsets, err := database.GetStatefulSetsByNamespace(ctx, namespace)
+	if err == nil {
+		for _, sts := range statefulsets {
+			pods, err := database.GetPodsByWorkload(ctx, "StatefulSet", sts.Name, namespace)
+			if err != nil {
+				continue
+			}
+			if len(pods) == 0 {
+				continue
+			}
+			analysis, err := AnalyzeWorkload(ctx, "StatefulSet", sts.Name, namespace, pods, opts)
+			if err != nil {
+				continue
+			}
+			workloads = append(workloads, analysis)
+		}
+	}
+
+	// Get all daemonsets
+	daemonsets, err := database.GetDaemonSetsByNamespace(ctx, namespace)
+	if err == nil {
+		for _, ds := range daemonsets {
+			pods, err := database.GetPodsByWorkload(ctx, "DaemonSet", ds.Name, namespace)
+			if err != nil {
+				continue
+			}
+			if len(pods) == 0 {
+				continue
+			}
+			analysis, err := AnalyzeWorkload(ctx, "DaemonSet", ds.Name, namespace, pods, opts)
+			if err != nil {
+				continue
+			}
+			workloads = append(workloads, analysis)
+		}
+	}
+
+	// Get standalone pods
+	standalonePods, err := database.GetStandalonePodsByNamespace(ctx, namespace)
+	if err == nil {
+		for _, pod := range standalonePods {
+			pods := []*database.Pod{pod}
+			analysis, err := AnalyzeWorkload(ctx, "Pod", pod.Name, namespace, pods, opts)
+			if err != nil {
+				continue
+			}
+			workloads = append(workloads, analysis)
+		}
+	}
+
+	// Get system pods
+	systemPods, err := database.GetPodsByOwnerKind(ctx, "Node", namespace)
+	if err == nil {
+		for _, pod := range systemPods {
+			pods := []*database.Pod{pod}
+			analysis, err := AnalyzeWorkload(ctx, "Pod", pod.Name, namespace, pods, opts)
+			if err != nil {
+				continue
+			}
+			workloads = append(workloads, analysis)
+		}
+	}
+
+	return workloads, nil
 }
 
 // Fetches container metrics
@@ -261,8 +369,6 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		Namespace:     container.Namespace,
 		Pod:           container.PodName,
 		Container:     container.Name,
-		UseCache:      opts.UseCache,
-		CacheTTL:      opts.CacheTTL,
 		RangeDuration: "5m",
 	})
 	if err != nil {
@@ -274,8 +380,6 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		Namespace: container.Namespace,
 		Pod:       container.PodName,
 		Container: container.Name,
-		UseCache:  opts.UseCache,
-		CacheTTL:  opts.CacheTTL,
 	})
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query memory metrics: %w", err)
@@ -302,8 +406,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	cpuMatrix, _, err := prometheus.QueryPodCPURange(ctx, r, prometheus.QueryOptions{
 		Namespace:     pod.Namespace,
 		Pod:           pod.Name,
-		UseCache:      opts.UseCache,
-		CacheTTL:      opts.CacheTTL,
 		RangeDuration: "5m",
 	})
 	if err != nil {
@@ -317,8 +419,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	memoryMatrix, _, err := prometheus.QueryPodMemoryRange(ctx, r, prometheus.QueryOptions{
 		Namespace: pod.Namespace,
 		Pod:       pod.Name,
-		UseCache:  opts.UseCache,
-		CacheTTL:  opts.CacheTTL,
 	})
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query pod memory metrics: %w", err)
@@ -352,8 +452,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		cpuMatrix, _, err := prometheus.QueryPodCPURange(ctx, r, prometheus.QueryOptions{
 			Namespace:     pod.Namespace,
 			Pod:           pod.Name,
-			UseCache:      opts.UseCache,
-			CacheTTL:      opts.CacheTTL,
 			RangeDuration: "5m",
 		})
 		if err != nil {
@@ -369,8 +467,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		memoryMatrix, _, err := prometheus.QueryPodMemoryRange(ctx, r, prometheus.QueryOptions{
 			Namespace: pod.Namespace,
 			Pod:       pod.Name,
-			UseCache:  opts.UseCache,
-			CacheTTL:  opts.CacheTTL,
 		})
 		if err != nil {
 			return ResourceMetrics{}, fmt.Errorf("failed to query pod memory metrics: %w", err)
@@ -400,8 +496,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	// Query CPU metrics
 	cpuMatrix, _, err := prometheus.QueryNamespaceCPURange(ctx, r, prometheus.QueryOptions{
 		Namespace:     namespace,
-		UseCache:      opts.UseCache,
-		CacheTTL:      opts.CacheTTL,
 		RangeDuration: "5m",
 	})
 	if err != nil {
@@ -411,8 +505,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	// Query memory metrics
 	memoryMatrix, _, err := prometheus.QueryNamespaceMemoryRange(ctx, r, prometheus.QueryOptions{
 		Namespace: namespace,
-		UseCache:  opts.UseCache,
-		CacheTTL:  opts.CacheTTL,
 	})
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query namespace memory metrics: %w", err)
