@@ -21,9 +21,39 @@ type AnalysisOptions struct {
 
 // Returns default analysis options
 func DefaultAnalysisOptions() AnalysisOptions {
-	return AnalysisOptions{
+	opts := AnalysisOptions{
 		TimeRange: 24 * time.Hour,
 		RangeStep: 1 * time.Minute,
+	}
+	opts.SetTimeRange(opts.TimeRange)
+	return opts
+}
+
+// Sets the time range and adjusts the step size to respect Prometheus limits
+func (opts *AnalysisOptions) SetTimeRange(timeRange time.Duration) {
+	opts.TimeRange = timeRange
+	const maxPoints = 11000
+
+	// Calculate minimum step needed
+	totalMinutes := timeRange.Minutes()
+	minStepMinutes := totalMinutes / maxPoints
+
+	// Round up to next reasonable interval
+	if minStepMinutes <= 1 {
+		opts.RangeStep = 1 * time.Minute
+	} else if minStepMinutes <= 5 {
+		opts.RangeStep = 5 * time.Minute
+	} else if minStepMinutes <= 15 {
+		opts.RangeStep = 15 * time.Minute
+	} else if minStepMinutes <= 30 {
+		opts.RangeStep = 30 * time.Minute
+	} else if minStepMinutes <= 60 {
+		opts.RangeStep = 1 * time.Hour
+	} else if minStepMinutes <= 240 {
+		opts.RangeStep = 4 * time.Hour
+	} else {
+		// For very long ranges, use 6-hour steps
+		opts.RangeStep = 6 * time.Hour
 	}
 }
 

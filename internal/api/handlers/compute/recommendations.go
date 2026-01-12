@@ -60,7 +60,7 @@ func GenerateRecommendations(c *gin.Context) {
 			})
 			return
 		}
-		analysisOpts.TimeRange = timeRange
+		analysisOpts.SetTimeRange(timeRange)
 	}
 
 	// Parse recommendation config

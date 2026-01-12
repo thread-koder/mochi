@@ -32,7 +32,7 @@ func AnalyzeNamespace(c *gin.Context) {
 			})
 			return
 		}
-		opts.TimeRange = timeRange
+		opts.SetTimeRange(timeRange)
 	}
 
 	// Create context with timeout
@@ -102,7 +102,7 @@ func AnalyzeWorkload(c *gin.Context) {
 			})
 			return
 		}
-		opts.TimeRange = timeRange
+		opts.SetTimeRange(timeRange)
 	}
 
 	// Create context with timeout
