@@ -43,7 +43,7 @@
                 <div class="glass glass-card-hover rounded-xl p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-gray-400 text-sm">Workloads</h3>
-                        <span class="text-2xl">⚙️</span>
+                        <iconify-icon icon="lucide:server" class="text-2xl"></iconify-icon>
                     </div>
                     <p class="text-3xl font-bold text-purple-400" x-data="counter({{.Stats.Workloads}})" x-text="count">{{.Stats.Workloads}}</p>
                 </div>
@@ -51,7 +51,7 @@
                 <div class="glass glass-card-hover rounded-xl p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-gray-400 text-sm">Pods</h3>
-                        <span class="text-2xl">🚀</span>
+                        <iconify-icon icon="lucide:rocket" class="text-2xl"></iconify-icon>
                     </div>
                     <p class="text-3xl font-bold text-cyan-400" x-data="counter({{.Stats.Pods}})" x-text="count">{{.Stats.Pods}}</p>
                 </div>
@@ -59,7 +59,7 @@
                 <div class="glass glass-card-hover rounded-xl p-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-gray-400 text-sm">Containers</h3>
-                        <span class="text-2xl">📦</span>
+                        <iconify-icon icon="lucide:container" class="text-2xl"></iconify-icon>
                     </div>
                     <p class="text-3xl font-bold text-pink-400" x-data="counter({{.Stats.Containers}})" x-text="count">{{.Stats.Containers}}</p>
                 </div>
@@ -228,9 +228,18 @@
                                     </div>
                                     <div class="flex items-center gap-2 pt-2">
                                         <span class="text-sm text-gray-500">Trend:</span>
-                                        <span x-show="utilization?.cpu?.trend?.direction === 'increasing'" class="text-sm text-red-400">↗ Increasing</span>
-                                        <span x-show="utilization?.cpu?.trend?.direction === 'decreasing'" class="text-sm text-green-400">↘ Decreasing</span>
-                                        <span x-show="utilization?.cpu?.trend?.direction === 'stable'" class="text-sm text-gray-400">→ Stable</span>
+                                        <span x-show="utilization?.cpu?.trend?.direction === 'increasing'" class="flex items-center gap-1 text-sm text-red-400">
+                                            <iconify-icon icon="lucide:trending-up" class="text-base"></iconify-icon>
+                                            <span>Increasing</span>
+                                        </span>
+                                        <span x-show="utilization?.cpu?.trend?.direction === 'decreasing'" class="flex items-center gap-1 text-sm text-green-400">
+                                            <iconify-icon icon="lucide:trending-down" class="text-base"></iconify-icon>
+                                            <span>Decreasing</span>
+                                        </span>
+                                        <span x-show="utilization?.cpu?.trend?.direction === 'stable'" class="flex items-center gap-1 text-sm text-gray-400">
+                                            <iconify-icon icon="lucide:arrow-right" class="text-base"></iconify-icon>
+                                            <span>Stable</span>
+                                        </span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <span class="text-sm text-gray-500">Anomalies:</span>
@@ -269,9 +278,18 @@
                                     </div>
                                     <div class="flex items-center gap-2 pt-2">
                                         <span class="text-sm text-gray-500">Trend:</span>
-                                        <span x-show="utilization?.memory?.trend?.direction === 'increasing'" class="text-sm text-red-400">↗ Increasing</span>
-                                        <span x-show="utilization?.memory?.trend?.direction === 'decreasing'" class="text-sm text-green-400">↘ Decreasing</span>
-                                        <span x-show="utilization?.memory?.trend?.direction === 'stable'" class="text-sm text-gray-400">→ Stable</span>
+                                        <span x-show="utilization?.memory?.trend?.direction === 'increasing'" class="flex items-center gap-1 text-sm text-red-400">
+                                            <iconify-icon icon="lucide:trending-up" class="text-base"></iconify-icon>
+                                            <span>Increasing</span>
+                                        </span>
+                                        <span x-show="utilization?.memory?.trend?.direction === 'decreasing'" class="flex items-center gap-1 text-sm text-green-400">
+                                            <iconify-icon icon="lucide:trending-down" class="text-base"></iconify-icon>
+                                            <span>Decreasing</span>
+                                        </span>
+                                        <span x-show="utilization?.memory?.trend?.direction === 'stable'" class="flex items-center gap-1 text-sm text-gray-400">
+                                            <iconify-icon icon="lucide:arrow-right" class="text-base"></iconify-icon>
+                                            <span>Stable</span>
+                                        </span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <span class="text-sm text-gray-500">Anomalies:</span>
@@ -394,18 +412,28 @@
                                                     </div>
                                                 </td>
                                                 <td class="py-3 px-4 text-center">
-                                                    <!-- Show CPU trend when sorting by CPU -->
-                                                    <template x-if="sortResource === 'cpu'">
-                                                        <span x-show="workload.utilization.cpu.trend.direction === 'increasing'" class="text-xs text-red-400">↗</span>
-                                                        <span x-show="workload.utilization.cpu.trend.direction === 'decreasing'" class="text-xs text-green-400">↘</span>
-                                                        <span x-show="workload.utilization.cpu.trend.direction === 'stable'" class="text-xs text-gray-400">→</span>
-                                                    </template>
-                                                    <!-- Show Memory trend when sorting by Memory -->
-                                                    <template x-if="sortResource === 'memory'">
-                                                        <span x-show="workload.utilization.memory.trend.direction === 'increasing'" class="text-xs text-red-400">↗</span>
-                                                        <span x-show="workload.utilization.memory.trend.direction === 'decreasing'" class="text-xs text-green-400">↘</span>
-                                                        <span x-show="workload.utilization.memory.trend.direction === 'stable'" class="text-xs text-gray-400">→</span>
-                                                    </template>
+                                                    <div class="flex flex-col items-center gap-1">
+                                                        <div>
+                                                            <span class="inline-flex items-center gap-1 text-xs text-purple-400">
+                                                                <span>CPU:</span>
+                                                                <iconify-icon icon="lucide:trending-up" x-show="workload.utilization.cpu.trend.direction === 'increasing'"
+                                                                    class="text-sm text-red-400"></iconify-icon>
+                                                                <iconify-icon icon="lucide:trending-down" x-show="workload.utilization.cpu.trend.direction === 'decreasing'"
+                                                                    class="text-sm text-green-400"></iconify-icon>
+                                                                <iconify-icon icon="lucide:arrow-right" x-show="workload.utilization.cpu.trend.direction === 'stable'" class="text-xs text-gray-400"></iconify-icon>
+                                                            </span>
+                                                        </div>
+                                                        <div>
+                                                            <span class="inline-flex items-center gap-1 text-sm text-cyan-400">
+                                                                <span>Mem:</span>
+                                                                <iconify-icon icon="lucide:trending-up" x-show="workload.utilization.memory.trend.direction === 'increasing'"
+                                                                    class="text-sm text-red-400"></iconify-icon>
+                                                                <iconify-icon icon="lucide:trending-down" x-show="workload.utilization.memory.trend.direction === 'decreasing'"
+                                                                    class="text-sm text-green-400"></iconify-icon>
+                                                                <iconify-icon icon="lucide:arrow-right" x-show="workload.utilization.memory.trend.direction === 'stable'" class="text-xs text-gray-400"></iconify-icon>
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </template>

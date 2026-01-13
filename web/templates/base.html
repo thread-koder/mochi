@@ -22,6 +22,9 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=jetbrains-mono:100,200,300,400,500,600,700,800" rel="stylesheet" />
+
+    <!-- Iconify -->
+    <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
     
     <!-- Custom Theme -->
     <style type="text/tailwindcss">
@@ -70,6 +73,13 @@
         .glass-item-hover:hover {
             background-color: rgba(139, 92, 246, 0.1) !important;
         }
+
+        /* Avoid layout shift */
+        iconify-icon {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+        }
         
         /* Transitions */
         * {
@@ -91,7 +101,7 @@
             <!-- Navigation -->
             <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
                 <a href="/" class="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-purple-500/10 {{if eq .Page "home"}}bg-purple-500/20{{end}}">
-                    <span>🏠</span>
+                    <iconify-icon icon="lucide:home" class="text-lg"></iconify-icon>
                     <span>Home</span>
                 </a>
                 
@@ -99,11 +109,11 @@
                 <div x-data="namespacesNavItems" class="space-y-2">
                     <button @click="open = !open; if (open) loadNamespaces()" class="flex items-center justify-between w-full px-4 py-2 rounded-lg hover:bg-purple-500/10 cursor-pointer">
                         <div class="flex items-center space-x-3">
-                            <span>📦</span>
+                            <iconify-icon icon="lucide:layers" class="text-lg"></iconify-icon>
                             <span>Namespaces</span>
                         </div>
-                        <span x-show="!open" x-cloak>▶</span>
-                        <span x-show="open" x-cloak>▼</span>
+                        <iconify-icon icon="lucide:chevron-right" x-show="!open" x-cloak class="text-base"></iconify-icon>
+                        <iconify-icon icon="lucide:chevron-down" x-show="open" x-cloak class="text-base"></iconify-icon>
                     </button>
                     <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform -translate-y-2" x-transition:enter-end="opacity-100 transform translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 transform translate-y-0" x-transition:leave-end="opacity-0 transform -translate-y-2" class="pl-8 space-y-1">
                         <template x-if="loading">
@@ -127,14 +137,14 @@
                 </div>
                 
                 <!-- Recommendations (expandable) -->
-                <div x-data="{ open: false }" class="space-y-2">
+                <div x-data="{ open: true }" class="space-y-2">
                     <button @click="open = !open" class="flex items-center justify-between w-full px-4 py-2 rounded-lg hover:bg-purple-500/10 cursor-pointer">
                         <div class="flex items-center space-x-3">
-                            <span>💡</span>
+                            <iconify-icon icon="lucide:lightbulb" class="text-lg"></iconify-icon>
                             <span>Recommendations</span>
                         </div>
-                        <span x-show="!open" x-cloak>▶</span>
-                        <span x-show="open" x-cloak>▼</span>
+                        <iconify-icon icon="lucide:chevron-right" x-show="!open" x-cloak class="text-base"></iconify-icon>
+                        <iconify-icon icon="lucide:chevron-down" x-show="open" x-cloak class="text-base"></iconify-icon>
                     </button>
                     <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform -translate-y-2" x-transition:enter-end="opacity-100 transform translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 transform translate-y-0" x-transition:leave-end="opacity-0 transform -translate-y-2" class="pl-8 space-y-1">
                         <a href="/recommendations/compute" class="block px-4 py-2 rounded-lg hover:bg-purple-500/10 {{if eq .Page "recommendations-compute"}}bg-purple-500/20{{end}}">

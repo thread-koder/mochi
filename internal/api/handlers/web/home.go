@@ -25,11 +25,9 @@ type HomeData struct {
 
 // Represents activity item with formatted time
 type ActivityItemDisplay struct {
-	Type      string `json:"type"`
-	Message   string `json:"message"`
-	TimeAgo   string `json:"time_ago"`
-	Icon      string `json:"icon"`
-	IconColor string `json:"icon_color"`
+	Type    string `json:"type"`
+	Message string `json:"message"`
+	TimeAgo string `json:"time_ago"`
 }
 
 // Renders the home page
@@ -87,18 +85,6 @@ func Home(c *gin.Context) {
 				Type:    activity.Type,
 				Message: activity.Message,
 				TimeAgo: formatTimeAgo(activity.Timestamp),
-			}
-
-			switch activity.Type {
-			case "recommendation_applied":
-				display.Icon = "✓"
-				display.IconColor = "text-green-400"
-			case "recommendation_generated":
-				display.Icon = "💡"
-				display.IconColor = "text-purple-400"
-			default:
-				display.Icon = "📊"
-				display.IconColor = "text-blue-400"
 			}
 
 			displayActivities = append(displayActivities, display)
