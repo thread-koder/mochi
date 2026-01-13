@@ -162,8 +162,8 @@
             }
         }
 
-        // Global counter component
         document.addEventListener('alpine:init', () => {
+            // Global counter component
             Alpine.data('counter', (target, intervalMs = 50) => ({
                 count: 0,
                 interval: null,
