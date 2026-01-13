@@ -77,7 +77,7 @@
                             {{.Type}}
                         </span>
                         <div class="flex-1">
-                            <h3 class="font-semibold text-lg">{{.Name}}</h3>
+                            <h3 class="font-semibold">{{.Name}}</h3>
                             <div class="text-sm text-gray-400 mt-1">
                                 <span>Replicas: <span class="text-gray-200">{{.Ready}}/{{.Replicas}}</span></span>
                                 <span class="mx-2">•</span>
@@ -104,7 +104,7 @@
                             Pod
                         </span>
                         <div class="flex-1">
-                            <h3 class="font-semibold text-lg">{{.Name}}</h3>
+                            <h3 class="font-semibold">{{.Name}}</h3>
                             <div class="text-sm text-gray-400 mt-1">
                                 <span>Phase: <span class="text-gray-200">{{.Phase}}</span></span>
                                 {{if .Node}}
@@ -133,7 +133,7 @@
                             System
                         </span>
                         <div class="flex-1">
-                            <h3 class="font-semibold text-lg">{{.Name}}</h3>
+                            <h3 class="font-semibold">{{.Name}}</h3>
                             <div class="text-sm text-gray-400 mt-1">
                                 <span>Phase: <span class="text-gray-200">{{.Phase}}</span></span>
                                 {{if .Node}}
@@ -203,7 +203,7 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <!-- CPU Metrics -->
                                 <div class="space-y-3">
-                                    <p class="text-base text-gray-400 font-medium">CPU Utilization</p>
+                                    <p class="text-gray-400 font-medium">CPU Utilization</p>
                                     <div>
                                         <p class="text-sm text-gray-500 mb-1">Current</p>
                                         <p class="text-2xl font-bold text-purple-400" x-text="formatCPU(utilization?.cpu?.current)"></p>
@@ -241,7 +241,7 @@
                                 
                                 <!-- Memory Metrics -->
                                 <div class="space-y-3">
-                                    <p class="text-base text-gray-400 font-medium">Memory Utilization</p>
+                                    <p class="text-gray-400 font-medium">Memory Utilization</p>
                                     <div>
                                         <p class="text-sm text-gray-500 mb-1">Current</p>
                                         <p class="text-2xl font-bold text-cyan-400" x-text="formatBytes(utilization?.memory?.current)"></p>
@@ -551,19 +551,44 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                legend: { labels: { color: '#a0a0a0' } },
+                                legend: { 
+                                    labels: { 
+                                        color: '#a0a0a0',
+                                        font: { family: 'JetBrains Mono', size: 12 }
+                                    } 
+                                },
                                 tooltip: {
+                                    titleFont: { family: 'JetBrains Mono', size: 12 },
+                                    bodyFont: { family: 'JetBrains Mono', size: 12 },
                                     callbacks: {
                                         label: (context) => formatCPU(context.parsed.y)
                                     }
                                 }
                             },
                             scales: {
-                                x: { ticks: { color: '#a0a0a0' }, grid: { color: 'rgba(168, 85, 247, 0.1)' } },
-                                y: {
-                                    ticks: { color: '#a0a0a0', callback: (value) => formatCPU(value) },
+                                x: { 
+                                    ticks: { 
+                                        color: '#a0a0a0',
+                                        font: { family: 'JetBrains Mono', size: 11 }
+                                    }, 
                                     grid: { color: 'rgba(168, 85, 247, 0.1)' },
-                                    title: { display: true, text: useMillicores ? 'CPU (millicores)' : 'CPU (cores)', color: '#a0a0a0' }
+                                    title: {
+                                        font: { family: 'JetBrains Mono', size: 12 }
+                                    }
+                                },
+                                y: {
+                                    ticks: { 
+                                        color: '#a0a0a0',
+                                        font: { family: 'JetBrains Mono', size: 11 },
+                                        callback: (value) => formatCPU(value) 
+                                    },
+                                    grid: { color: 'rgba(168, 85, 247, 0.1)' },
+                                    title: { 
+                                        display: true, 
+                                        text: useMillicores ? 'CPU (millicores)' : 'CPU (cores)', 
+                                        color: '#a0a0a0',
+                                        font: { family: 'JetBrains Mono', size: 12 }
+                                    }
                                 }
                             }
                         }
@@ -616,19 +641,44 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                legend: { labels: { color: '#a0a0a0' } },
+                                legend: { 
+                                    labels: { 
+                                        color: '#a0a0a0',
+                                        font: { family: 'JetBrains Mono', size: 12 }
+                                    } 
+                                },
                                 tooltip: {
+                                    titleFont: { family: 'JetBrains Mono', size: 12 },
+                                    bodyFont: { family: 'JetBrains Mono', size: 12 },
                                     callbacks: {
                                         label: (context) => formatBytes(context.parsed.y)
                                     }
                                 }
                             },
                             scales: {
-                                x: { ticks: { color: '#a0a0a0' }, grid: { color: 'rgba(34, 211, 238, 0.1)' } },
-                                y: {
-                                    ticks: { color: '#a0a0a0', callback: (value) => formatBytes(value) },
+                                x: { 
+                                    ticks: { 
+                                        color: '#a0a0a0',
+                                        font: { family: 'JetBrains Mono', size: 11 }
+                                    }, 
                                     grid: { color: 'rgba(34, 211, 238, 0.1)' },
-                                    title: { display: true, text: 'Memory', color: '#a0a0a0' }
+                                    title: {
+                                        font: { family: 'JetBrains Mono', size: 12 }
+                                    }
+                                },
+                                y: {
+                                    ticks: { 
+                                        color: '#a0a0a0',
+                                        font: { family: 'JetBrains Mono', size: 11 },
+                                        callback: (value) => formatBytes(value) 
+                                    },
+                                    grid: { color: 'rgba(34, 211, 238, 0.1)' },
+                                    title: { 
+                                        display: true, 
+                                        text: 'Memory', 
+                                        color: '#a0a0a0',
+                                        font: { family: 'JetBrains Mono', size: 12 }
+                                    }
                                 }
                             }
                         }
