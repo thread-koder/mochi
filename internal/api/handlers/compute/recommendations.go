@@ -422,8 +422,8 @@ func ApplyRecommendation(c *gin.Context) {
 		}
 
 		// Validate required fields
-		if bodyRec.WorkloadName == "" || bodyRec.Namespace == "" {
-			err := fmt.Errorf("workload_name and namespace are required")
+		if bodyRec.WorkloadName == "" || bodyRec.Namespace == "" || bodyRec.AnalysisTimeRange == "" || bodyRec.RecommendationMode == "" {
+			err := fmt.Errorf("workload_name, namespace, analysis_time_range, and recommendation_mode are required")
 			c.Error(err)
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":   "missing required fields",
@@ -440,11 +440,6 @@ func ApplyRecommendation(c *gin.Context) {
 				"details": err.Error(),
 			})
 			return
-		}
-
-		// Set default mode if not provided
-		if bodyRec.RecommendationMode == "" {
-			bodyRec.RecommendationMode = "burstable"
 		}
 
 		// Convert to database model
