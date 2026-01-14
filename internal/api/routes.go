@@ -50,10 +50,10 @@ func setupRoutes(router *gin.Engine) {
 				recommendationsGroup.GET("/recommendations", computeHandlers.GetRecommendations)
 				recommendationsGroup.GET("/recommendations/:id", computeHandlers.GetRecommendationByID)
 				recommendationsGroup.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestWorkloadRecommendation)
+				recommendationsGroup.GET("/recommendations/generate/:workloadType/:workloadName", computeHandlers.GenerateRecommendations)
 			}
 
 			// POST endpoints (no caching)
-			compute.POST("/recommendations/generate/:workloadType/:workloadName", computeHandlers.GenerateRecommendations)
 			compute.POST("/recommendations/apply", computeHandlers.ApplyRecommendation)
 		}
 	}
