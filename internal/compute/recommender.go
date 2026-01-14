@@ -17,6 +17,7 @@ type Recommendation struct {
 	Namespace          string                    `json:"namespace"`
 	RecommendationMode string                    `json:"recommendation_mode"` // "cost_optimized", "burstable", or "guaranteed"
 	Recommendations    []ContainerRecommendation `json:"recommendations"`
+	AnalysisTimeRange  string                    `json:"analysis_time_range"`
 }
 
 // Represents a container recommendation
@@ -266,6 +267,7 @@ func GenerateWorkloadRecommendations(
 		Namespace:          namespace,
 		RecommendationMode: string(config.Mode),
 		Recommendations:    recommendations,
+		AnalysisTimeRange:  analysisOpts.TimeRange.String(),
 	}
 
 	return result, nil
@@ -295,7 +297,7 @@ func calculateChangePercent(current, recommended *float64) *float64 {
 }
 
 // Converts a compute Recommendation to a database ComputeRecommendation
-func ComputeRecommendationToDB(rec Recommendation, analysisTimeRange *string) (*database.ComputeRecommendation, error) {
+func ComputeRecommendationToDB(rec Recommendation) (*database.ComputeRecommendation, error) {
 	recommendationsJSON, err := json.Marshal(rec.Recommendations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal recommendations: %w", err)
@@ -309,7 +311,7 @@ func ComputeRecommendationToDB(rec Recommendation, analysisTimeRange *string) (*
 		RecommendationMode: rec.RecommendationMode,
 		Recommendations:    recommendationsJSON,
 		Status:             "pending",
-		AnalysisTimeRange:  analysisTimeRange,
+		AnalysisTimeRange:  rec.AnalysisTimeRange,
 		CreatedAt:          now,
 		UpdatedAt:          now,
 		GeneratedAt:        now,

@@ -183,7 +183,7 @@ type ComputeRecommendation struct {
 	RecommendationMode string          `json:"recommendation_mode" db:"recommendation_mode"`
 	Recommendations    json.RawMessage `json:"recommendations" db:"recommendations"` // Array of ContainerRecommendation
 	Status             string          `json:"status" db:"status"`
-	AnalysisTimeRange  *string         `json:"analysis_time_range,omitempty" db:"analysis_time_range"`
+	AnalysisTimeRange  string          `json:"analysis_time_range,omitempty" db:"analysis_time_range"`
 	CreatedAt          time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt          time.Time       `json:"updated_at" db:"updated_at"`
 	GeneratedAt        time.Time       `json:"generated_at" db:"generated_at"`

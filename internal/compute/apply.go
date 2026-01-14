@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -14,6 +15,14 @@ import (
 	"github.com/thread_koder/mochi/internal/database"
 	"github.com/thread_koder/mochi/internal/kubernetes"
 	"github.com/thread_koder/mochi/internal/logger"
+)
+
+// Mochi annotation keys
+const (
+	AnnotationManagedBy          = "mochi.io/managed-by"
+	AnnotationRecommendationID   = "mochi.io/recommendation-id"
+	AnnotationRecommendationMode = "mochi.io/recommendation-mode"
+	AnnotationLastApplied        = "mochi.io/last-applied"
 )
 
 // Applies a compute recommendation to the target workload
@@ -38,11 +47,11 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 
 	switch rec.WorkloadType {
 	case "Deployment":
-		return applyToDeployment(ctx, rec.Namespace, rec.WorkloadName, containerRecs)
+		return applyToDeployment(ctx, rec, containerRecs)
 	case "StatefulSet":
-		return applyToStatefulSet(ctx, rec.Namespace, rec.WorkloadName, containerRecs)
+		return applyToStatefulSet(ctx, rec, containerRecs)
 	case "DaemonSet":
-		return applyToDaemonSet(ctx, rec.Namespace, rec.WorkloadName, containerRecs)
+		return applyToDaemonSet(ctx, rec, containerRecs)
 	case "Pod":
 		return applyToPod()
 	default:
@@ -51,13 +60,13 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 }
 
 // Applies recommendations to a deployment
-func applyToDeployment(ctx context.Context, namespace, name string, containerRecs []ContainerRecommendation) error {
+func applyToDeployment(ctx context.Context, rec *database.ComputeRecommendation, containerRecs []ContainerRecommendation) error {
 	if kubernetes.Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
 	// Get the deployment
-	deployment, err := kubernetes.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	deployment, err := kubernetes.Clientset.AppsV1().Deployments(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get deployment: %w", err)
 	}
@@ -67,6 +76,9 @@ func applyToDeployment(ctx context.Context, namespace, name string, containerRec
 	if err != nil {
 		return fmt.Errorf("failed to marshal original deployment: %w", err)
 	}
+
+	// Add Mochi annotations to workload metadata
+	addMochiAnnotations(&deployment.ObjectMeta, rec)
 
 	// Apply container recommendations
 	if err := updateContainerResources(&deployment.Spec.Template.Spec, containerRecs); err != nil {
@@ -85,9 +97,9 @@ func applyToDeployment(ctx context.Context, namespace, name string, containerRec
 	}
 
 	// Apply the patch
-	_, err = kubernetes.Clientset.AppsV1().Deployments(namespace).Patch(
+	_, err = kubernetes.Clientset.AppsV1().Deployments(rec.Namespace).Patch(
 		ctx,
-		name,
+		rec.WorkloadName,
 		types.StrategicMergePatchType,
 		patchBytes,
 		metav1.PatchOptions{},
@@ -100,13 +112,13 @@ func applyToDeployment(ctx context.Context, namespace, name string, containerRec
 }
 
 // Applies recommendations to a statefulset
-func applyToStatefulSet(ctx context.Context, namespace, name string, containerRecs []ContainerRecommendation) error {
+func applyToStatefulSet(ctx context.Context, rec *database.ComputeRecommendation, containerRecs []ContainerRecommendation) error {
 	if kubernetes.Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
 	// Get the statefulset
-	statefulSet, err := kubernetes.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	statefulSet, err := kubernetes.Clientset.AppsV1().StatefulSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get statefulset: %w", err)
 	}
@@ -116,6 +128,9 @@ func applyToStatefulSet(ctx context.Context, namespace, name string, containerRe
 	if err != nil {
 		return fmt.Errorf("failed to marshal original statefulset: %w", err)
 	}
+
+	// Add Mochi annotations to workload metadata
+	addMochiAnnotations(&statefulSet.ObjectMeta, rec)
 
 	// Apply container recommendations
 	if err := updateContainerResources(&statefulSet.Spec.Template.Spec, containerRecs); err != nil {
@@ -134,9 +149,9 @@ func applyToStatefulSet(ctx context.Context, namespace, name string, containerRe
 	}
 
 	// Apply the patch
-	_, err = kubernetes.Clientset.AppsV1().StatefulSets(namespace).Patch(
+	_, err = kubernetes.Clientset.AppsV1().StatefulSets(rec.Namespace).Patch(
 		ctx,
-		name,
+		rec.WorkloadName,
 		types.StrategicMergePatchType,
 		patchBytes,
 		metav1.PatchOptions{},
@@ -149,13 +164,13 @@ func applyToStatefulSet(ctx context.Context, namespace, name string, containerRe
 }
 
 // Applies recommendations to a daemonset
-func applyToDaemonSet(ctx context.Context, namespace, name string, containerRecs []ContainerRecommendation) error {
+func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, containerRecs []ContainerRecommendation) error {
 	if kubernetes.Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
 	// Get the daemonset
-	daemonSet, err := kubernetes.Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	daemonSet, err := kubernetes.Clientset.AppsV1().DaemonSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get daemonset: %w", err)
 	}
@@ -165,6 +180,9 @@ func applyToDaemonSet(ctx context.Context, namespace, name string, containerRecs
 	if err != nil {
 		return fmt.Errorf("failed to marshal original daemonset: %w", err)
 	}
+
+	// Add Mochi annotations to workload metadata
+	addMochiAnnotations(&daemonSet.ObjectMeta, rec)
 
 	// Apply container recommendations
 	if err := updateContainerResources(&daemonSet.Spec.Template.Spec, containerRecs); err != nil {
@@ -183,9 +201,9 @@ func applyToDaemonSet(ctx context.Context, namespace, name string, containerRecs
 	}
 
 	// Apply the patch
-	_, err = kubernetes.Clientset.AppsV1().DaemonSets(namespace).Patch(
+	_, err = kubernetes.Clientset.AppsV1().DaemonSets(rec.Namespace).Patch(
 		ctx,
-		name,
+		rec.WorkloadName,
 		types.StrategicMergePatchType,
 		patchBytes,
 		metav1.PatchOptions{},
@@ -201,6 +219,25 @@ func applyToDaemonSet(ctx context.Context, namespace, name string, containerRecs
 // Pods are immutable, return an error explaining the limitation
 func applyToPod() error {
 	return fmt.Errorf("cannot apply recommendations to standalone pods: pods are immutable and cannot be patched. To apply resource changes, you must delete and recreate the pod manually, or use a Deployment/StatefulSet/DaemonSet instead")
+}
+
+// Adds Mochi annotations to workload metadata
+func addMochiAnnotations(metadata *metav1.ObjectMeta, rec *database.ComputeRecommendation) {
+	if metadata.Annotations == nil {
+		metadata.Annotations = make(map[string]string)
+	}
+
+	// Set managed-by annotation
+	metadata.Annotations[AnnotationManagedBy] = "mochi"
+
+	// Set recommendation ID
+	metadata.Annotations[AnnotationRecommendationID] = fmt.Sprintf("%d", rec.ID)
+
+	// Set recommendation mode
+	metadata.Annotations[AnnotationRecommendationMode] = rec.RecommendationMode
+
+	// Set last applied timestamp
+	metadata.Annotations[AnnotationLastApplied] = time.Now().UTC().Format(time.RFC3339)
 }
 
 // Updates container resources in a pod spec based on recommendations

@@ -27,8 +27,8 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 	`
 
 	var analysisTimeRange *time.Duration
-	if rec.AnalysisTimeRange != nil {
-		duration, err := time.ParseDuration(*rec.AnalysisTimeRange)
+	if rec.AnalysisTimeRange != "" {
+		duration, err := time.ParseDuration(rec.AnalysisTimeRange)
 		if err == nil {
 			analysisTimeRange = &duration
 		}
@@ -78,7 +78,7 @@ func GetComputeRecommendationByID(ctx context.Context, id int64) (*ComputeRecomm
 
 	if analysisTimeRange != nil {
 		durationStr := analysisTimeRange.String()
-		rec.AnalysisTimeRange = &durationStr
+		rec.AnalysisTimeRange = durationStr
 	}
 
 	return &rec, nil
@@ -112,7 +112,7 @@ func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadN
 
 	if analysisTimeRange != nil {
 		durationStr := analysisTimeRange.String()
-		rec.AnalysisTimeRange = &durationStr
+		rec.AnalysisTimeRange = durationStr
 	}
 
 	return &rec, nil
@@ -194,7 +194,7 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 
 		if analysisTimeRange != nil {
 			durationStr := analysisTimeRange.String()
-			rec.AnalysisTimeRange = &durationStr
+			rec.AnalysisTimeRange = durationStr
 		}
 
 		recommendations = append(recommendations, &rec)
@@ -270,6 +270,31 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 		Str("workload_name", workloadName).
 		Str("namespace", namespace).
 		Msg("Recommendations marked as superseded successfully")
+
+	return nil
+}
+
+// Deletes a compute recommendation by ID
+func DeleteComputeRecommendation(ctx context.Context, id int64) error {
+	log := logger.WithComponent("database")
+	log.Debug().
+		Int64("id", id).
+		Msg("Deleting compute recommendation")
+
+	query := `DELETE FROM compute_recommendations WHERE id = $1`
+
+	result, err := Pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete compute recommendation: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("compute recommendation %d not found", id)
+	}
+
+	log.Debug().
+		Int64("id", id).
+		Msg("Compute recommendation deleted successfully")
 
 	return nil
 }
