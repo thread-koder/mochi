@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/thread_koder/mochi/internal/config"
 	"github.com/thread_koder/mochi/internal/database"
 	"github.com/thread_koder/mochi/internal/logger"
 )
@@ -18,7 +20,7 @@ func SyncAllResources(ctx context.Context) error {
 	log := logger.WithComponent("kubernetes")
 	log.Debug().Msg("Starting full resource sync")
 
-	// Sync namespaces first (they are referenced by other resources)
+	// Sync namespaces
 	if err := SyncNamespaces(ctx); err != nil {
 		return fmt.Errorf("failed to sync namespaces: %w", err)
 	}
@@ -58,12 +60,12 @@ func SyncAllResources(ctx context.Context) error {
 		return fmt.Errorf("failed to sync endpoints: %w", err)
 	}
 
-	// Sync pods last (they reference other resources)
+	// Sync pods
 	if err := SyncPods(ctx); err != nil {
 		return fmt.Errorf("failed to sync pods: %w", err)
 	}
 
-	// Sync containers (they reference pods)
+	// Sync containers
 	if err := SyncContainers(ctx); err != nil {
 		return fmt.Errorf("failed to sync containers: %w", err)
 	}
@@ -91,6 +93,10 @@ func SyncNamespaces(ctx context.Context) error {
 	now := time.Now()
 
 	for _, ns := range namespaces.Items {
+		if !shouldSyncNamespace(ns.Name) {
+			continue
+		}
+
 		labelsJSON, _ := mapToJSON(ns.Labels)
 		annotationsJSON, _ := mapToJSON(ns.Annotations)
 
@@ -214,6 +220,10 @@ func SyncDeployments(ctx context.Context) error {
 	now := time.Now()
 
 	for _, dep := range deployments.Items {
+		if !shouldSyncNamespace(dep.Namespace) {
+			continue
+		}
+
 		labelsJSON, _ := mapToJSON(dep.Labels)
 		annotationsJSON, _ := mapToJSON(dep.Annotations)
 
@@ -265,6 +275,9 @@ func SyncReplicaSets(ctx context.Context) error {
 	now := time.Now()
 
 	for _, rs := range replicasets.Items {
+		if !shouldSyncNamespace(rs.Namespace) {
+			continue
+		}
 		// Only sync active ReplicaSets
 		if rs.Status.Replicas == 0 {
 			continue
@@ -333,6 +346,10 @@ func SyncStatefulSets(ctx context.Context) error {
 	now := time.Now()
 
 	for _, sts := range statefulsets.Items {
+		if !shouldSyncNamespace(sts.Namespace) {
+			continue
+		}
+
 		labelsJSON, _ := mapToJSON(sts.Labels)
 		annotationsJSON, _ := mapToJSON(sts.Annotations)
 
@@ -383,6 +400,10 @@ func SyncDaemonSets(ctx context.Context) error {
 	now := time.Now()
 
 	for _, ds := range daemonsets.Items {
+		if !shouldSyncNamespace(ds.Namespace) {
+			continue
+		}
+
 		labelsJSON, _ := mapToJSON(ds.Labels)
 		annotationsJSON, _ := mapToJSON(ds.Annotations)
 
@@ -429,6 +450,10 @@ func SyncServices(ctx context.Context) error {
 	now := time.Now()
 
 	for _, svc := range services.Items {
+		if !shouldSyncNamespace(svc.Namespace) {
+			continue
+		}
+
 		labelsJSON, _ := mapToJSON(svc.Labels)
 		annotationsJSON, _ := mapToJSON(svc.Annotations)
 		selectorJSON, _ := mapToJSON(svc.Spec.Selector)
@@ -484,6 +509,10 @@ func SyncEndpoints(ctx context.Context) error {
 	now := time.Now()
 
 	for _, ep := range endpoints.Items {
+		if !shouldSyncNamespace(ep.Namespace) {
+			continue
+		}
+
 		labelsJSON, _ := mapToJSON(ep.Labels)
 		annotationsJSON, _ := mapToJSON(ep.Annotations)
 		// Extract addresses and ports from subsets
@@ -540,6 +569,10 @@ func SyncPods(ctx context.Context) error {
 	now := time.Now()
 
 	for _, pod := range pods.Items {
+		if !shouldSyncNamespace(pod.Namespace) {
+			continue
+		}
+
 		labelsJSON, _ := mapToJSON(pod.Labels)
 		annotationsJSON, _ := mapToJSON(pod.Annotations)
 
@@ -603,6 +636,10 @@ func SyncContainers(ctx context.Context) error {
 	now := time.Now()
 
 	for _, pod := range pods.Items {
+		if !shouldSyncNamespace(pod.Namespace) {
+			continue
+		}
+
 		podUID := string(pod.UID)
 		podName := pod.Name
 		namespace := pod.Namespace
@@ -672,6 +709,24 @@ func SyncContainers(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// Checks if a namespace should be synced based on include/exclude lists
+func shouldSyncNamespace(namespace string) bool {
+	cfg := config.AppConfig.Workers
+	if cfg.IncludeNamespaces == nil && cfg.ExcludeNamespaces == nil {
+		return true
+	}
+
+	if len(cfg.IncludeNamespaces) > 0 {
+		return slices.Contains(cfg.IncludeNamespaces, namespace)
+	}
+
+	if len(cfg.ExcludeNamespaces) > 0 {
+		return !slices.Contains(cfg.ExcludeNamespaces, namespace)
+	}
+
+	return true
 }
 
 // Helper function to convert map to JSON bytes

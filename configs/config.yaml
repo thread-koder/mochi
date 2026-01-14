@@ -46,5 +46,11 @@ redis:
   cache_ttl: 300 # Default cache TTL in seconds
 
 workers:
-  resource_sync_interval: 300 # Resource sync interval in seconds (5 minutes)
-  stale_resource_threshold: 600 # Stale resource threshold in seconds (10 minutes)
+  resource_sync_interval: 180 # Resource sync interval in seconds (3 minutes)
+  stale_resource_threshold: 300 # Stale resource threshold in seconds (5 minutes)
+  exclude_namespaces: # List of namespaces to exclude from syncing
+    - "default"
+    - "kube-system"
+    - "kube-public"
+    - "kube-node-lease"
+  include_namespaces: [] # If non-empty, only sync these namespaces (exclude_namespaces ignored)
