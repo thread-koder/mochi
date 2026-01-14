@@ -14,13 +14,13 @@ CREATE TABLE IF NOT EXISTS endpoints (
     UNIQUE(namespace, name)
 );
 
--- Create index on namespace and name for faster lookups
+-- Create index on namespace and name
 CREATE INDEX IF NOT EXISTS idx_endpoints_namespace_name ON endpoints(namespace, name);
 
--- Create index on uid for unique lookups
+-- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_endpoints_uid ON endpoints(uid);
 
--- Create index on synced_at for sync tracking
+-- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_endpoints_synced_at ON endpoints(synced_at);
 
 -- Create trigger to automatically update updated_at

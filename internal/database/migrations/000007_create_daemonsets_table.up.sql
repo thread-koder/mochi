@@ -15,13 +15,13 @@ CREATE TABLE IF NOT EXISTS daemonsets (
     UNIQUE(namespace, name)
 );
 
--- Create index on namespace and name for faster lookups
+-- Create index on namespace and name
 CREATE INDEX IF NOT EXISTS idx_daemonsets_namespace_name ON daemonsets(namespace, name);
 
--- Create index on uid for unique lookups
+-- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_daemonsets_uid ON daemonsets(uid);
 
--- Create index on synced_at for sync tracking
+-- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_daemonsets_synced_at ON daemonsets(synced_at);
 
 -- Create trigger to automatically update updated_at

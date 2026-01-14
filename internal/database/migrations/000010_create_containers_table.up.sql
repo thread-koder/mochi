@@ -18,13 +18,13 @@ CREATE TABLE IF NOT EXISTS containers (
     UNIQUE(pod_uid, name)
 );
 
--- Create index on pod_uid for faster lookups
+-- Create index on pod_uid
 CREATE INDEX IF NOT EXISTS idx_containers_pod_uid ON containers(pod_uid);
 
--- Create index on namespace and pod_name for faster lookups
+-- Create index on namespace and pod_name
 CREATE INDEX IF NOT EXISTS idx_containers_namespace_pod_name ON containers(namespace, pod_name);
 
--- Create index on synced_at for sync tracking
+-- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_containers_synced_at ON containers(synced_at);
 
 -- Create trigger to automatically update updated_at

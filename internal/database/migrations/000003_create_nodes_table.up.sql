@@ -21,13 +21,13 @@ CREATE TABLE IF NOT EXISTS nodes (
     synced_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- Create index on name for faster lookups
+-- Create index on name
 CREATE INDEX IF NOT EXISTS idx_nodes_name ON nodes(name);
 
--- Create index on uid for unique lookups
+-- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_nodes_uid ON nodes(uid);
 
--- Create index on synced_at for sync tracking
+-- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_nodes_synced_at ON nodes(synced_at);
 
 -- Create trigger to automatically update updated_at

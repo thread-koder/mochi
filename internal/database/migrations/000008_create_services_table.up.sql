@@ -16,13 +16,13 @@ CREATE TABLE IF NOT EXISTS services (
     UNIQUE(namespace, name)
 );
 
--- Create index on namespace and name for faster lookups
+-- Create index on namespace and name
 CREATE INDEX IF NOT EXISTS idx_services_namespace_name ON services(namespace, name);
 
--- Create index on uid for unique lookups
+-- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_services_uid ON services(uid);
 
--- Create index on synced_at for sync tracking
+-- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_services_synced_at ON services(synced_at);
 
 -- Create trigger to automatically update updated_at

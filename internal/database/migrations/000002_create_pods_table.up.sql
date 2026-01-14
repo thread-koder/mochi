@@ -16,19 +16,19 @@ CREATE TABLE IF NOT EXISTS pods (
     synced_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- Create index on namespace and name for faster lookups
+-- Create index on namespace and name
 CREATE INDEX IF NOT EXISTS idx_pods_namespace_name ON pods(namespace, name);
 
--- Create index on uid for unique lookups
+-- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_pods_uid ON pods(uid);
 
--- Create index on node_name for node-based queries
+-- Create index on node_name
 CREATE INDEX IF NOT EXISTS idx_pods_node_name ON pods(node_name);
 
--- Create index on owner for owner-based queries
+-- Create index on owner
 CREATE INDEX IF NOT EXISTS idx_pods_owner ON pods(owner_kind, owner_name);
 
--- Create index on synced_at for sync tracking
+-- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_pods_synced_at ON pods(synced_at);
 
 -- Create trigger to automatically update updated_at
