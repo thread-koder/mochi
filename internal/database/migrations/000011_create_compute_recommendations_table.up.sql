@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS compute_recommendations (
     workload_name VARCHAR(255) NOT NULL,
     namespace VARCHAR(255) NOT NULL,
     recommendation_mode VARCHAR(50) NOT NULL DEFAULT 'burstable'
-        CHECK (recommendation_mode IN ('burstable', 'guaranteed')),
+        CHECK (recommendation_mode IN ('cost_optimized', 'burstable', 'guaranteed')),
     recommendations JSONB NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'applied', 'rejected', 'superseded')),

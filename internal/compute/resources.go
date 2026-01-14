@@ -16,32 +16,19 @@ type ResourceRecommendation struct {
 	Confidence    float64 `json:"confidence"`     // Overall confidence score (0-1)
 }
 
-// Represents the reason for a recommendation
-type RecommendationReason string
-
-const (
-	ReasonOverProvisioned  RecommendationReason = "over_provisioned"
-	ReasonUnderProvisioned RecommendationReason = "under_provisioned"
-	ReasonOptimal          RecommendationReason = "optimal"
-	ReasonNoData           RecommendationReason = "no_data"
-)
-
 // Represents the recommendation mode
 type RecommendationMode string
 
 const (
-	ModeBurstable  RecommendationMode = "burstable"  // Default: optimize for efficiency, allow some throttling risk
-	ModeGuaranteed RecommendationMode = "guaranteed" // Request = peak * safetyMargin (no throttling risk)
+	ModeCostOptimized RecommendationMode = "cost_optimized" // Maximum cost savings, accept throttling risk
+	ModeBurstable     RecommendationMode = "burstable"      // Default: balance performance/reliability/efficiency
+	ModeGuaranteed    RecommendationMode = "guaranteed"     // Best performance, no throttling risk
 )
 
 // Configuration for recommendation calculations
 type RecommendationConfig struct {
-	// Recommendation mode: burstable (optimize for efficiency) or guaranteed (no throttling risk)
+	// Recommendation mode: cost_optimized (maximize cost savings), burstable (balance), or guaranteed (best performance)
 	Mode RecommendationMode
-	// Target utilization range for requests (default: 0.50-0.70 = 50-70%)
-	// Only used in burstable mode
-	TargetRequestUtilizationMin float64
-	TargetRequestUtilizationMax float64
 	// Safety margin multiplier for requests (default: 1.2 = 20% headroom)
 	RequestSafetyMargin float64
 	// Safety margin multiplier for limits based on peak (default: 1.3 = 30% headroom)
@@ -52,44 +39,27 @@ type RecommendationConfig struct {
 	MinMemoryRequest int64
 	// Minimum confidence threshold to generate recommendations (default: 0.5)
 	MinConfidenceThreshold float64
-	// Maximum increase multiplier (default: 2.0 = 200% increase max)
-	MaxIncreaseMultiplier float64
-	// Maximum decrease multiplier (default: 0.5 = 50% decrease max)
-	MaxDecreaseMultiplier float64
+	// Burst detection threshold: if Max > percentile * BurstThreshold, treat as burst workload
+	BurstThreshold float64
 }
 
 // Returns default recommendation configuration
 func DefaultRecommendationConfig() RecommendationConfig {
 	return RecommendationConfig{
-		Mode:                        ModeBurstable,    // Default: optimize for efficiency
-		TargetRequestUtilizationMin: 0.50,             // 50% min (aligns with analyzer)
-		TargetRequestUtilizationMax: 0.70,             // 70% max (aligns with analyzer)
-		RequestSafetyMargin:         1.2,              // 20% headroom
-		LimitSafetyMargin:           1.3,              // 30% headroom
-		MinCPURequest:               0.01,             // 10m minimum
-		MinMemoryRequest:            64 * 1024 * 1024, // 64Mi minimum
-		MinConfidenceThreshold:      0.5,              // 50% minimum confidence
-		MaxIncreaseMultiplier:       2.0,              // Max 2x increase
-		MaxDecreaseMultiplier:       0.5,              // Max 50% decrease
+		Mode:                   ModeBurstable,    // Default: optimize for efficiency
+		RequestSafetyMargin:    1.2,              // 20% headroom
+		LimitSafetyMargin:      1.3,              // 30% headroom
+		MinCPURequest:          0.01,             // 10m minimum
+		MinMemoryRequest:       64 * 1024 * 1024, // 64Mi minimum
+		MinConfidenceThreshold: 0.5,              // 50% minimum confidence
+		BurstThreshold:         2.0,              // Max > 2x percentile = burst workload
 	}
 }
 
 // Validates recommendation configuration
 func (config RecommendationConfig) Validate() error {
-	if config.Mode != ModeBurstable && config.Mode != ModeGuaranteed {
-		return fmt.Errorf("Mode must be either %s or %s, got: %v", ModeBurstable, ModeGuaranteed, config.Mode)
-	}
-	if config.Mode == ModeBurstable {
-		// Target utilization only required for burstable mode
-		if config.TargetRequestUtilizationMin <= 0 {
-			return fmt.Errorf("TargetRequestUtilizationMin must be positive, got: %v", config.TargetRequestUtilizationMin)
-		}
-		if config.TargetRequestUtilizationMax <= 0 {
-			return fmt.Errorf("TargetRequestUtilizationMax must be positive, got: %v", config.TargetRequestUtilizationMax)
-		}
-		if config.TargetRequestUtilizationMin >= config.TargetRequestUtilizationMax {
-			return fmt.Errorf("TargetRequestUtilizationMin must be less than TargetRequestUtilizationMax, got: min=%v max=%v", config.TargetRequestUtilizationMin, config.TargetRequestUtilizationMax)
-		}
+	if config.Mode != ModeCostOptimized && config.Mode != ModeBurstable && config.Mode != ModeGuaranteed {
+		return fmt.Errorf("Mode must be one of %s, %s, or %s, got: %v", ModeCostOptimized, ModeBurstable, ModeGuaranteed, config.Mode)
 	}
 	if config.RequestSafetyMargin <= 0 {
 		return fmt.Errorf("RequestSafetyMargin must be positive, got: %v", config.RequestSafetyMargin)
@@ -106,11 +76,8 @@ func (config RecommendationConfig) Validate() error {
 	if config.MinConfidenceThreshold < 0 || config.MinConfidenceThreshold > 1 {
 		return fmt.Errorf("MinConfidenceThreshold must be between 0 and 1, got: %v", config.MinConfidenceThreshold)
 	}
-	if config.MaxIncreaseMultiplier <= 1.0 {
-		return fmt.Errorf("MaxIncreaseMultiplier must be greater than 1.0, got: %v", config.MaxIncreaseMultiplier)
-	}
-	if config.MaxDecreaseMultiplier <= 0 || config.MaxDecreaseMultiplier >= 1.0 {
-		return fmt.Errorf("MaxDecreaseMultiplier must be between 0 and 1.0, got: %v", config.MaxDecreaseMultiplier)
+	if config.BurstThreshold <= 0 {
+		return fmt.Errorf("BurstThreshold must be positive, got: %v", config.BurstThreshold)
 	}
 	return nil
 }
@@ -121,7 +88,7 @@ func CalculateCPURequestRecommendation(
 	utilization CPUUtilization,
 	provisioning CPUProvisioning,
 	config RecommendationConfig,
-) (*float64, RecommendationReason, error) {
+) (*float64, error) {
 	// Adjust confidence threshold based on efficiency
 	effectiveThreshold := config.MinConfidenceThreshold
 	if provisioning.Efficiency < 0.3 {
@@ -131,68 +98,103 @@ func CalculateCPURequestRecommendation(
 
 	// If we don't have enough confidence, don't recommend
 	if provisioning.Confidence < effectiveThreshold {
-		return nil, ReasonNoData, nil
+		return nil, nil
 	}
 
-	// Choose percentile based on anomalies and variance
-	// If many anomalies or high variance, use P99 for more conservative recommendation
+	// Start with P95 as baseline (steady-state usage)
 	percentile := utilization.Stats.Percentile.P95
+	baselineP95 := percentile
 	cv := 0.0
 	if utilization.Stats.Mean > 0 {
 		cv = utilization.Stats.StdDev / utilization.Stats.Mean
 	}
 
-	// Use P99 if: many anomalies, high variance, or P99 is much higher than P95
-	if utilization.Anomalies.AnomalyCount > 5 ||
-		cv > 0.5 ||
-		utilization.Stats.Percentile.P99 > utilization.Stats.Percentile.P95*1.5 {
-		percentile = utilization.Stats.Percentile.P99
-	}
+	// Detect bursty workloads: if Max is significantly higher than percentile, it indicates occasional spikes
+	peakUsage := utilization.Stats.Max
+	isBurstWorkload := false
+	if percentile > 0 && peakUsage > percentile*config.BurstThreshold {
+		isBurstWorkload = true
+		// Use a higher percentile or weighted approach
+		// Check if P99 is much higher than P95
+		if utilization.Stats.Percentile.P99 > percentile*1.5 {
+			percentile = utilization.Stats.Percentile.P99
+			// Check if Max is still significantly higher than P99
+			if peakUsage > percentile*config.BurstThreshold {
+				percentile = calculateWeightedPercentile(percentile, peakUsage, baselineP95)
+			}
+		} else {
+			weightedPercentile := calculateWeightedPercentile(percentile, peakUsage, baselineP95)
 
-	// Calculate recommended request to achieve target utilization
-	// recommended = percentileUsage / targetUtilization * safetyMargin
-	safetyMargin := config.RequestSafetyMargin
-
-	// Adjust safety margin based on trend
-	if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
-		// Increasing trend with strong signal = add extra headroom
-		safetyMargin *= 1.1
-	} else if utilization.Trend.Direction == DirectionDecreasing && utilization.Trend.Strength > 0.5 {
-		// Decreasing trend = can be slightly less conservative
-		safetyMargin *= 0.95
-	}
-
-	// Adjust safety margin based on variance (coefficient of variation)
-	if cv > 0.5 {
-		// High variance = more conservative
-		safetyMargin *= 1.15
-	} else if cv < 0.2 {
-		// Low variance = can be more precise
-		safetyMargin *= 0.98
-	}
-
-	// Adjust safety margin based on anomalies
-	if utilization.Anomalies.AnomalyCount > 10 {
-		// Many anomalies = more conservative
-		safetyMargin *= 1.1
+			// Validate: if weighted result is still too extreme (> 5x P95), use P99 instead
+			if weightedPercentile > percentile*5.0 {
+				// Use P99 if available, otherwise use the weighted result
+				if utilization.Stats.Percentile.P99 > 0 {
+					percentile = utilization.Stats.Percentile.P99
+					// Check if Max is still higher than P99
+					if peakUsage > percentile*config.BurstThreshold {
+						percentile = calculateWeightedPercentile(percentile, peakUsage, baselineP95)
+					}
+				} else {
+					percentile = weightedPercentile
+				}
+			} else {
+				percentile = weightedPercentile
+			}
+		}
 	}
 
 	// Calculate recommended request based on mode
 	var recommendedCores float64
-	if config.Mode == ModeGuaranteed {
-		// Guaranteed mode: request = peak usage * safety margin (no throttling risk)
-		peakUsage := utilization.Stats.Max
-		recommendedCores = peakUsage * safetyMargin
-	} else {
-		// Burstable mode: optimize for efficiency using target utilization
-		// Use midpoint of target range for calculation
-		targetUtilization := (config.TargetRequestUtilizationMin + config.TargetRequestUtilizationMax) / 2.0
-		recommendedCores = (percentile / targetUtilization) * safetyMargin
+	switch config.Mode {
+	case ModeGuaranteed:
+		// Guaranteed mode: use base safety margin only
+		recommendedCores = peakUsage * config.RequestSafetyMargin
+	case ModeCostOptimized:
+		// Cost-optimized mode: use percentile with minimal safety margin (1.1x)
+		recommendedCores = percentile * 1.1
+	default:
+		// Burstable mode: calculate safety margin with all dynamic adjustments
+		safetyMargin := config.RequestSafetyMargin
+
+		// Adjust safety margin based on trend
+		if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
+			// Increasing trend with strong signal = add extra headroom
+			safetyMargin *= 1.1
+		} else if utilization.Trend.Direction == DirectionDecreasing && utilization.Trend.Strength > 0.5 {
+			// Decreasing trend = can be slightly less conservative
+			safetyMargin *= 0.95
+		}
+
+		// Adjust safety margin based on variance
+		if cv > 0.5 {
+			// High variance = more conservative
+			safetyMargin *= 1.15
+		} else if cv < 0.2 && cv > 0 {
+			// Low variance = can be more precise
+			safetyMargin *= 0.98
+		}
+
+		// Adjust safety margin based on anomalies
+		if utilization.Anomalies.AnomalyCount > 10 {
+			safetyMargin *= 1.1
+		}
+
+		// Add safety margin for bursty workloads
+		if isBurstWorkload {
+			safetyMargin *= 1.15
+		}
+
+		// Burstable mode: use percentile directly with safety margin
+		recommendedCores = percentile * safetyMargin
 	}
 
-	// Validation: ensure recommended is at least greater than mean (sanity check)
+	// Validation: ensure recommended accounts for actual usage patterns
+	// Only use Mean if it's higher than the recommendation
 	if utilization.Stats.Mean > 0 && recommendedCores < utilization.Stats.Mean {
-		recommendedCores = utilization.Stats.Mean * 1.1 // At least 10% above mean
+		meanBased := utilization.Stats.Mean * 1.1
+		if meanBased > recommendedCores {
+			recommendedCores = meanBased
+		}
 	}
 
 	// Apply minimum
@@ -200,52 +202,32 @@ func CalculateCPURequestRecommendation(
 		recommendedCores = config.MinCPURequest
 	}
 
-	// Apply maximum increase/decrease bounds to prevent excessive changes
-	if currentRequest != nil && *currentRequest > 0 {
-		current := *currentRequest
-
-		// Prevent excessive increases
-		maxAllowed := current * config.MaxIncreaseMultiplier
-		if recommendedCores > maxAllowed {
-			recommendedCores = maxAllowed
-		}
-
-		// Prevent excessive decreases
-		minAllowed := current * config.MaxDecreaseMultiplier
-		if recommendedCores < minAllowed {
-			recommendedCores = minAllowed
-		}
-	}
-
 	// Round to reasonable precision (3 decimal places for CPU)
 	recommendedCores = math.Round(recommendedCores*1000) / 1000
 
-	// Determine reason
-	var reason RecommendationReason
-	if currentRequest == nil {
-		reason = ReasonUnderProvisioned // No request set, recommend one
-	} else if provisioning.IsOverProvisioned {
-		reason = ReasonOverProvisioned
-	} else if provisioning.IsUnderProvisioned {
-		reason = ReasonUnderProvisioned
-	} else {
-		reason = ReasonOptimal
-	}
-
-	// Only recommend if there's a meaningful change (at least 10% difference)
+	// Allow larger changes for severely mis-provisioned workloads
 	if currentRequest != nil {
 		current := *currentRequest
 		// If current is 0, always recommend (no request set)
 		if current > 0 {
 			diff := math.Abs(recommendedCores - current)
-			if diff < current*0.1 {
-				// Less than 10% difference, consider it optimal
-				return nil, ReasonOptimal, nil
+			changePercent := diff / current
+
+			// For severely mis-provisioned workloads, use a lower threshold
+			threshold := 0.1
+			if changePercent > 1.0 {
+				// More than 100% difference - severely mis-provisioned
+				threshold = 0.05
+			}
+
+			if changePercent < threshold {
+				// Change is too small, consider it optimal
+				return nil, nil
 			}
 		}
 	}
 
-	return &recommendedCores, reason, nil
+	return &recommendedCores, nil
 }
 
 // Calculates CPU limit recommendation based on utilization analysis
@@ -255,7 +237,7 @@ func CalculateCPULimitRecommendation(
 	provisioning CPUProvisioning,
 	config RecommendationConfig,
 	recommendedRequest *float64,
-) (*float64, RecommendationReason, error) {
+) (*float64, error) {
 	// Adjust confidence threshold based on efficiency
 	effectiveThreshold := config.MinConfidenceThreshold
 	if provisioning.Efficiency < 0.3 {
@@ -264,34 +246,27 @@ func CalculateCPULimitRecommendation(
 
 	// If we don't have enough confidence, don't recommend
 	if provisioning.Confidence < effectiveThreshold {
-		return nil, ReasonNoData, nil
+		return nil, nil
 	}
 
-	// Use peak (max) for limit recommendation with safety margin
+	// Use peak (max) for limit recommendation
 	peakUsage := utilization.Stats.Max
 
-	// Adjust safety margin based on trend
-	safetyMargin := config.LimitSafetyMargin
-	if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
-		// Increasing trend = add extra headroom
-		safetyMargin *= 1.1
+	// Calculate safety margin based on mode
+	var safetyMargin float64
+	if config.Mode == ModeCostOptimized {
+		// Cost-optimized mode: minimal safety margin (1.1x)
+		safetyMargin = 1.1
+	} else {
+		// Burstable/Guaranteed mode: base + trend only
+		safetyMargin = config.LimitSafetyMargin
+		if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
+			// Increasing trend = add extra headroom for future growth
+			safetyMargin *= 1.1
+		}
 	}
 
-	// Adjust safety margin based on variance
-	cv := 0.0
-	if utilization.Stats.Mean > 0 {
-		cv = utilization.Stats.StdDev / utilization.Stats.Mean
-	}
-	if cv > 0.5 {
-		safetyMargin *= 1.15
-	}
-
-	// Adjust safety margin based on anomalies
-	if utilization.Anomalies.AnomalyCount > 10 {
-		safetyMargin *= 1.1
-	}
-
-	// Calculate recommended limit: peak * safetyMargin
+	// Calculate recommended limit
 	recommendedCores := peakUsage * safetyMargin
 
 	// Apply minimum
@@ -304,51 +279,32 @@ func CalculateCPULimitRecommendation(
 		recommendedCores = *recommendedRequest
 	}
 
-	// Apply maximum increase/decrease bounds to prevent excessive changes
-	if currentLimit != nil && *currentLimit > 0 {
-		current := *currentLimit
-
-		// Prevent excessive increases
-		maxAllowed := current * config.MaxIncreaseMultiplier
-		if recommendedCores > maxAllowed {
-			recommendedCores = maxAllowed
-		}
-
-		// Prevent excessive decreases
-		minAllowed := current * config.MaxDecreaseMultiplier
-		if recommendedCores < minAllowed {
-			recommendedCores = minAllowed
-		}
-	}
-
 	// Round to reasonable precision
 	recommendedCores = math.Round(recommendedCores*1000) / 1000
 
-	// Determine reason
-	var reason RecommendationReason
-	if currentLimit == nil {
-		reason = ReasonUnderProvisioned // No limit set, recommend one
-	} else if provisioning.LimitUtilization > (1.0 - 0.2) {
-		// Peak too close to limit (within 20%)
-		reason = ReasonUnderProvisioned
-	} else {
-		reason = ReasonOptimal
-	}
-
-	// Only recommend if there's a meaningful change (at least 10% difference)
+	// Allow larger changes for severely mis-provisioned workloads
 	if currentLimit != nil {
 		current := *currentLimit
 		// If current is 0, always recommend (no limit set)
 		if current > 0 {
 			diff := math.Abs(recommendedCores - current)
-			if diff < current*0.1 {
-				// Less than 10% difference, consider it optimal
-				return nil, ReasonOptimal, nil
+			changePercent := diff / current
+
+			// For severely mis-provisioned workloads, use a lower threshold
+			threshold := 0.1
+			if changePercent > 1.0 {
+				// More than 100% difference - severely mis-provisioned
+				threshold = 0.05
+			}
+
+			if changePercent < threshold {
+				// Change is too small, consider it optimal
+				return nil, nil
 			}
 		}
 	}
 
-	return &recommendedCores, reason, nil
+	return &recommendedCores, nil
 }
 
 // Calculates memory request recommendation based on utilization analysis
@@ -357,7 +313,7 @@ func CalculateMemoryRequestRecommendation(
 	utilization MemoryUtilization,
 	provisioning MemoryProvisioning,
 	config RecommendationConfig,
-) (*float64, RecommendationReason, error) {
+) (*float64, error) {
 	// Adjust confidence threshold based on efficiency
 	effectiveThreshold := config.MinConfidenceThreshold
 	if provisioning.Efficiency < 0.3 {
@@ -366,61 +322,103 @@ func CalculateMemoryRequestRecommendation(
 
 	// If we don't have enough confidence, don't recommend
 	if provisioning.Confidence < effectiveThreshold {
-		return nil, ReasonNoData, nil
+		return nil, nil
 	}
 
-	// Choose percentile based on anomalies and variance
+	// Start with P95 as baseline (steady-state usage)
 	percentile := utilization.Stats.Percentile.P95
+	baselineP95 := percentile
 	cv := 0.0
 	if utilization.Stats.Mean > 0 {
 		cv = utilization.Stats.StdDev / utilization.Stats.Mean
 	}
 
-	// Use P99 if: many anomalies, high variance, or P99 is much higher than P95
-	if utilization.Anomalies.AnomalyCount > 5 ||
-		cv > 0.5 ||
-		utilization.Stats.Percentile.P99 > utilization.Stats.Percentile.P95*1.5 {
-		percentile = utilization.Stats.Percentile.P99
-	}
+	// Detect bursty workloads: if Max is significantly higher than percentile, it indicates occasional spikes
+	peakUsage := utilization.Stats.Max
+	isBurstWorkload := false
+	if percentile > 0 && peakUsage > percentile*config.BurstThreshold {
+		isBurstWorkload = true
+		// Use a higher percentile or weighted approach
+		// Check if P99 is much higher than P95
+		if utilization.Stats.Percentile.P99 > percentile*1.5 {
+			percentile = utilization.Stats.Percentile.P99
+			// Check if Max is still significantly higher than P99
+			if peakUsage > percentile*config.BurstThreshold {
+				percentile = calculateWeightedPercentile(percentile, peakUsage, baselineP95)
+			}
+		} else {
+			weightedPercentile := calculateWeightedPercentile(percentile, peakUsage, baselineP95)
 
-	// Calculate recommended request to achieve target utilization
-	safetyMargin := config.RequestSafetyMargin
-
-	// Adjust safety margin based on trend
-	if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
-		safetyMargin *= 1.1
-	} else if utilization.Trend.Direction == DirectionDecreasing && utilization.Trend.Strength > 0.5 {
-		safetyMargin *= 0.95
-	}
-
-	// Adjust safety margin based on variance
-	if cv > 0.5 {
-		safetyMargin *= 1.15
-	} else if cv < 0.2 {
-		safetyMargin *= 0.98
-	}
-
-	// Adjust safety margin based on anomalies
-	if utilization.Anomalies.AnomalyCount > 10 {
-		safetyMargin *= 1.1
+			// Validate: if weighted result is still too extreme (> 5x P95), use P99 instead
+			if weightedPercentile > percentile*5.0 {
+				// Use P99 if available, otherwise use the weighted result
+				if utilization.Stats.Percentile.P99 > 0 {
+					percentile = utilization.Stats.Percentile.P99
+					// Check if Max is still higher than P99
+					if peakUsage > percentile*config.BurstThreshold {
+						percentile = calculateWeightedPercentile(percentile, peakUsage, baselineP95)
+					}
+				} else {
+					percentile = weightedPercentile
+				}
+			} else {
+				percentile = weightedPercentile
+			}
+		}
 	}
 
 	// Calculate recommended request based on mode
 	var recommendedBytes float64
-	if config.Mode == ModeGuaranteed {
-		// Guaranteed mode: request = peak usage * safety margin (no throttling risk)
-		peakUsage := utilization.Stats.Max
-		recommendedBytes = peakUsage * safetyMargin
-	} else {
-		// Burstable mode: optimize for efficiency using target utilization
-		// Use midpoint of target range for calculation
-		targetUtilization := (config.TargetRequestUtilizationMin + config.TargetRequestUtilizationMax) / 2.0
-		recommendedBytes = (percentile / targetUtilization) * safetyMargin
+	switch config.Mode {
+	case ModeGuaranteed:
+		// Guaranteed mode: use base safety margin only
+		recommendedBytes = peakUsage * config.RequestSafetyMargin * 1.1
+	case ModeCostOptimized:
+		// Cost-optimized mode: use percentile with minimal safety margin (1.1x)
+		recommendedBytes = percentile * 1.1
+	default:
+		// Burstable mode: calculate safety margin with all dynamic adjustments
+		safetyMargin := config.RequestSafetyMargin * 1.1
+
+		// Adjust safety margin based on trend
+		if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
+			// Increasing trend with strong signal = add extra headroom
+			safetyMargin *= 1.1
+		} else if utilization.Trend.Direction == DirectionDecreasing && utilization.Trend.Strength > 0.5 {
+			// Decreasing trend = can be slightly less conservative
+			safetyMargin *= 0.95
+		}
+
+		// Adjust safety margin based on variance
+		if cv > 0.5 {
+			// High variance = more conservative
+			safetyMargin *= 1.15
+		} else if cv < 0.2 && cv > 0 {
+			// Low variance = can be more precise
+			safetyMargin *= 0.98
+		}
+
+		// Adjust safety margin based on anomalies
+		if utilization.Anomalies.AnomalyCount > 10 {
+			safetyMargin *= 1.1
+		}
+
+		// Add safety margin for bursty workloads
+		if isBurstWorkload {
+			safetyMargin *= 1.15
+		}
+
+		// Burstable mode: use percentile directly with safety margin
+		recommendedBytes = percentile * safetyMargin
 	}
 
-	// Validation: ensure recommended is at least greater than mean
+	// Validate: ensure recommended accounts for actual usage patterns
+	// Only use Mean if it's higher than the recommendation
 	if utilization.Stats.Mean > 0 && recommendedBytes < utilization.Stats.Mean {
-		recommendedBytes = utilization.Stats.Mean * 1.1
+		meanBased := utilization.Stats.Mean * 1.1
+		if meanBased > recommendedBytes {
+			recommendedBytes = meanBased
+		}
 	}
 
 	// Apply minimum
@@ -428,52 +426,32 @@ func CalculateMemoryRequestRecommendation(
 		recommendedBytes = float64(config.MinMemoryRequest)
 	}
 
-	// Apply maximum increase/decrease bounds to prevent excessive changes
-	if currentRequest != nil && *currentRequest > 0 {
-		current := *currentRequest
-
-		// Prevent excessive increases
-		maxAllowed := current * config.MaxIncreaseMultiplier
-		if recommendedBytes > maxAllowed {
-			recommendedBytes = maxAllowed
-		}
-
-		// Prevent excessive decreases
-		minAllowed := current * config.MaxDecreaseMultiplier
-		if recommendedBytes < minAllowed {
-			recommendedBytes = minAllowed
-		}
-	}
-
 	// Round to nearest byte
 	recommendedBytes = math.Round(recommendedBytes)
 
-	// Determine reason
-	var reason RecommendationReason
-	if currentRequest == nil {
-		reason = ReasonUnderProvisioned // No request set, recommend one
-	} else if provisioning.IsOverProvisioned {
-		reason = ReasonOverProvisioned
-	} else if provisioning.IsUnderProvisioned {
-		reason = ReasonUnderProvisioned
-	} else {
-		reason = ReasonOptimal
-	}
-
-	// Only recommend if there's a meaningful change (at least 10% difference)
+	// Allow larger changes for severely mis-provisioned workloads
 	if currentRequest != nil {
 		current := *currentRequest
 		// If current is 0, always recommend (no request set)
 		if current > 0 {
 			diff := math.Abs(recommendedBytes - current)
-			if diff < current*0.1 {
-				// Less than 10% difference, consider it optimal
-				return nil, ReasonOptimal, nil
+			changePercent := diff / current
+
+			// For severely mis-provisioned workloads, use a lower threshold
+			threshold := 0.1
+			if changePercent > 1.0 {
+				// More than 100% difference - severely mis-provisioned
+				threshold = 0.05
+			}
+
+			if changePercent < threshold {
+				// Change is too small, consider it optimal
+				return nil, nil
 			}
 		}
 	}
 
-	return &recommendedBytes, reason, nil
+	return &recommendedBytes, nil
 }
 
 // Calculates memory limit recommendation based on utilization analysis
@@ -483,7 +461,7 @@ func CalculateMemoryLimitRecommendation(
 	provisioning MemoryProvisioning,
 	config RecommendationConfig,
 	recommendedRequest *float64,
-) (*float64, RecommendationReason, error) {
+) (*float64, error) {
 	// Adjust confidence threshold based on efficiency
 	effectiveThreshold := config.MinConfidenceThreshold
 	if provisioning.Efficiency < 0.3 {
@@ -492,33 +470,27 @@ func CalculateMemoryLimitRecommendation(
 
 	// If we don't have enough confidence, don't recommend
 	if provisioning.Confidence < effectiveThreshold {
-		return nil, ReasonNoData, nil
+		return nil, nil
 	}
 
-	// Use peak (max) for limit recommendation with safety margin
+	// Use peak (max) for limit recommendation
 	peakUsage := utilization.Stats.Max
 
-	// Adjust safety margin based on trend
-	safetyMargin := config.LimitSafetyMargin
-	if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
-		safetyMargin *= 1.1
+	// Calculate safety margin based on mode
+	var safetyMargin float64
+	if config.Mode == ModeCostOptimized {
+		// Cost-optimized mode: minimal safety margin (1.1x)
+		safetyMargin = 1.1
+	} else {
+		// Burstable/Guaranteed mode: base + trend only
+		safetyMargin = config.LimitSafetyMargin * 1.1
+		if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
+			// Increasing trend = add extra headroom for future growth
+			safetyMargin *= 1.1
+		}
 	}
 
-	// Adjust safety margin based on variance
-	cv := 0.0
-	if utilization.Stats.Mean > 0 {
-		cv = utilization.Stats.StdDev / utilization.Stats.Mean
-	}
-	if cv > 0.5 {
-		safetyMargin *= 1.15
-	}
-
-	// Adjust safety margin based on anomalies
-	if utilization.Anomalies.AnomalyCount > 10 {
-		safetyMargin *= 1.1
-	}
-
-	// Calculate recommended limit: peak * safetyMargin
+	// Calculate recommended limit
 	recommendedBytes := peakUsage * safetyMargin
 
 	// Apply minimum
@@ -531,51 +503,60 @@ func CalculateMemoryLimitRecommendation(
 		recommendedBytes = *recommendedRequest
 	}
 
-	// Apply maximum increase/decrease bounds to prevent excessive changes
-	if currentLimit != nil && *currentLimit > 0 {
-		current := *currentLimit
-
-		// Prevent excessive increases
-		maxAllowed := current * config.MaxIncreaseMultiplier
-		if recommendedBytes > maxAllowed {
-			recommendedBytes = maxAllowed
-		}
-
-		// Prevent excessive decreases
-		minAllowed := current * config.MaxDecreaseMultiplier
-		if recommendedBytes < minAllowed {
-			recommendedBytes = minAllowed
-		}
-	}
-
 	// Round to nearest byte
 	recommendedBytes = math.Round(recommendedBytes)
 
-	// Determine reason
-	var reason RecommendationReason
-	if currentLimit == nil {
-		reason = ReasonUnderProvisioned // No limit set, recommend one
-	} else if provisioning.LimitUtilization > (1.0 - 0.2) {
-		// Peak too close to limit (within 20%)
-		reason = ReasonUnderProvisioned
-	} else {
-		reason = ReasonOptimal
-	}
-
-	// Only recommend if there's a meaningful change (at least 10% difference)
+	// Allow larger changes for severely mis-provisioned workloads
 	if currentLimit != nil {
 		current := *currentLimit
 		// If current is 0, always recommend (no limit set)
 		if current > 0 {
 			diff := math.Abs(recommendedBytes - current)
-			if diff < current*0.1 {
-				// Less than 10% difference, consider it optimal
-				return nil, ReasonOptimal, nil
+			changePercent := diff / current
+
+			// For severely mis-provisioned workloads, use a lower threshold
+			threshold := 0.1
+			if changePercent > 1.0 {
+				// More than 100% difference - severely mis-provisioned
+				threshold = 0.05
+			}
+
+			if changePercent < threshold {
+				// Change is too small, consider it optimal
+				return nil, nil
 			}
 		}
 	}
 
-	return &recommendedBytes, reason, nil
+	return &recommendedBytes, nil
+}
+
+// Calculates the maximum weight to use for weighted percentile calculation based on gap ratio
+func calculateMaxWeightForGap(gapRatio float64) float64 {
+	if gapRatio > 50.0 {
+		// Very extreme gap (>50x): use 70% of Max to prevent throttling
+		return 0.7
+	} else if gapRatio > 20.0 {
+		// Extreme gap (20-50x): use 60% of Max to prevent throttling
+		return 0.6
+	} else if gapRatio > 10.0 {
+		// Very large gap (10-20x): use 50% of Max
+		return 0.5
+	} else if gapRatio > 5.0 {
+		// Large gap (5-10x): use 40% of Max
+		return 0.4
+	} else {
+		// Moderate gap (2-5x): use 30% of Max
+		return 0.3
+	}
+}
+
+// Calculates weighted percentile using dynamic weighting based on gap severity
+func calculateWeightedPercentile(percentile, peakUsage, baselineP95 float64) float64 {
+	gapRatio := peakUsage / baselineP95
+	maxWeight := calculateMaxWeightForGap(gapRatio)
+	percentileWeight := 1.0 - maxWeight
+	return percentile*percentileWeight + (peakUsage-percentile)*maxWeight
 }
 
 // Calculates overall confidence score from CPU and memory provisioning

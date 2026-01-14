@@ -15,7 +15,7 @@ type Recommendation struct {
 	WorkloadType       string                    `json:"workload_type"` // Deployment, StatefulSet, DaemonSet, Pod
 	WorkloadName       string                    `json:"workload_name"`
 	Namespace          string                    `json:"namespace"`
-	RecommendationMode string                    `json:"recommendation_mode"` // "burstable" or "guaranteed"
+	RecommendationMode string                    `json:"recommendation_mode"` // "cost_optimized", "burstable", or "guaranteed"
 	Recommendations    []ContainerRecommendation `json:"recommendations"`
 }
 
@@ -71,7 +71,7 @@ func GenerateContainerRecommendation(
 	}
 
 	// Calculate CPU request recommendation
-	cpuRequestRecValue, _, err := CalculateCPURequestRecommendation(
+	cpuRequestRecValue, err := CalculateCPURequestRecommendation(
 		specs.CPURequest,
 		containerAnalysis.Utilization.CPU,
 		containerAnalysis.Provisioning.CPU,
@@ -82,7 +82,7 @@ func GenerateContainerRecommendation(
 	}
 
 	// Calculate CPU limit recommendation
-	cpuLimitRecValue, _, err := CalculateCPULimitRecommendation(
+	cpuLimitRecValue, err := CalculateCPULimitRecommendation(
 		specs.CPULimit,
 		containerAnalysis.Utilization.CPU,
 		containerAnalysis.Provisioning.CPU,
@@ -94,7 +94,7 @@ func GenerateContainerRecommendation(
 	}
 
 	// Calculate memory request recommendation
-	memoryRequestRecValue, _, err := CalculateMemoryRequestRecommendation(
+	memoryRequestRecValue, err := CalculateMemoryRequestRecommendation(
 		specs.MemoryRequest,
 		containerAnalysis.Utilization.Memory,
 		containerAnalysis.Provisioning.Memory,
@@ -105,7 +105,7 @@ func GenerateContainerRecommendation(
 	}
 
 	// Calculate memory limit recommendation
-	memoryLimitRecValue, _, err := CalculateMemoryLimitRecommendation(
+	memoryLimitRecValue, err := CalculateMemoryLimitRecommendation(
 		specs.MemoryLimit,
 		containerAnalysis.Utilization.Memory,
 		containerAnalysis.Provisioning.Memory,

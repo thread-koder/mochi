@@ -67,8 +67,8 @@ func GenerateRecommendations(c *gin.Context) {
 	recConfig := compute.DefaultRecommendationConfig()
 	if modeStr != "" {
 		mode := compute.RecommendationMode(modeStr)
-		if mode != compute.ModeBurstable && mode != compute.ModeGuaranteed {
-			err := fmt.Errorf("mode must be one of: burstable, guaranteed")
+		if mode != compute.ModeBurstable && mode != compute.ModeGuaranteed && mode != compute.ModeCostOptimized {
+			err := fmt.Errorf("mode must be one of: burstable, guaranteed, cost_optimized")
 			c.Error(err)
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":   "invalid recommendation mode",
