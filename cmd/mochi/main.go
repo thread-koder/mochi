@@ -76,7 +76,10 @@ func main() {
 	defer workerPool.Stop()
 
 	// Create and start API server
-	server := api.NewServer(&cfg.API)
+	server, err := api.NewServer(&cfg.API)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create API server")
+	}
 	log.Info().Msg("Components initialized")
 
 	// Start server in a goroutine

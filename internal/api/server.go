@@ -22,7 +22,7 @@ type Server struct {
 }
 
 // Creates a new API server instance
-func NewServer(cfg *config.APIConfig) *Server {
+func NewServer(cfg *config.APIConfig) (*Server, error) {
 	// Set Gin mode
 	gin.SetMode(cfg.Mode)
 
@@ -36,9 +36,7 @@ func NewServer(cfg *config.APIConfig) *Server {
 	// Load HTML templates
 	tmpl, err := loadTemplates()
 	if err != nil {
-		// Log error but continue, templates might not be available yet
-		log := logger.WithComponent("server")
-		log.Warn().Err(err).Msg("Failed to load templates, continuing without them")
+		return nil, fmt.Errorf("failed to load templates: %w", err)
 	} else {
 		router.SetHTMLTemplate(tmpl)
 	}
@@ -61,7 +59,7 @@ func NewServer(cfg *config.APIConfig) *Server {
 		router: router,
 		server: server,
 		cfg:    cfg,
-	}
+	}, nil
 }
 
 // Starts the HTTP server
@@ -96,7 +94,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 func loadTemplates() (*template.Template, error) {
 	tmpl, err := template.ParseGlob("web/templates/*.html")
 	if err != nil {
-		return nil, fmt.Errorf("failed to load templates: %w", err)
+		return nil, fmt.Errorf("failed to parse templates: %w", err)
 	}
 
 	// Parse base template if it exists separately
