@@ -43,8 +43,8 @@ type ProvisioningResult struct {
 // Thresholds for provisioning detection
 const (
 	// Optimal utilization range for requests
-	OptimalUtilizationMin = 0.50 // 50%
-	OptimalUtilizationMax = 0.70 // 70%
+	OptimalUtilizationMin = 0.4 // 40%
+	OptimalUtilizationMax = 0.6 // 60%
 	// Headroom for limits (peak should stay below this percentage of limit)
 	LimitHeadroom = 0.2 // 20% headroom
 )
