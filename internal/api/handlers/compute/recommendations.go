@@ -348,7 +348,6 @@ func ApplyRecommendation(c *gin.Context) {
 
 	var recommendation *database.ComputeRecommendation
 	var id int64
-	var isImmediate bool
 
 	// Check if ID is provided in query param
 	idStr := c.Query("id")
@@ -395,7 +394,6 @@ func ApplyRecommendation(c *gin.Context) {
 		}
 	} else {
 		// Apply from body (immediate apply)
-		isImmediate = true
 		var bodyRec compute.Recommendation
 		if err := c.ShouldBindJSON(&bodyRec); err != nil {
 			c.Error(err)
@@ -450,7 +448,7 @@ func ApplyRecommendation(c *gin.Context) {
 		}
 
 		// Convert to database model
-		dbRec, err := compute.ComputeRecommendationToDB(bodyRec, nil)
+		dbRec, err := compute.ComputeRecommendationToDB(bodyRec)
 		if err != nil {
 			c.Error(err)
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -461,21 +459,6 @@ func ApplyRecommendation(c *gin.Context) {
 		}
 
 		recommendation = dbRec
-	}
-
-	// Apply the recommendation
-	if err := compute.ApplyRecommendation(ctx, recommendation); err != nil {
-		c.Error(err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to apply recommendation",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	// If immediate apply, save to database first
-	if isImmediate {
-		recommendation.Status = "applied"
 		if err := database.InsertComputeRecommendation(ctx, recommendation); err != nil {
 			c.Error(err)
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -485,12 +468,28 @@ func ApplyRecommendation(c *gin.Context) {
 			return
 		}
 		id = recommendation.ID
-	} else {
-		// if applying by ID, update status to "applied"
-		if err := database.UpdateComputeRecommendationStatus(ctx, id, "applied"); err != nil {
-			// Log error but don't fail
-			c.Error(err)
+	}
+
+	// Apply the recommendation
+	if err := compute.ApplyRecommendation(ctx, recommendation); err != nil {
+		if idStr == "" {
+			if delErr := database.DeleteComputeRecommendation(ctx, id); delErr != nil {
+				// Log error but don't fail
+				c.Error(delErr)
+			}
 		}
+		c.Error(err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "failed to apply recommendation",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	// Update status to "applied"
+	if err := database.UpdateComputeRecommendationStatus(ctx, id, "applied"); err != nil {
+		// Log error but don't fail
+		c.Error(err)
 	}
 
 	// Mark other pending recommendations as superseded
