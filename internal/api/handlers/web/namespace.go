@@ -83,7 +83,7 @@ func Namespace(c *gin.Context) {
 	}
 
 	// Get workloads
-	deployments, err := database.GetDeploymentsByNamespace(ctx, namespaceName)
+	deployments, err := database.GetDeploymentsByNamespace(ctx, namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get deployments: %w", err))
 	} else {
@@ -99,7 +99,7 @@ func Namespace(c *gin.Context) {
 		data.Stats.Workloads += len(deployments)
 	}
 
-	statefulsets, err := database.GetStatefulSetsByNamespace(ctx, namespaceName)
+	statefulsets, err := database.GetStatefulSetsByNamespace(ctx, namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get statefulsets: %w", err))
 	} else {
@@ -115,7 +115,7 @@ func Namespace(c *gin.Context) {
 		data.Stats.Workloads += len(statefulsets)
 	}
 
-	daemonsets, err := database.GetDaemonSetsByNamespace(ctx, namespaceName)
+	daemonsets, err := database.GetDaemonSetsByNamespace(ctx, namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get daemonsets: %w", err))
 	} else {
@@ -132,7 +132,7 @@ func Namespace(c *gin.Context) {
 	}
 
 	// Get standalone pods
-	standalonePods, err := database.GetStandalonePodsByNamespace(ctx, namespaceName)
+	standalonePods, err := database.GetStandalonePodsByNamespace(ctx, namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get standalone pods: %w", err))
 	} else {
@@ -151,7 +151,7 @@ func Namespace(c *gin.Context) {
 	}
 
 	// Get system pods (Node-owned)
-	systemPods, err := database.GetPodsByOwnerKind(ctx, "Node", namespaceName)
+	systemPods, err := database.GetPodsByOwnerKind(ctx, "Node", namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get system pods: %w", err))
 	} else {
@@ -170,7 +170,7 @@ func Namespace(c *gin.Context) {
 	}
 
 	// Get pod count
-	podCount, err := database.GetPodCountByNamespace(ctx, namespaceName)
+	podCount, err := database.GetPodCountByNamespace(ctx, namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get pod count: %w", err))
 	} else {
@@ -178,7 +178,7 @@ func Namespace(c *gin.Context) {
 	}
 
 	// Get container count
-	containerCount, err := database.GetContainerCountByNamespace(ctx, namespaceName)
+	containerCount, err := database.GetContainerCountByNamespace(ctx, namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get container count: %w", err))
 	} else {
