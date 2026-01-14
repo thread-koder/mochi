@@ -9,14 +9,14 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Creates a compute recommendation in the database
-func UpsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation) error {
+// Inserts a new compute recommendation into the database
+func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation) error {
 	log := logger.WithComponent("database")
 	log.Debug().
 		Str("workload_type", rec.WorkloadType).
 		Str("workload_name", rec.WorkloadName).
 		Str("namespace", rec.Namespace).
-		Msg("Upserting compute recommendation")
+		Msg("Inserting compute recommendation")
 
 	query := `
 		INSERT INTO compute_recommendations (
@@ -40,14 +40,14 @@ func UpsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 		rec.CreatedAt, rec.UpdatedAt, rec.GeneratedAt,
 	).Scan(&rec.ID)
 	if err != nil {
-		return fmt.Errorf("failed to upsert compute recommendation: %w", err)
+		return fmt.Errorf("failed to insert compute recommendation: %w", err)
 	}
 
 	log.Debug().
 		Int64("id", rec.ID).
 		Str("workload_name", rec.WorkloadName).
 		Str("namespace", rec.Namespace).
-		Msg("Compute recommendation upserted successfully")
+		Msg("Compute recommendation inserted successfully")
 
 	return nil
 }

@@ -476,7 +476,7 @@ func ApplyRecommendation(c *gin.Context) {
 	// If immediate apply, save to database first
 	if isImmediate {
 		recommendation.Status = "applied"
-		if err := database.UpsertComputeRecommendation(ctx, recommendation); err != nil {
+		if err := database.InsertComputeRecommendation(ctx, recommendation); err != nil {
 			c.Error(err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error":   "failed to save recommendation",
