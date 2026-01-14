@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
-	"io/fs"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -60,59 +59,4 @@ func Migrate(cfg *config.DatabaseConfig) error {
 
 	log.Info().Msg("Migrations applied")
 	return nil
-}
-
-// Gets the current migration version
-func GetMigrationVersion(cfg *config.DatabaseConfig) (uint, bool, error) {
-	dsn := buildDSN(cfg)
-
-	// Create SQL DB connection for migrations
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		return 0, false, fmt.Errorf("failed to open database connection: %w", err)
-	}
-	defer db.Close()
-
-	// Create postgres driver instance
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
-	if err != nil {
-		return 0, false, fmt.Errorf("failed to create postgres driver: %w", err)
-	}
-
-	// Create source driver from embedded filesystem
-	sourceDriver, err := iofs.New(migrationsFS, "migrations")
-	if err != nil {
-		return 0, false, fmt.Errorf("failed to create source driver: %w", err)
-	}
-
-	// Create migrate instance
-	m, err := migrate.NewWithInstance("iofs", sourceDriver, "postgres", driver)
-	if err != nil {
-		return 0, false, fmt.Errorf("failed to create migration instance: %w", err)
-	}
-
-	version, dirty, err := m.Version()
-	if err != nil {
-		if err == migrate.ErrNilVersion {
-			return 0, false, nil
-		}
-		return 0, false, fmt.Errorf("failed to get migration version: %w", err)
-	}
-
-	return version, dirty, nil
-}
-
-// Lists all migration files
-func ListMigrations() ([]string, error) {
-	var files []string
-	err := fs.WalkDir(migrationsFS, "migrations", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() && d.Name() != "" {
-			files = append(files, path)
-		}
-		return nil
-	})
-	return files, err
 }
