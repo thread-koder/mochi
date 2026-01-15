@@ -25,6 +25,9 @@
 
     <!-- Iconify -->
     <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+
+    <!-- Animations -->
+    <script type="module" src="/static/js/animations.js" defer></script>
     
     <!-- Custom Theme -->
     <style type="text/tailwindcss">
@@ -67,6 +70,11 @@
         /* Hover effects for glass cards */
         .glass-card-hover:hover {
             border-color: rgba(139, 92, 246, 0.5) !important;
+        }
+        
+        /* Magnetic card  */
+        .magnetic-card {
+            will-change: transform;
         }
         
         /* Hover background for list items */
@@ -180,6 +188,7 @@
             }
         }
 
+        // Alpine.js components
         document.addEventListener('alpine:init', () => {
             // Global counter component
             Alpine.data('counter', (target, intervalMs = 50) => ({

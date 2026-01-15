@@ -40,7 +40,7 @@
         <div x-show="activeTab === 'overview'" x-transition class="mt-6">
             <!-- Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="glass glass-card-hover rounded-xl p-6">
+                <div class="glass glass-card-hover rounded-xl p-6 magnetic-card">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-gray-400 text-sm">Workloads</h3>
                         <iconify-icon icon="lucide:server" class="text-2xl"></iconify-icon>
@@ -48,7 +48,7 @@
                     <p class="text-3xl font-bold text-purple-400" x-data="counter({{.Stats.Workloads}})" x-text="count">{{.Stats.Workloads}}</p>
                 </div>
                 
-                <div class="glass glass-card-hover rounded-xl p-6">
+                <div class="glass glass-card-hover rounded-xl p-6 magnetic-card">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-gray-400 text-sm">Pods</h3>
                         <iconify-icon icon="lucide:rocket" class="text-2xl"></iconify-icon>
@@ -56,7 +56,7 @@
                     <p class="text-3xl font-bold text-cyan-400" x-data="counter({{.Stats.Pods}})" x-text="count">{{.Stats.Pods}}</p>
                 </div>
                 
-                <div class="glass glass-card-hover rounded-xl p-6">
+                <div class="glass glass-card-hover rounded-xl p-6 magnetic-card">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-gray-400 text-sm">Containers</h3>
                         <iconify-icon icon="lucide:container" class="text-2xl"></iconify-icon>
