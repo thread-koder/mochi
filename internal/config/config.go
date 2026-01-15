@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -122,6 +123,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
 
+	// Validate configuration
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
+	}
+
 	AppConfig = &config
 	return &config, nil
 }
@@ -179,4 +185,180 @@ func setDefaults() {
 	viper.SetDefault("workers.stale_resource_threshold", 300) // 5 minutes
 	viper.SetDefault("workers.exclude_namespaces", []string{"default", "kube-system", "kube-public", "kube-node-lease"})
 	viper.SetDefault("workers.include_namespaces", []string{})
+}
+
+// Validates the entire configuration
+func (c *Config) Validate() error {
+	if err := c.Log.Validate(); err != nil {
+		return fmt.Errorf("log config: %w", err)
+	}
+	if err := c.API.Validate(); err != nil {
+		return fmt.Errorf("api config: %w", err)
+	}
+	if err := c.Database.Validate(); err != nil {
+		return fmt.Errorf("database config: %w", err)
+	}
+	if err := c.Kubernetes.Validate(); err != nil {
+		return fmt.Errorf("kubernetes config: %w", err)
+	}
+	if err := c.Prometheus.Validate(); err != nil {
+		return fmt.Errorf("prometheus config: %w", err)
+	}
+	if err := c.Redis.Validate(); err != nil {
+		return fmt.Errorf("redis config: %w", err)
+	}
+	if err := c.Workers.Validate(); err != nil {
+		return fmt.Errorf("workers config: %w", err)
+	}
+	return nil
+}
+
+// Validates log configuration
+func (c *LogConfig) Validate() error {
+	validLevels := map[string]bool{
+		"debug": true,
+		"info":  true,
+		"warn":  true,
+		"error": true,
+	}
+	if !validLevels[strings.ToLower(c.Level)] {
+		return fmt.Errorf("level must be one of: debug, info, warn, error, got: %s", c.Level)
+	}
+
+	validFormats := map[string]bool{
+		"json":    true,
+		"console": true,
+	}
+	if !validFormats[strings.ToLower(c.Format)] {
+		return fmt.Errorf("format must be one of: json, console, got: %s", c.Format)
+	}
+	return nil
+}
+
+// Validates API configuration
+func (c *APIConfig) Validate() error {
+	if c.Port <= 0 || c.Port > 65535 {
+		return fmt.Errorf("port must be between 1 and 65535, got: %d", c.Port)
+	}
+	if c.ReadTimeout <= 0 {
+		return fmt.Errorf("read_timeout must be greater than 0, got: %d", c.ReadTimeout)
+	}
+	if c.WriteTimeout <= 0 {
+		return fmt.Errorf("write_timeout must be greater than 0, got: %d", c.WriteTimeout)
+	}
+
+	validModes := map[string]bool{
+		"debug":   true,
+		"release": true,
+		"test":    true,
+	}
+	if !validModes[strings.ToLower(c.Mode)] {
+		return fmt.Errorf("mode must be one of: debug, release, test, got: %s", c.Mode)
+	}
+	return nil
+}
+
+// Validates database configuration
+func (c *DatabaseConfig) Validate() error {
+	if c.Port <= 0 || c.Port > 65535 {
+		return fmt.Errorf("port must be between 1 and 65535, got: %d", c.Port)
+	}
+	if c.MaxConnections <= 0 {
+		return fmt.Errorf("max_connections must be greater than 0, got: %d", c.MaxConnections)
+	}
+	if c.MaxIdleConns < 0 {
+		return fmt.Errorf("max_idle_conns must be non-negative, got: %d", c.MaxIdleConns)
+	}
+	if c.ConnMaxLifetime <= 0 {
+		return fmt.Errorf("conn_max_lifetime must be greater than 0, got: %d", c.ConnMaxLifetime)
+	}
+	if c.ConnMaxIdleTime <= 0 {
+		return fmt.Errorf("conn_max_idle_time must be greater than 0, got: %d", c.ConnMaxIdleTime)
+	}
+
+	validSSLModes := map[string]bool{
+		"disable":     true,
+		"require":     true,
+		"verify-ca":   true,
+		"verify-full": true,
+	}
+	if !validSSLModes[strings.ToLower(c.SSLMode)] {
+		return fmt.Errorf("ssl_mode must be one of: disable, require, verify-ca, verify-full, got: %s", c.SSLMode)
+	}
+	return nil
+}
+
+// Validates Kubernetes configuration
+func (c *KubernetesConfig) Validate() error {
+	if c.RequestTimeout <= 0 {
+		return fmt.Errorf("request_timeout must be greater than 0, got: %d", c.RequestTimeout)
+	}
+	if c.QPS <= 0 {
+		return fmt.Errorf("qps must be greater than 0, got: %d", c.QPS)
+	}
+	if c.Burst <= 0 {
+		return fmt.Errorf("burst must be greater than 0, got: %d", c.Burst)
+	}
+	return nil
+}
+
+// Validates Prometheus configuration
+func (c *PrometheusConfig) Validate() error {
+	if c.URL == "" {
+		return fmt.Errorf("url cannot be empty")
+	}
+	if _, err := url.Parse(c.URL); err != nil {
+		return fmt.Errorf("url is invalid: %w", err)
+	}
+	if c.Timeout <= 0 {
+		return fmt.Errorf("timeout must be greater than 0, got: %d", c.Timeout)
+	}
+	return nil
+}
+
+// Validates Redis configuration
+func (c *RedisConfig) Validate() error {
+	if c.Port <= 0 || c.Port > 65535 {
+		return fmt.Errorf("port must be between 1 and 65535, got: %d", c.Port)
+	}
+	if c.Database < 0 || c.Database > 15 {
+		return fmt.Errorf("database must be between 0 and 15, got: %d", c.Database)
+	}
+	if c.MaxRetries < 0 {
+		return fmt.Errorf("max_retries must be non-negative, got: %d", c.MaxRetries)
+	}
+	if c.PoolSize <= 0 {
+		return fmt.Errorf("pool_size must be greater than 0, got: %d", c.PoolSize)
+	}
+	if c.MinIdleConns < 0 {
+		return fmt.Errorf("min_idle_conns must be non-negative, got: %d", c.MinIdleConns)
+	}
+	if c.ConnMaxLifetime <= 0 {
+		return fmt.Errorf("conn_max_lifetime must be greater than 0, got: %d", c.ConnMaxLifetime)
+	}
+	if c.ConnMaxIdleTime <= 0 {
+		return fmt.Errorf("conn_max_idle_time must be greater than 0, got: %d", c.ConnMaxIdleTime)
+	}
+	if c.CacheTTL <= 0 {
+		return fmt.Errorf("cache_ttl must be greater than 0, got: %d", c.CacheTTL)
+	}
+	return nil
+}
+
+// Validates worker configuration
+func (c *WorkerConfig) Validate() error {
+	if c.ResourceSyncInterval <= 0 {
+		return fmt.Errorf("resource_sync_interval must be greater than 0, got: %d", c.ResourceSyncInterval)
+	}
+	if c.StaleResourceThreshold <= 0 {
+		return fmt.Errorf("stale_resource_threshold must be greater than 0, got: %d", c.StaleResourceThreshold)
+	}
+	// Ensure ExcludeNamespaces and IncludeNamespaces are initialized as slices (not nil)
+	if c.ExcludeNamespaces == nil {
+		c.ExcludeNamespaces = []string{}
+	}
+	if c.IncludeNamespaces == nil {
+		c.IncludeNamespaces = []string{}
+	}
+	return nil
 }
