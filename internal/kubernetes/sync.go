@@ -15,109 +15,63 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Syncs all Kubernetes resources to PostgreSQL
-func SyncAllResources(ctx context.Context) error {
+// Syncs resources to PostgreSQL
+func SyncResources(ctx context.Context) error {
 	log := logger.WithComponent("kubernetes")
-	log.Debug().Msg("Starting full resource sync")
+	log.Info().Msg("Starting resources sync...")
 
-	// Sync namespaces
-	if err := SyncNamespaces(ctx); err != nil {
-		return fmt.Errorf("failed to sync namespaces: %w", err)
-	}
-
-	// Sync nodes
 	if err := SyncNodes(ctx); err != nil {
-		return fmt.Errorf("failed to sync nodes: %w", err)
-	}
-
-	// Sync deployments
-	if err := SyncDeployments(ctx); err != nil {
-		return fmt.Errorf("failed to sync deployments: %w", err)
-	}
-
-	// Sync replicasets
-	if err := SyncReplicaSets(ctx); err != nil {
-		return fmt.Errorf("failed to sync replicasets: %w", err)
-	}
-
-	// Sync statefulsets
-	if err := SyncStatefulSets(ctx); err != nil {
-		return fmt.Errorf("failed to sync statefulsets: %w", err)
-	}
-
-	// Sync daemonsets
-	if err := SyncDaemonSets(ctx); err != nil {
-		return fmt.Errorf("failed to sync daemonsets: %w", err)
-	}
-
-	// Sync services
-	if err := SyncServices(ctx); err != nil {
-		return fmt.Errorf("failed to sync services: %w", err)
-	}
-
-	// Sync endpoints
-	if err := SyncEndpoints(ctx); err != nil {
-		return fmt.Errorf("failed to sync endpoints: %w", err)
-	}
-
-	// Sync pods
-	if err := SyncPods(ctx); err != nil {
-		return fmt.Errorf("failed to sync pods: %w", err)
-	}
-
-	// Sync containers
-	if err := SyncContainers(ctx); err != nil {
-		return fmt.Errorf("failed to sync containers: %w", err)
-	}
-
-	log.Debug().Msg("Full resource sync completed")
-	return nil
-}
-
-// Syncs namespaces to PostgreSQL
-func SyncNamespaces(ctx context.Context) error {
-	log := logger.WithComponent("kubernetes")
-
-	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		log.Warn().Err(err).Msg("Failed to sync nodes")
 	}
 
 	namespaces, err := Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list namespaces: %w", err)
+		log.Warn().Err(err).Msg("Failed to list namespaces")
 	}
-
-	log.Debug().Int("count", len(namespaces.Items)).Msg("Syncing namespaces")
-
-	dbNamespaces := make([]*database.Namespace, 0, len(namespaces.Items))
-	now := time.Now()
+	if err := SyncNamespaces(ctx, namespaces); err != nil {
+		log.Warn().Err(err).Msg("Failed to sync namespaces")
+	}
 
 	for _, ns := range namespaces.Items {
 		if !shouldSyncNamespace(ns.Name) {
 			continue
 		}
 
-		labelsJSON, _ := mapToJSON(ns.Labels)
-		annotationsJSON, _ := mapToJSON(ns.Annotations)
-
-		dbNamespace := &database.Namespace{
-			Name:        ns.Name,
-			UID:         string(ns.UID),
-			Phase:       string(ns.Status.Phase),
-			Labels:      labelsJSON,
-			Annotations: annotationsJSON,
-			CreatedAt:   ns.CreationTimestamp.Time,
-			SyncedAt:    now,
+		if err := SyncDeployments(ctx, ns.Name); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync deployments")
 		}
 
-		dbNamespaces = append(dbNamespaces, dbNamespace)
+		if err := SyncReplicaSets(ctx, ns.Name); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync replicasets")
+		}
+
+		if err := SyncStatefulSets(ctx, ns.Name); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync statefulsets")
+		}
+
+		if err := SyncDaemonSets(ctx, ns.Name); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync daemonsets")
+		}
+
+		if err := SyncServices(ctx, ns.Name); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync services")
+		}
+
+		if err := SyncEndpoints(ctx, ns.Name); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync endpoints")
+		}
+
+		if err := SyncPods(ctx, ns.Name); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync pods")
+		}
+
+		if err := SyncContainers(ctx, ns.Name); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync containers")
+		}
+
 	}
 
-	if err := database.UpsertNamespacesBatch(ctx, dbNamespaces); err != nil {
-		return fmt.Errorf("failed to upsert namespaces: %w", err)
-	}
-
-	log.Debug().Int("count", len(dbNamespaces)).Msg("Namespaces synced successfully")
+	log.Info().Msg("Resources sync completed")
 	return nil
 }
 
@@ -134,7 +88,7 @@ func SyncNodes(ctx context.Context) error {
 		return fmt.Errorf("failed to list nodes: %w", err)
 	}
 
-	log.Debug().Int("count", len(nodes.Items)).Msg("Syncing nodes")
+	log.Debug().Int("count", len(nodes.Items)).Msg("Syncing nodes...")
 
 	dbNodes := make([]*database.Node, 0, len(nodes.Items))
 	now := time.Now()
@@ -201,29 +155,67 @@ func SyncNodes(ctx context.Context) error {
 	return nil
 }
 
-// Syncs deployments to PostgreSQL
-func SyncDeployments(ctx context.Context) error {
+// Syncs namespaces to PostgreSQL
+func SyncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	deployments, err := Clientset.AppsV1().Deployments("").List(ctx, metav1.ListOptions{})
+	log.Debug().Int("count", len(namespaces.Items)).Msg("Syncing namespaces...")
+
+	dbNamespaces := make([]*database.Namespace, 0, len(namespaces.Items))
+	now := time.Now()
+
+	for _, ns := range namespaces.Items {
+		if !shouldSyncNamespace(ns.Name) {
+			continue
+		}
+
+		labelsJSON, _ := mapToJSON(ns.Labels)
+		annotationsJSON, _ := mapToJSON(ns.Annotations)
+
+		dbNamespace := &database.Namespace{
+			Name:        ns.Name,
+			UID:         string(ns.UID),
+			Phase:       string(ns.Status.Phase),
+			Labels:      labelsJSON,
+			Annotations: annotationsJSON,
+			CreatedAt:   ns.CreationTimestamp.Time,
+			SyncedAt:    now,
+		}
+
+		dbNamespaces = append(dbNamespaces, dbNamespace)
+	}
+
+	if err := database.UpsertNamespacesBatch(ctx, dbNamespaces); err != nil {
+		return fmt.Errorf("failed to upsert namespaces: %w", err)
+	}
+
+	log.Debug().Int("count", len(dbNamespaces)).Msg("Namespaces synced successfully")
+	return nil
+}
+
+// Syncs deployments to PostgreSQL
+func SyncDeployments(ctx context.Context, namespace string) error {
+	log := logger.WithComponent("kubernetes")
+
+	if Clientset == nil {
+		return fmt.Errorf("Kubernetes client not initialized")
+	}
+
+	deployments, err := Clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list deployments: %w", err)
 	}
 
-	log.Debug().Int("count", len(deployments.Items)).Msg("Syncing deployments")
+	log.Debug().Int("count", len(deployments.Items)).Msg("Syncing deployments...")
 
 	dbDeployments := make([]*database.Deployment, 0, len(deployments.Items))
 	now := time.Now()
 
 	for _, dep := range deployments.Items {
-		if !shouldSyncNamespace(dep.Namespace) {
-			continue
-		}
-
 		labelsJSON, _ := mapToJSON(dep.Labels)
 		annotationsJSON, _ := mapToJSON(dep.Annotations)
 
@@ -257,27 +249,24 @@ func SyncDeployments(ctx context.Context) error {
 }
 
 // Syncs replicasets to PostgreSQL
-func SyncReplicaSets(ctx context.Context) error {
+func SyncReplicaSets(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	replicasets, err := Clientset.AppsV1().ReplicaSets("").List(ctx, metav1.ListOptions{})
+	replicasets, err := Clientset.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list replicasets: %w", err)
 	}
 
-	log.Debug().Int("count", len(replicasets.Items)).Msg("Syncing replicasets")
+	log.Debug().Int("count", len(replicasets.Items)).Msg("Syncing replicasets...")
 
 	dbReplicaSets := make([]*database.ReplicaSet, 0, len(replicasets.Items))
 	now := time.Now()
 
 	for _, rs := range replicasets.Items {
-		if !shouldSyncNamespace(rs.Namespace) {
-			continue
-		}
 		// Only sync active ReplicaSets
 		if rs.Status.Replicas == 0 {
 			continue
@@ -328,28 +317,24 @@ func SyncReplicaSets(ctx context.Context) error {
 }
 
 // Syncs statefulsets to PostgreSQL
-func SyncStatefulSets(ctx context.Context) error {
+func SyncStatefulSets(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	statefulsets, err := Clientset.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{})
+	statefulsets, err := Clientset.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list statefulsets: %w", err)
 	}
 
-	log.Debug().Int("count", len(statefulsets.Items)).Msg("Syncing statefulsets")
+	log.Debug().Int("count", len(statefulsets.Items)).Msg("Syncing statefulsets...")
 
 	dbStatefulSets := make([]*database.StatefulSet, 0, len(statefulsets.Items))
 	now := time.Now()
 
 	for _, sts := range statefulsets.Items {
-		if !shouldSyncNamespace(sts.Namespace) {
-			continue
-		}
-
 		labelsJSON, _ := mapToJSON(sts.Labels)
 		annotationsJSON, _ := mapToJSON(sts.Annotations)
 
@@ -382,28 +367,24 @@ func SyncStatefulSets(ctx context.Context) error {
 }
 
 // Syncs daemonsets to PostgreSQL
-func SyncDaemonSets(ctx context.Context) error {
+func SyncDaemonSets(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	daemonsets, err := Clientset.AppsV1().DaemonSets("").List(ctx, metav1.ListOptions{})
+	daemonsets, err := Clientset.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list daemonsets: %w", err)
 	}
 
-	log.Debug().Int("count", len(daemonsets.Items)).Msg("Syncing daemonsets")
+	log.Debug().Int("count", len(daemonsets.Items)).Msg("Syncing daemonsets...")
 
 	dbDaemonSets := make([]*database.DaemonSet, 0, len(daemonsets.Items))
 	now := time.Now()
 
 	for _, ds := range daemonsets.Items {
-		if !shouldSyncNamespace(ds.Namespace) {
-			continue
-		}
-
 		labelsJSON, _ := mapToJSON(ds.Labels)
 		annotationsJSON, _ := mapToJSON(ds.Annotations)
 
@@ -432,28 +413,24 @@ func SyncDaemonSets(ctx context.Context) error {
 }
 
 // Syncs services to PostgreSQL
-func SyncServices(ctx context.Context) error {
+func SyncServices(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	services, err := Clientset.CoreV1().Services("").List(ctx, metav1.ListOptions{})
+	services, err := Clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list services: %w", err)
 	}
 
-	log.Debug().Int("count", len(services.Items)).Msg("Syncing services")
+	log.Debug().Int("count", len(services.Items)).Msg("Syncing services...")
 
 	dbServices := make([]*database.Service, 0, len(services.Items))
 	now := time.Now()
 
 	for _, svc := range services.Items {
-		if !shouldSyncNamespace(svc.Namespace) {
-			continue
-		}
-
 		labelsJSON, _ := mapToJSON(svc.Labels)
 		annotationsJSON, _ := mapToJSON(svc.Annotations)
 		selectorJSON, _ := mapToJSON(svc.Spec.Selector)
@@ -491,28 +468,24 @@ func SyncServices(ctx context.Context) error {
 }
 
 // Syncs endpoints to PostgreSQL
-func SyncEndpoints(ctx context.Context) error {
+func SyncEndpoints(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	endpoints, err := Clientset.CoreV1().Endpoints("").List(ctx, metav1.ListOptions{})
+	endpoints, err := Clientset.CoreV1().Endpoints(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list endpoints: %w", err)
 	}
 
-	log.Debug().Int("count", len(endpoints.Items)).Msg("Syncing endpoints")
+	log.Debug().Int("count", len(endpoints.Items)).Msg("Syncing endpoints...")
 
 	dbEndpoints := make([]*database.Endpoint, 0, len(endpoints.Items))
 	now := time.Now()
 
 	for _, ep := range endpoints.Items {
-		if !shouldSyncNamespace(ep.Namespace) {
-			continue
-		}
-
 		labelsJSON, _ := mapToJSON(ep.Labels)
 		annotationsJSON, _ := mapToJSON(ep.Annotations)
 		// Extract addresses and ports from subsets
@@ -551,28 +524,24 @@ func SyncEndpoints(ctx context.Context) error {
 }
 
 // Syncs pods to PostgreSQL
-func SyncPods(ctx context.Context) error {
+func SyncPods(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	pods, err := Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	pods, err := Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list pods: %w", err)
 	}
 
-	log.Debug().Int("count", len(pods.Items)).Msg("Syncing pods")
+	log.Debug().Int("count", len(pods.Items)).Msg("Syncing pods...")
 
 	dbPods := make([]*database.Pod, 0, len(pods.Items))
 	now := time.Now()
 
 	for _, pod := range pods.Items {
-		if !shouldSyncNamespace(pod.Namespace) {
-			continue
-		}
-
 		labelsJSON, _ := mapToJSON(pod.Labels)
 		annotationsJSON, _ := mapToJSON(pod.Annotations)
 
@@ -620,14 +589,14 @@ func SyncPods(ctx context.Context) error {
 }
 
 // Syncs containers to PostgreSQL
-func SyncContainers(ctx context.Context) error {
+func SyncContainers(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	pods, err := Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	pods, err := Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list pods: %w", err)
 	}
@@ -636,10 +605,6 @@ func SyncContainers(ctx context.Context) error {
 	now := time.Now()
 
 	for _, pod := range pods.Items {
-		if !shouldSyncNamespace(pod.Namespace) {
-			continue
-		}
-
 		podUID := string(pod.UID)
 		podName := pod.Name
 		namespace := pod.Namespace
@@ -701,7 +666,7 @@ func SyncContainers(ctx context.Context) error {
 	}
 
 	if len(dbContainers) > 0 {
-		log.Debug().Int("count", len(dbContainers)).Msg("Syncing containers")
+		log.Debug().Int("count", len(dbContainers)).Msg("Syncing containers...")
 		if err := database.UpsertContainersBatch(ctx, dbContainers); err != nil {
 			return fmt.Errorf("failed to upsert containers: %w", err)
 		}
@@ -714,9 +679,6 @@ func SyncContainers(ctx context.Context) error {
 // Checks if a namespace should be synced based on include/exclude lists
 func shouldSyncNamespace(namespace string) bool {
 	cfg := config.AppConfig.Workers
-	if cfg.IncludeNamespaces == nil && cfg.ExcludeNamespaces == nil {
-		return true
-	}
 
 	if len(cfg.IncludeNamespaces) > 0 {
 		return slices.Contains(cfg.IncludeNamespaces, namespace)

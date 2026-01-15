@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -22,20 +23,15 @@ type WorkerPool struct {
 }
 
 // Creates a new worker pool
-func NewWorkerPool(cfg *config.WorkerConfig) *WorkerPool {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	syncInterval := 5 * time.Minute
-	staleThreshold := 10 * time.Minute
-
-	if cfg != nil {
-		if cfg.ResourceSyncInterval > 0 {
-			syncInterval = time.Duration(cfg.ResourceSyncInterval) * time.Second
-		}
-		if cfg.StaleResourceThreshold > 0 {
-			staleThreshold = time.Duration(cfg.StaleResourceThreshold) * time.Second
-		}
+func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("worker config is nil")
 	}
+
+	syncInterval := time.Duration(cfg.ResourceSyncInterval) * time.Second
+	staleThreshold := time.Duration(cfg.StaleResourceThreshold) * time.Second
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	return &WorkerPool{
 		ctx:            ctx,
@@ -43,13 +39,13 @@ func NewWorkerPool(cfg *config.WorkerConfig) *WorkerPool {
 		resourceSync:   NewResourceSyncWorker(ctx, syncInterval, staleThreshold),
 		syncInterval:   syncInterval,
 		staleThreshold: staleThreshold,
-	}
+	}, nil
 }
 
 // Starts all workers
 func (wp *WorkerPool) Start() {
 	log := logger.WithComponent("workers")
-	log.Info().Msg("Starting worker pool")
+	log.Info().Msg("Starting worker pool...")
 
 	// Start resource sync worker
 	wp.wg.Go(func() {
@@ -92,7 +88,7 @@ func (w *ResourceSyncWorker) Run() {
 	log.Info().
 		Dur("interval", w.interval).
 		Dur("stale_threshold", w.staleThreshold).
-		Msg("Starting resource sync worker")
+		Msg("Starting resource sync worker...")
 
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
@@ -114,18 +110,16 @@ func (w *ResourceSyncWorker) Run() {
 // Performs the actual sync operation
 func (w *ResourceSyncWorker) sync() {
 	log := logger.WithComponent("workers")
-	log.Info().Msg("Starting resource sync")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
+	log.Info().Msg("Starting resources sync process...")
 	// Sync all resources
-	if err := kubernetes.SyncAllResources(ctx); err != nil {
-		log.Error().Err(err).Msg("Failed to sync resources")
-		return
+	if err := kubernetes.SyncResources(ctx); err != nil {
+		log.Warn().Err(err).Msg("Failed to sync resources")
 	}
-
-	log.Info().Msg("Resource sync completed")
+	log.Info().Msg("Resources sync process completed")
 
 	// Run cleanup after sync
 	w.cleanup(ctx)
@@ -134,8 +128,8 @@ func (w *ResourceSyncWorker) sync() {
 // Performs cleanup operations for stale resources and recommendations
 func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	log := logger.WithComponent("workers")
-	log.Info().Msg("Starting resource cleanup")
 
+	log.Info().Msg("Starting resource cleanup process...")
 	// Clean up stale resources (resources that haven't been synced recently)
 	staleThreshold := time.Now().Add(-w.staleThreshold)
 	if err := database.DeletePodsNotSyncedSince(ctx, staleThreshold); err != nil {
@@ -175,6 +169,5 @@ func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	if err := database.CleanupComputeRecommendationsForDeletedWorkloads(ctx); err != nil {
 		log.Warn().Err(err).Msg("Failed to cleanup compute recommendations for deleted workloads")
 	}
-
-	log.Info().Msg("Resource cleanup completed")
+	log.Info().Msg("Resource cleanup process completed")
 }
