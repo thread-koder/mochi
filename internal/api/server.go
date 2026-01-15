@@ -23,6 +23,10 @@ type Server struct {
 
 // Creates a new API server instance
 func NewServer(cfg *config.APIConfig) (*Server, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("api config is nil")
+	}
+
 	// Set Gin mode
 	gin.SetMode(cfg.Mode)
 

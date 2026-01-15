@@ -17,6 +17,10 @@ var (
 
 // Initializes the database connection pool using pgx
 func Init(cfg *config.DatabaseConfig) error {
+	if cfg == nil {
+		return fmt.Errorf("database config is nil")
+	}
+
 	log := logger.WithComponent("database")
 	log.Info().Msg("Initializing connection pool...")
 

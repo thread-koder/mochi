@@ -22,6 +22,10 @@ var (
 
 // Initializes the Prometheus client
 func Init(cfg *config.PrometheusConfig) error {
+	if cfg == nil {
+		return fmt.Errorf("prometheus config is nil")
+	}
+
 	log := logger.WithComponent("prometheus")
 	log.Info().Msg("Initializing client...")
 

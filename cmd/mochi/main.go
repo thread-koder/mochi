@@ -71,7 +71,10 @@ func main() {
 	defer redis.Close()
 
 	// Create and start worker pool
-	workerPool := workers.NewWorkerPool(&cfg.Workers)
+	workerPool, err := workers.NewWorkerPool(&cfg.Workers)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create worker pool")
+	}
 	workerPool.Start()
 	defer workerPool.Stop()
 

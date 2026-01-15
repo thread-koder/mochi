@@ -18,6 +18,10 @@ var migrationsFS embed.FS
 
 // Runs database migrations using a temporary sql.DB connection
 func Migrate(cfg *config.DatabaseConfig) error {
+	if cfg == nil {
+		return fmt.Errorf("database config is nil")
+	}
+
 	log := logger.WithComponent("database")
 	log.Info().Msg("Applying migrations...")
 

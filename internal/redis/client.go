@@ -17,6 +17,10 @@ var (
 
 // Initializes the Redis client
 func Init(cfg *config.RedisConfig) error {
+	if cfg == nil {
+		return fmt.Errorf("redis config is nil")
+	}
+
 	log := logger.WithComponent("redis")
 	log.Info().Msg("Initializing client...")
 

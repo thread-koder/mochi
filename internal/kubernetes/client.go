@@ -32,6 +32,10 @@ type ClusterInfo struct {
 
 // Initializes the Kubernetes client with the provided configuration
 func Init(cfg *config.KubernetesConfig) error {
+	if cfg == nil {
+		return fmt.Errorf("kubernetes config is nil")
+	}
+
 	var err error
 	var kubeconfig string
 
