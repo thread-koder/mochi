@@ -1,0 +1,49 @@
+/* Transitions */
+* {
+  transition: all 0.2s ease;
+}
+
+/* Avoid layout shift */
+iconify-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1f3a;
+}
+::-webkit-scrollbar-thumb {
+  background: #8b5cf6;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #7c3aed;
+}
+
+/* Glassmorphism effect */
+.glass {
+  background: var(--color-bg-card);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+/* Hover effects for glass cards */
+.glass-card-hover:hover {
+  border-color: rgba(139, 92, 246, 0.5) !important;
+}
+
+/* Magnetic card  */
+.magnetic-card {
+  will-change: transform;
+}
+
+/* Hover background for list items */
+.glass-item-hover:hover {
+  background-color: rgba(139, 92, 246, 0.1) !important;
+}
