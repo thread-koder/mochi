@@ -20,6 +20,19 @@ document.addEventListener("alpine:init", () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 
+  // Helper function to get CSS variable color, optionally with opacity
+  function getCSSVariableColor(variableName, opacity = null) {
+    const root = document.documentElement;
+    const computedStyle = getComputedStyle(root);
+    const value = computedStyle.getPropertyValue(variableName).trim();
+    if (!value) return null;
+
+    if (opacity !== null) {
+      return value.replace(/\)$/, ` / ${opacity})`);
+    }
+    return value;
+  }
+
   // Main compute component
   Alpine.data("compute", (namespace) => ({
     namespace: namespace,
@@ -153,6 +166,15 @@ document.addEventListener("alpine:init", () => {
         const maxValue = Math.max(...data.map((d) => d.y));
         const useMillicores = maxValue < 1;
 
+        // Get theme colors
+        const primaryColor = getCSSVariableColor("--color-primary-light");
+        const primaryColorWithOpacity = getCSSVariableColor(
+          "--color-primary-light",
+          0.1
+        );
+        const gridColor = getCSSVariableColor("--color-primary", 0.1);
+        const textColor = getCSSVariableColor("--color-on-surface-secondary");
+
         chart = new Chart(ctx, {
           type: "line",
           data: {
@@ -163,8 +185,8 @@ document.addEventListener("alpine:init", () => {
                   : "CPU Utilization (cores)",
                 data: data,
                 parsing: false,
-                borderColor: "rgb(168, 85, 247)",
-                backgroundColor: "rgba(168, 85, 247, 0.1)",
+                borderColor: primaryColor,
+                backgroundColor: primaryColorWithOpacity,
                 borderWidth: 2,
                 fill: true,
                 tension: 0.6,
@@ -189,16 +211,28 @@ document.addEventListener("alpine:init", () => {
               },
               legend: {
                 labels: {
-                  color: "#a0a0a0",
+                  color: textColor,
                   font: { family: "JetBrains Mono", size: 12 },
                 },
               },
               tooltip: {
+                backgroundColor: getCSSVariableColor(
+                  "--color-surface-elevated"
+                ),
+                borderColor: getCSSVariableColor("--color-primary", 0.3),
+                borderWidth: 1,
+                titleColor: getCSSVariableColor("--color-on-surface-secondary"),
+                bodyColor: getCSSVariableColor("--color-on-surface"),
                 titleFont: { family: "JetBrains Mono", size: 12 },
                 bodyFont: { family: "JetBrains Mono", size: 12 },
+                cornerRadius: 8,
+                padding: 12,
+                displayColors: true,
+                boxWidth: 12,
+                boxHeight: 12,
+                boxPadding: 2,
                 intersect: false,
                 mode: "index",
-                padding: 12,
                 callbacks: {
                   title: (context) => {
                     const timestamp = new Date(context[0].parsed.x);
@@ -232,28 +266,28 @@ document.addEventListener("alpine:init", () => {
                   },
                 },
                 ticks: {
-                  color: "#a0a0a0",
+                  color: textColor,
                   font: { family: "JetBrains Mono", size: 11 },
                   maxTicksLimit: 10,
                   maxRotation: 0,
                   autoSkip: true,
                 },
-                grid: { color: "rgba(168, 85, 247, 0.1)" },
+                grid: { color: gridColor },
                 title: {
                   font: { family: "JetBrains Mono", size: 12 },
                 },
               },
               y: {
                 ticks: {
-                  color: "#a0a0a0",
+                  color: textColor,
                   font: { family: "JetBrains Mono", size: 11 },
                   callback: (value) => formatCPU(value),
                 },
-                grid: { color: "rgba(168, 85, 247, 0.1)" },
+                grid: { color: gridColor },
                 title: {
                   display: true,
                   text: useMillicores ? "CPU (millicores)" : "CPU (cores)",
-                  color: "#a0a0a0",
+                  color: textColor,
                   font: { family: "JetBrains Mono", size: 12 },
                 },
               },
@@ -300,6 +334,16 @@ document.addEventListener("alpine:init", () => {
           y: dp.value,
         }));
 
+        // Get theme colors
+        const secondaryColor = getCSSVariableColor("--color-secondary-light");
+        const secondaryColorWithOpacity = getCSSVariableColor(
+          "--color-secondary-light",
+          0.1
+        );
+        const gridColor = getCSSVariableColor("--color-secondary", 0.1);
+        console.log("Grid color:", gridColor);
+        const textColor = getCSSVariableColor("--color-on-surface-secondary");
+
         chart = new Chart(ctx, {
           type: "line",
           data: {
@@ -308,8 +352,8 @@ document.addEventListener("alpine:init", () => {
                 label: "Memory Utilization",
                 data: data,
                 parsing: false,
-                borderColor: "rgb(34, 211, 238)",
-                backgroundColor: "rgba(34, 211, 238, 0.1)",
+                borderColor: secondaryColor,
+                backgroundColor: secondaryColorWithOpacity,
                 borderWidth: 2,
                 fill: true,
                 tension: 0.6,
@@ -334,16 +378,28 @@ document.addEventListener("alpine:init", () => {
               },
               legend: {
                 labels: {
-                  color: "#a0a0a0",
+                  color: textColor,
                   font: { family: "JetBrains Mono", size: 12 },
                 },
               },
               tooltip: {
+                backgroundColor: getCSSVariableColor(
+                  "--color-surface-elevated"
+                ),
+                borderColor: getCSSVariableColor("--color-secondary", 0.3),
+                borderWidth: 1,
+                titleColor: getCSSVariableColor("--color-on-surface-secondary"),
+                bodyColor: getCSSVariableColor("--color-on-surface"),
                 titleFont: { family: "JetBrains Mono", size: 12 },
                 bodyFont: { family: "JetBrains Mono", size: 12 },
+                cornerRadius: 8,
+                padding: 12,
+                displayColors: true,
+                boxWidth: 12,
+                boxHeight: 12,
+                boxPadding: 2,
                 intersect: false,
                 mode: "index",
-                padding: 12,
                 callbacks: {
                   title: (context) => {
                     const timestamp = new Date(context[0].parsed.x);
@@ -377,28 +433,28 @@ document.addEventListener("alpine:init", () => {
                   },
                 },
                 ticks: {
-                  color: "#a0a0a0",
+                  color: textColor,
                   font: { family: "JetBrains Mono", size: 11 },
                   maxTicksLimit: 10,
                   maxRotation: 0,
                   autoSkip: true,
                 },
-                grid: { color: "rgba(34, 211, 238, 0.1)" },
+                grid: { color: gridColor },
                 title: {
                   font: { family: "JetBrains Mono", size: 12 },
                 },
               },
               y: {
                 ticks: {
-                  color: "#a0a0a0",
+                  color: textColor,
                   font: { family: "JetBrains Mono", size: 11 },
                   callback: (value) => formatBytes(value),
                 },
-                grid: { color: "rgba(34, 211, 238, 0.1)" },
+                grid: { color: gridColor },
                 title: {
                   display: true,
                   text: "Memory",
-                  color: "#a0a0a0",
+                  color: textColor,
                   font: { family: "JetBrains Mono", size: 12 },
                 },
               },
