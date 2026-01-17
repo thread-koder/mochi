@@ -108,6 +108,33 @@ func GetDaemonSetsByNamespace(ctx context.Context, namespace string) ([]*DaemonS
 	return daemonsets, nil
 }
 
+// Gets a daemonset by name and namespace
+func GetDaemonSetByName(ctx context.Context, name string, namespace string) (*DaemonSet, error) {
+	query := `
+		SELECT id, name, namespace, uid, desired_number_scheduled, number_ready, number_available,
+		       labels, annotations, created_at, updated_at, synced_at
+		FROM daemonsets
+		WHERE name = $1 AND namespace = $2
+		LIMIT 1
+	`
+
+	var ds DaemonSet
+	err := Pool.QueryRow(ctx, query, name, namespace).Scan(
+		&ds.ID, &ds.Name, &ds.Namespace, &ds.UID,
+		&ds.DesiredNumberScheduled, &ds.NumberReady, &ds.NumberAvailable,
+		&ds.Labels, &ds.Annotations,
+		&ds.CreatedAt, &ds.UpdatedAt, &ds.SyncedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("daemonset %s not found in namespace %s", name, namespace)
+		}
+		return nil, fmt.Errorf("failed to query daemonset by name: %w", err)
+	}
+
+	return &ds, nil
+}
+
 // Deletes daemonsets that haven't been synced since the specified time
 func DeleteDaemonSetsNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")

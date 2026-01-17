@@ -48,14 +48,6 @@ type StandalonePodItem struct {
 // Renders the namespace page
 func Namespace(c *gin.Context) {
 	namespaceName := c.Param("namespace")
-	if namespaceName == "" {
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{
-			"Title":   "Bad Request",
-			"Page":    "error",
-			"Message": "Namespace name is required",
-		})
-		return
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

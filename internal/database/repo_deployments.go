@@ -108,6 +108,33 @@ func GetDeploymentsByNamespace(ctx context.Context, namespace string) ([]*Deploy
 	return deployments, nil
 }
 
+// Gets a deployment by name and namespace
+func GetDeploymentByName(ctx context.Context, name string, namespace string) (*Deployment, error) {
+	query := `
+		SELECT id, name, namespace, uid, replicas, ready_replicas, available_replicas,
+		       labels, annotations, created_at, updated_at, synced_at
+		FROM deployments
+		WHERE name = $1 AND namespace = $2
+		LIMIT 1
+	`
+
+	var dep Deployment
+	err := Pool.QueryRow(ctx, query, name, namespace).Scan(
+		&dep.ID, &dep.Name, &dep.Namespace, &dep.UID,
+		&dep.Replicas, &dep.ReadyReplicas, &dep.AvailableReplicas,
+		&dep.Labels, &dep.Annotations,
+		&dep.CreatedAt, &dep.UpdatedAt, &dep.SyncedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("deployment %s not found in namespace %s", name, namespace)
+		}
+		return nil, fmt.Errorf("failed to query deployment by name: %w", err)
+	}
+
+	return &dep, nil
+}
+
 // Deletes deployments that haven't been synced since the specified time
 func DeleteDeploymentsNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")

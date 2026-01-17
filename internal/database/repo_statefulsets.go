@@ -107,6 +107,33 @@ func GetStatefulSetsByNamespace(ctx context.Context, namespace string) ([]*State
 	return statefulsets, nil
 }
 
+// Gets a statefulset by name and namespace
+func GetStatefulSetByName(ctx context.Context, name string, namespace string) (*StatefulSet, error) {
+	query := `
+		SELECT id, name, namespace, uid, replicas, ready_replicas,
+		       labels, annotations, created_at, updated_at, synced_at
+		FROM statefulsets
+		WHERE name = $1 AND namespace = $2
+		LIMIT 1
+	`
+
+	var sts StatefulSet
+	err := Pool.QueryRow(ctx, query, name, namespace).Scan(
+		&sts.ID, &sts.Name, &sts.Namespace, &sts.UID,
+		&sts.Replicas, &sts.ReadyReplicas,
+		&sts.Labels, &sts.Annotations,
+		&sts.CreatedAt, &sts.UpdatedAt, &sts.SyncedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("statefulset %s not found in namespace %s", name, namespace)
+		}
+		return nil, fmt.Errorf("failed to query statefulset by name: %w", err)
+	}
+
+	return &sts, nil
+}
+
 // Deletes statefulsets that haven't been synced since the specified time
 func DeleteStatefulSetsNotSyncedSince(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")
