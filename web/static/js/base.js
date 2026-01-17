@@ -82,4 +82,67 @@ document.addEventListener("alpine:init", () => {
       }
     },
   }));
+
+  // Theme Switcher component
+  Alpine.data("themeSwitcher", () => {
+    const applyTheme = (theme) => {
+      const html = document.documentElement;
+      if (theme === "dark") {
+        html.classList.add("dark");
+      } else {
+        html.classList.remove("dark");
+      }
+    };
+
+    const getCurrentTheme = () => {
+      if (localStorage.theme === "dark" || localStorage.theme === "light") {
+        return localStorage.theme;
+      }
+      // Use system preference
+      return window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+    };
+
+    return {
+      isDark: false,
+      systemPreferenceHandler: null,
+      mediaQuery: null,
+
+      init() {
+        const theme = getCurrentTheme();
+        this.isDark = theme === "dark";
+
+        // Ensure theme is applied
+        applyTheme(theme);
+
+        // Watch for system preference changes
+        if (!("theme" in localStorage)) {
+          this.mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+          this.systemPreferenceHandler = (e) => {
+            const newTheme = e.matches ? "dark" : "light";
+            this.isDark = newTheme === "dark";
+            applyTheme(newTheme);
+          };
+          this.mediaQuery.addEventListener("change", this.systemPreferenceHandler);
+        }
+      },
+
+      toggleTheme() {
+        this.isDark = !this.isDark;
+        const theme = this.isDark ? "dark" : "light";
+        applyTheme(theme);
+
+        // Store preference
+        localStorage.theme = theme;
+
+        // Remove system preference listener
+        if (this.systemPreferenceHandler && this.mediaQuery) {
+          this.mediaQuery.removeEventListener("change", this.systemPreferenceHandler);
+          this.systemPreferenceHandler = null;
+          this.mediaQuery = null;
+        }
+      },
+    };
+  });
 });
