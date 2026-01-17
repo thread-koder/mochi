@@ -212,7 +212,7 @@ document.addEventListener("alpine:init", () => {
               legend: {
                 labels: {
                   color: textColor,
-                  font: { family: "JetBrains Mono", size: 12 },
+                  font: { family: "Inconsolata", size: 14 },
                 },
               },
               tooltip: {
@@ -223,8 +223,8 @@ document.addEventListener("alpine:init", () => {
                 borderWidth: 1,
                 titleColor: getCSSVariableColor("--color-on-surface-secondary"),
                 bodyColor: getCSSVariableColor("--color-on-surface"),
-                titleFont: { family: "JetBrains Mono", size: 12 },
-                bodyFont: { family: "JetBrains Mono", size: 12 },
+                titleFont: { family: "Inconsolata", size: 14 },
+                bodyFont: { family: "Inconsolata", size: 14 },
                 cornerRadius: 8,
                 padding: 12,
                 displayColors: true,
@@ -267,20 +267,20 @@ document.addEventListener("alpine:init", () => {
                 },
                 ticks: {
                   color: textColor,
-                  font: { family: "JetBrains Mono", size: 11 },
+                  font: { family: "Inconsolata", size: 13 },
                   maxTicksLimit: 10,
                   maxRotation: 0,
                   autoSkip: true,
                 },
                 grid: { color: gridColor },
                 title: {
-                  font: { family: "JetBrains Mono", size: 12 },
+                  font: { family: "Inconsolata", size: 14 },
                 },
               },
               y: {
                 ticks: {
                   color: textColor,
-                  font: { family: "JetBrains Mono", size: 11 },
+                  font: { family: "Inconsolata", size: 13 },
                   callback: (value) => formatCPU(value),
                 },
                 grid: { color: gridColor },
@@ -288,7 +288,7 @@ document.addEventListener("alpine:init", () => {
                   display: true,
                   text: useMillicores ? "CPU (millicores)" : "CPU (cores)",
                   color: textColor,
-                  font: { family: "JetBrains Mono", size: 12 },
+                  font: { family: "Inconsolata", size: 14 },
                 },
               },
             },
@@ -379,7 +379,7 @@ document.addEventListener("alpine:init", () => {
               legend: {
                 labels: {
                   color: textColor,
-                  font: { family: "JetBrains Mono", size: 12 },
+                  font: { family: "Inconsolata", size: 14 },
                 },
               },
               tooltip: {
@@ -390,8 +390,8 @@ document.addEventListener("alpine:init", () => {
                 borderWidth: 1,
                 titleColor: getCSSVariableColor("--color-on-surface-secondary"),
                 bodyColor: getCSSVariableColor("--color-on-surface"),
-                titleFont: { family: "JetBrains Mono", size: 12 },
-                bodyFont: { family: "JetBrains Mono", size: 12 },
+                titleFont: { family: "Inconsolata", size: 14 },
+                bodyFont: { family: "Inconsolata", size: 14 },
                 cornerRadius: 8,
                 padding: 12,
                 displayColors: true,
@@ -434,20 +434,20 @@ document.addEventListener("alpine:init", () => {
                 },
                 ticks: {
                   color: textColor,
-                  font: { family: "JetBrains Mono", size: 11 },
+                  font: { family: "Inconsolata", size: 13 },
                   maxTicksLimit: 10,
                   maxRotation: 0,
                   autoSkip: true,
                 },
                 grid: { color: gridColor },
                 title: {
-                  font: { family: "JetBrains Mono", size: 12 },
+                  font: { family: "Inconsolata", size: 14 },
                 },
               },
               y: {
                 ticks: {
                   color: textColor,
-                  font: { family: "JetBrains Mono", size: 11 },
+                  font: { family: "Inconsolata", size: 13 },
                   callback: (value) => formatBytes(value),
                 },
                 grid: { color: gridColor },
@@ -455,7 +455,7 @@ document.addEventListener("alpine:init", () => {
                   display: true,
                   text: "Memory",
                   color: textColor,
-                  font: { family: "JetBrains Mono", size: 12 },
+                  font: { family: "Inconsolata", size: 14 },
                 },
               },
             },

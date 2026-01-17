@@ -4,7 +4,7 @@
 <div class="p-8">
     <!-- Hero Section -->
     <div class="mb-8">
-        <h1 class="text-4xl font-bold mb-2">Welcome to Mochi</h1>
+        <h1 class="text-4xl font-bold font-heading mb-2">Welcome to Mochi</h1>
         <p class="text-on-surface-secondary mb-1">Kubernetes Resource Optimization Platform</p>
         {{if .ClusterName}}
         <p class="text-sm text-on-surface-muted">Cluster: {{.ClusterName}}</p>
@@ -52,7 +52,7 @@
     
     <!-- Recent Activity -->
     <div class="glass rounded-xl p-6 mb-8">
-        <h2 class="text-2xl font-bold mb-4">Recent Activity</h2>
+        <h2 class="text-2xl font-bold font-heading mb-4">Recent Activity</h2>
         <div class="space-y-3">
             {{if .Activities}}
                 {{range .Activities}}
@@ -76,7 +76,7 @@
     
     <!-- System Health Indicators -->
     <div class="glass rounded-xl p-6">
-        <h2 class="text-2xl font-bold mb-4">System Health</h2>
+        <h2 class="text-2xl font-bold font-heading mb-4">System Health</h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             {{if index .HealthChecks "database"}}
             <div class="flex items-center space-x-3 p-4 rounded-lg bg-success/10 border border-success/20">

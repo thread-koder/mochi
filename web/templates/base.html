@@ -18,7 +18,7 @@
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=jetbrains-mono:100,200,300,400,500,600,700,800" rel="stylesheet" />
+    <link href="https://fonts.bunny.net/css?family=inconsolata:400,500,600,700|karla:400,500,600,700" rel="stylesheet" />
 
     <!-- Iconify -->
     <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
@@ -26,8 +26,22 @@
     <!-- Tailwind Custom Theme -->
     <style type="text/tailwindcss">
         @theme static {
-            /* Font */
-            --font-sans: 'JetBrains Mono', 'Courier New', monospace;
+            /* Fonts */
+            --font-heading: 'Karla', sans-serif;
+            --font-body: 'Inconsolata', monospace;
+            --font-sans: var(--font-body);
+            
+            /* Text Sizes */
+            --text-xs: 0.875rem;    /* 14px */
+            --text-sm: 1rem;        /* 16px */
+            --text-base: 1.125rem;   /* 18px */
+            --text-lg: 1.25rem;      /* 20px */
+            --text-xl: 1.375rem;     /* 22px */
+            --text-2xl: 1.625rem;    /* 26px */
+            --text-3xl: 2rem;        /* 32px */
+            --text-4xl: 2.375rem;    /* 38px */
+            --text-5xl: 3.125rem;    /* 50px */
+            --text-6xl: 3.875rem;    /* 62px */
             
             /* Light Theme Palette (Default) */
             /* Base colors */
@@ -132,13 +146,13 @@
     <script src="/static/js/namespace.js"></script>
     {{end}}
 </head>
-<body class="bg-surface text-on-surface min-h-screen">
+<body class="bg-surface text-on-surface min-h-screen font-body">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
         <aside class="w-64 glass border-r border-primary/30 flex flex-col">
             <!-- Logo -->
             <div class="p-6 border-b border-primary/30">
-                <h1 class="text-2xl font-bold bg-gradient-to-r from-primary-light via-primary to-secondary-light bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(196,181,253,0.3)]">
+                <h1 class="text-2xl font-bold font-heading bg-gradient-to-r from-primary-light via-primary to-secondary-light bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(196,181,253,0.3)]">
                     Mochi
                 </h1>
             </div>

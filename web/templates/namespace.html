@@ -6,7 +6,7 @@
     <div class="mb-8">
         <div class="flex items-center justify-between mb-4">
             <div>
-                <h1 class="text-4xl font-bold mb-2">{{.Namespace.Name}}</h1>
+                <h1 class="text-4xl font-bold font-heading mb-2">{{.Namespace.Name}}</h1>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-on-surface-secondary">Namespace</span>
                     {{if eq .Namespace.Phase "Active"}}
@@ -67,7 +67,7 @@
 
             <!-- Workloads List -->
             <div class="glass rounded-xl p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4">Workloads</h2>
+                <h2 class="text-2xl font-bold font-heading mb-4">Workloads</h2>
                 {{if .Workloads}}
                 <div class="space-y-2">
                     {{range .Workloads}}
@@ -98,7 +98,7 @@
             <!-- Standalone Pods -->
             {{if .Standalone}}
             <div class="glass rounded-xl p-6 mb-6">
-                <h2 class="text-2xl font-bold mb-4">Standalone Pods</h2>
+                <h2 class="text-2xl font-bold font-heading mb-4">Standalone Pods</h2>
                 <div class="space-y-2">
                     {{range .Standalone}}
                     <a href="/namespaces/{{$.Namespace.Name}}/workloads/pod/{{.Name}}" 
@@ -127,7 +127,7 @@
             <!-- System Pods -->
             {{if .System}}
             <div class="glass rounded-xl p-6">
-                <h2 class="text-2xl font-bold mb-4">System Pods</h2>
+                <h2 class="text-2xl font-bold font-heading mb-4">System Pods</h2>
                 <div class="space-y-2">
                     {{range .System}}
                     <a href="/namespaces/{{$.Namespace.Name}}/workloads/pod/{{.Name}}" 
@@ -202,7 +202,7 @@
                     <div x-show="!loading && !error && analysis" class="space-y-6">
                         <!-- Summary Metrics -->
                         <div x-data="summaryMetrics($data)" class="glass rounded-xl p-6">
-                            <h2 class="text-2xl font-bold mb-4">Summary</h2>
+                            <h2 class="text-2xl font-bold font-heading mb-4">Summary</h2>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <!-- CPU Metrics -->
                                 <div class="space-y-3">
@@ -308,18 +308,18 @@
 
                         <!-- Resource Utilization Charts -->
                         <div x-show="analysis?.time_series" class="glass rounded-xl p-6">
-                            <h2 class="text-2xl font-bold mb-4">Resource Utilization</h2>
+                            <h2 class="text-2xl font-bold font-heading mb-4">Resource Utilization</h2>
                             <div class="space-y-6">
                                 <!-- CPU Chart -->
                                 <div x-data="cpuChart($data)">
-                                    <h3 class="text-xl font-semibold mb-2 text-primary-light">CPU Utilization Over Time</h3>
+                                    <h3 class="text-xl font-semibold font-heading mb-2 text-primary-light">CPU Utilization Over Time</h3>
                                     <div class="h-96 relative" x-init="$watch('cpuData', () => { if (cpuData && cpuData.length > 0) initChart(); }, { immediate: true })">
                                         <canvas x-ref="chart" class="w-full h-full"></canvas>
                                     </div>
                                 </div>
                                 <!-- Memory Chart -->
                                 <div x-data="memoryChart($data)">
-                                    <h3 class="text-xl font-semibold mb-2 text-secondary-light">Memory Utilization Over Time</h3>
+                                    <h3 class="text-xl font-semibold font-heading mb-2 text-secondary-light">Memory Utilization Over Time</h3>
                                     <div class="h-96 relative" x-init="$watch('memoryData', () => { if (memoryData && memoryData.length > 0) initChart(); }, { immediate: true })">
                                         <canvas x-ref="chart" class="w-full h-full"></canvas>
                                     </div>
@@ -330,7 +330,7 @@
                         <!-- Top Workloads -->
                         <div x-data="workloadsList(namespace, $data)" x-show="analysis?.workloads && analysis.workloads.length > 0" class="glass rounded-xl p-6">
                             <div class="flex items-center justify-between mb-4">
-                                <h2 class="text-2xl font-bold">Top Workloads by Usage</h2>
+                                <h2 class="text-2xl font-bold font-heading">Top Workloads by Usage</h2>
                                 <div class="flex items-center gap-2">
                                     <select x-model="sortMetric" @change="sortWorkloads()" 
                                             class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-1 text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50">
