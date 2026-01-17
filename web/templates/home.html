@@ -5,48 +5,48 @@
     <!-- Hero Section -->
     <div class="mb-8">
         <h1 class="text-4xl font-bold mb-2">Welcome to Mochi</h1>
-        <p class="text-gray-400">Kubernetes Resource Optimization Platform</p>
+        <p class="text-on-surface-secondary mb-1">Kubernetes Resource Optimization Platform</p>
         {{if .ClusterName}}
-        <p class="text-sm text-gray-500 mt-1">Cluster: {{.ClusterName}}</p>
+        <p class="text-sm text-on-surface-muted">Cluster: {{.ClusterName}}</p>
         {{end}}
     </div>
     
     <!-- Quick Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <!-- Total Namespaces -->
-        <div class="glass glass-card-hover rounded-xl p-6 magnetic-card">
+        <div class="glass hover:border-primary/50 rounded-xl p-6 magnetic-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-gray-400 text-sm">Total Namespaces</h3>
-                <iconify-icon icon="lucide:layers" class="text-2xl"></iconify-icon>
+                <h3 class="text-on-surface-secondary text-sm">Total Namespaces</h3>
+                <iconify-icon icon="lucide:layers" class="text-xl"></iconify-icon>
             </div>
-            <p class="text-3xl font-bold text-purple-400" x-data="counter({{.Stats.Namespaces}})" x-text="count">{{.Stats.Namespaces}}</p>
+            <p class="text-3xl font-bold text-primary-light" x-data="counter({{.Stats.Namespaces}})" x-text="count">{{.Stats.Namespaces}}</p>
         </div>
         
         <!-- Total Workloads -->
-        <div class="glass glass-card-hover rounded-xl p-6 magnetic-card">
+        <div class="glass hover:border-primary/50 rounded-xl p-6 magnetic-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-gray-400 text-sm">Total Workloads</h3>
-                <iconify-icon icon="lucide:server" class="text-2xl"></iconify-icon>
+                <h3 class="text-on-surface-secondary text-sm">Total Workloads</h3>
+                <iconify-icon icon="lucide:server" class="text-xl"></iconify-icon>
             </div>
-            <p class="text-3xl font-bold text-cyan-400" x-data="counter({{.Stats.Workloads}})" x-text="count">{{.Stats.Workloads}}</p>
+            <p class="text-3xl font-bold text-secondary-light" x-data="counter({{.Stats.Workloads}})" x-text="count">{{.Stats.Workloads}}</p>
         </div>
         
         <!-- Total Pods -->
-        <div class="glass glass-card-hover rounded-xl p-6 magnetic-card">
+        <div class="glass hover:border-primary/50 rounded-xl p-6 magnetic-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-gray-400 text-sm">Total Pods</h3>
-                <iconify-icon icon="lucide:rocket" class="text-2xl"></iconify-icon>
+                <h3 class="text-on-surface-secondary text-sm">Total Pods</h3>
+                <iconify-icon icon="lucide:rocket" class="text-xl"></iconify-icon>
             </div>
-            <p class="text-3xl font-bold text-pink-400" x-data="counter({{.Stats.Pods}})" x-text="count">{{.Stats.Pods}}</p>
+            <p class="text-3xl font-bold text-tertiary-light" x-data="counter({{.Stats.Pods}})" x-text="count">{{.Stats.Pods}}</p>
         </div>
         
         <!-- System Health -->
-        <div class="glass glass-card-hover rounded-xl p-6 magnetic-card">
+        <div class="glass hover:border-primary/50 rounded-xl p-6 magnetic-card">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-gray-400 text-sm">System Health</h3>
-                <iconify-icon icon="lucide:heart" class="text-2xl"></iconify-icon>
+                <h3 class="text-on-surface-secondary text-sm">System Health</h3>
+                <iconify-icon icon="lucide:heart" class="text-xl"></iconify-icon>
             </div>
-            <p class="text-3xl font-bold text-green-400" x-data="counter({{.Stats.HealthScore}}, 30)" x-text="count + '%'">{{.Stats.HealthScore}}%</p>
+            <p class="text-3xl font-bold text-success-light" x-data="counter({{.Stats.HealthScore}}, 30)" x-text="count + '%'">{{.Stats.HealthScore}}%</p>
         </div>
     </div>
     
@@ -56,20 +56,20 @@
         <div class="space-y-3">
             {{if .Activities}}
                 {{range .Activities}}
-                <div class="flex items-center space-x-3 p-3 rounded-lg glass-item-hover">
+                <div class="flex items-center space-x-3 p-4 rounded-lg glass hover:bg-primary/10 transition-all hover:text-on-surface">
                     {{if eq .Type "recommendation_applied"}}
-                        <iconify-icon icon="lucide:check-circle-2" class="text-2xl text-green-400"></iconify-icon>
+                        <iconify-icon icon="lucide:check-circle-2" class="text-xl text-success-light"></iconify-icon>
                     {{else if eq .Type "recommendation_generated"}}
-                        <iconify-icon icon="lucide:lightbulb" class="text-2xl text-purple-400"></iconify-icon>
+                        <iconify-icon icon="lucide:lightbulb" class="text-xl text-primary-light"></iconify-icon>
                     {{else}}
-                        <iconify-icon icon="lucide:alert-circle" class="text-2xl text-cyan-400"></iconify-icon>
+                        <iconify-icon icon="lucide:alert-circle" class="text-xl text-secondary-light"></iconify-icon>
                     {{end}}
-                    <span>{{.Message}}</span>
-                    <span class="text-gray-400 text-sm ml-auto">{{.TimeAgo}}</span>
+                    <span class="text-sm font-medium flex-1">{{.Message}}</span>
+                    <span class="text-on-surface-secondary text-sm ml-auto">{{.TimeAgo}}</span>
                 </div>
                 {{end}}
             {{else}}
-                <div class="text-gray-400 text-center py-8">No recent activity</div>
+                <div class="text-on-surface-secondary text-center py-8">No recent activity</div>
             {{end}}
         </div>
     </div>
@@ -79,73 +79,73 @@
         <h2 class="text-2xl font-bold mb-4">System Health</h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             {{if index .HealthChecks "database"}}
-            <div class="flex items-center space-x-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                <iconify-icon icon="lucide:check-circle-2" class="text-2xl text-green-400"></iconify-icon>
+            <div class="flex items-center space-x-3 p-4 rounded-lg bg-success/10 border border-success/20">
+                <iconify-icon icon="lucide:check-circle-2" class="text-xl text-success-light"></iconify-icon>
                 <div>
-                    <p class="font-semibold">Database</p>
-                    <p class="text-sm text-gray-400">Connected</p>
+                    <p class="font-medium">Database</p>
+                    <p class="text-sm text-on-surface-secondary">Connected</p>
                 </div>
             </div>
             {{else}}
-            <div class="flex items-center space-x-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                <iconify-icon icon="lucide:x-circle" class="text-2xl text-red-400"></iconify-icon>
+            <div class="flex items-center space-x-3 p-4 rounded-lg bg-error/10 border border-error/20">
+                <iconify-icon icon="lucide:x-circle" class="text-xl text-error-light"></iconify-icon>
                 <div>
-                    <p class="font-semibold">Database</p>
-                    <p class="text-sm text-gray-400">Disconnected</p>
+                    <p class="font-medium">Database</p>
+                    <p class="text-sm text-on-surface-secondary">Disconnected</p>
                 </div>
             </div>
             {{end}}
             
             {{if index .HealthChecks "kubernetes"}}
-            <div class="flex items-center space-x-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                <iconify-icon icon="lucide:check-circle-2" class="text-2xl text-green-400"></iconify-icon>
+            <div class="flex items-center space-x-3 p-4 rounded-lg bg-success/10 border border-success/20">
+                <iconify-icon icon="lucide:check-circle-2" class="text-xl text-success-light"></iconify-icon>
                 <div>
-                    <p class="font-semibold">Kubernetes</p>
-                    <p class="text-sm text-gray-400">Connected</p>
+                    <p class="font-medium">Kubernetes</p>
+                    <p class="text-sm text-on-surface-secondary">Connected</p>
                 </div>
             </div>
             {{else}}
-            <div class="flex items-center space-x-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                <iconify-icon icon="lucide:x-circle" class="text-2xl text-red-400"></iconify-icon>
+            <div class="flex items-center space-x-3 p-4 rounded-lg bg-error/10 border border-error/20">
+                <iconify-icon icon="lucide:x-circle" class="text-xl text-error-light"></iconify-icon>
                 <div>
-                    <p class="font-semibold">Kubernetes</p>
-                    <p class="text-sm text-gray-400">Disconnected</p>
+                    <p class="font-medium">Kubernetes</p>
+                    <p class="text-sm text-on-surface-secondary">Disconnected</p>
                 </div>
             </div>
             {{end}}
             
             {{if index .HealthChecks "prometheus"}}
-            <div class="flex items-center space-x-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                <iconify-icon icon="lucide:check-circle-2" class="text-2xl text-green-400"></iconify-icon>
+            <div class="flex items-center space-x-3 p-4 rounded-lg bg-success/10 border border-success/20">
+                <iconify-icon icon="lucide:check-circle-2" class="text-xl text-success-light"></iconify-icon>
                 <div>
-                    <p class="font-semibold">Prometheus</p>
-                    <p class="text-sm text-gray-400">Connected</p>
+                    <p class="font-medium">Prometheus</p>
+                    <p class="text-sm text-on-surface-secondary">Connected</p>
                 </div>
             </div>
             {{else}}
-            <div class="flex items-center space-x-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                <iconify-icon icon="lucide:x-circle" class="text-2xl text-red-400"></iconify-icon>
+            <div class="flex items-center space-x-3 p-4 rounded-lg bg-error/10 border border-error/20">
+                <iconify-icon icon="lucide:x-circle" class="text-xl text-error-light"></iconify-icon>
                 <div>
-                    <p class="font-semibold">Prometheus</p>
-                    <p class="text-sm text-gray-400">Disconnected</p>
+                    <p class="font-medium">Prometheus</p>
+                    <p class="text-sm text-on-surface-secondary">Disconnected</p>
                 </div>
             </div>
             {{end}}
             
             {{if index .HealthChecks "redis"}}
-            <div class="flex items-center space-x-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                <iconify-icon icon="lucide:check-circle-2" class="text-2xl text-green-400"></iconify-icon>
+            <div class="flex items-center space-x-3 p-4 rounded-lg bg-success/10 border border-success/20">
+                <iconify-icon icon="lucide:check-circle-2" class="text-xl text-success-light"></iconify-icon>
                 <div>
-                    <p class="font-semibold">Redis</p>
-                    <p class="text-sm text-gray-400">Connected</p>
+                    <p class="font-medium">Redis</p>
+                    <p class="text-sm text-on-surface-secondary">Connected</p>
                 </div>
             </div>
             {{else}}
-            <div class="flex items-center space-x-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                <iconify-icon icon="lucide:x-circle" class="text-2xl text-red-400"></iconify-icon>
+            <div class="flex items-center space-x-3 p-4 rounded-lg bg-error/10 border border-error/20">
+                <iconify-icon icon="lucide:x-circle" class="text-xl text-error-light"></iconify-icon>
                 <div>
-                    <p class="font-semibold">Redis</p>
-                    <p class="text-sm text-gray-400">Disconnected</p>
+                    <p class="font-medium">Redis</p>
+                    <p class="text-sm text-on-surface-secondary">Disconnected</p>
                 </div>
             </div>
             {{end}}
