@@ -88,10 +88,7 @@
                     {{end}}
                 </div>
                 {{else}}
-                <div class="flex flex-col items-center justify-center gap-2 text-on-surface-secondary text-center py-8">
-                    <iconify-icon icon="lucide:server-off" class="text-4xl text-on-surface-muted"></iconify-icon>
-                    <span>No workloads found</span>
-                </div>
+                <p class="text-base font-medium text-on-surface-secondary text-center py-12">No workloads found</p>
                 {{end}}
             </div>
 
@@ -371,14 +368,11 @@
                                         <template x-if="filteredWorkloads.length === 0">
                                             <tr>
                                                 <td colspan="7" class="py-8 px-4">
-                                                    <div class="flex flex-col items-center justify-center gap-2 text-on-surface-secondary text-center">
-                                                        <iconify-icon icon="lucide:server-off" class="text-4xl text-on-surface-muted"></iconify-icon>
-                                                        <div>
-                                                            <span>No workloads found</span>
-                                                            <span x-show="filterType !== 'all'">
-                                                                <span> for type: </span><span class="text-primary-light capitalize" x-text="filterType"></span>
-                                                            </span>
-                                                        </div>
+                                                    <div class="text-on-surface-secondary text-center font-medium">
+                                                        <span>No workloads found</span>
+                                                        <span x-show="filterType !== 'all'">
+                                                            <span> for type: </span><span class="text-primary-light capitalize" x-text="filterType"></span>
+                                                        </span>
                                                     </div>
                                                 </td>
                                             </tr>
