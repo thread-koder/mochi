@@ -74,11 +74,11 @@ document.addEventListener("alpine:init", () => {
     getPhaseColor(phase) {
       switch (phase.toLowerCase()) {
         case "active":
-          return "bg-green-400";
+          return "bg-success";
         case "terminating":
-          return "bg-yellow-400";
+          return "bg-warning";
         default:
-          return "bg-gray-400";
+          return "bg-on-surface-muted";
       }
     },
   }));
