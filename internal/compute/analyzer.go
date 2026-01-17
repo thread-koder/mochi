@@ -22,8 +22,9 @@ type AnalysisOptions struct {
 // Returns default analysis options
 func DefaultAnalysisOptions() AnalysisOptions {
 	opts := AnalysisOptions{
-		TimeRange: 24 * time.Hour,
-		RangeStep: 1 * time.Minute,
+		TimeRange:         24 * time.Hour,
+		RangeStep:         1 * time.Minute,
+		IncludeTimeSeries: false,
 	}
 	opts.SetTimeRange(opts.TimeRange)
 	return opts
@@ -73,14 +74,16 @@ type ContainerAnalysis struct {
 	ContainerName string             `json:"container_name"`
 	Utilization   UtilizationResult  `json:"utilization"`
 	Provisioning  ProvisioningResult `json:"provisioning"`
+	TimeSeries    *ResourceMetrics   `json:"time_series,omitempty"` // Optional: raw datapoints for charting
 }
 
 // Represents analysis results for a pod
 type PodAnalysis struct {
 	PodUID      string              `json:"pod_uid"`
 	PodName     string              `json:"pod_name"`
-	Containers  []ContainerAnalysis `json:"containers"`  // Individual container analyses
-	Utilization UtilizationResult   `json:"utilization"` // Aggregated from containers
+	Containers  []ContainerAnalysis `json:"containers"`            // Individual container analyses
+	Utilization UtilizationResult   `json:"utilization"`           // Aggregated from containers
+	TimeSeries  *ResourceMetrics    `json:"time_series,omitempty"` // Optional: raw datapoints for charting
 }
 
 // Represents analysis results for a workload
@@ -90,6 +93,7 @@ type WorkloadAnalysis struct {
 	Namespace    string            `json:"namespace"`
 	Pods         []PodAnalysis     `json:"pods"` // Individual pod analyses
 	Utilization  UtilizationResult `json:"utilization"`
+	TimeSeries   *ResourceMetrics  `json:"time_series,omitempty"` // Optional: raw datapoints for charting
 }
 
 // Represents analysis results for a namespace
@@ -140,11 +144,18 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 		return ContainerAnalysis{}, fmt.Errorf("failed to analyze provisioning: %w", err)
 	}
 
-	return ContainerAnalysis{
+	result := ContainerAnalysis{
 		ContainerName: container.Name,
 		Utilization:   utilization,
 		Provisioning:  provisioning,
-	}, nil
+	}
+
+	// Include time series if requested
+	if opts.IncludeTimeSeries {
+		result.TimeSeries = &metrics
+	}
+
+	return result, nil
 }
 
 // Analyzes a pod and its containers
@@ -181,12 +192,19 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 		return PodAnalysis{}, fmt.Errorf("failed to analyze pod utilization: %w", err)
 	}
 
-	return PodAnalysis{
+	result := PodAnalysis{
 		PodUID:      pod.UID,
 		PodName:     pod.Name,
 		Containers:  containerAnalyses,
 		Utilization: utilization,
-	}, nil
+	}
+
+	// Include time series if requested
+	if opts.IncludeTimeSeries {
+		result.TimeSeries = &metrics
+	}
+
+	return result, nil
 }
 
 // Analyzes a workload and its pods
@@ -235,13 +253,20 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 		return WorkloadAnalysis{}, fmt.Errorf("failed to analyze workload utilization: %w", err)
 	}
 
-	return WorkloadAnalysis{
+	result := WorkloadAnalysis{
 		WorkloadType: workloadType,
 		WorkloadName: workloadName,
 		Namespace:    namespace,
 		Pods:         podAnalyses,
 		Utilization:  utilization,
-	}, nil
+	}
+
+	// Include time series if requested
+	if opts.IncludeTimeSeries {
+		result.TimeSeries = &metrics
+	}
+
+	return result, nil
 }
 
 // Analyzes a namespace
