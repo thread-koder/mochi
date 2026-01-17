@@ -221,6 +221,9 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 
 	// Analyze each pod individually
 	podAnalyses := make([]PodAnalysis, 0, len(pods))
+	// Disable time series for pod analysis
+	podOpts := opts
+	podOpts.IncludeTimeSeries = false
 	for _, pod := range pods {
 		// Fetch containers for this pod
 		containers, err := database.GetContainersByPodUID(ctx, pod.UID)
@@ -229,7 +232,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 		}
 
 		// Analyze the pod
-		podAnalysis, err := AnalyzePod(ctx, pod, containers, opts)
+		podAnalysis, err := AnalyzePod(ctx, pod, containers, podOpts)
 		if err != nil {
 			return WorkloadAnalysis{}, fmt.Errorf("failed to analyze pod: %w", err)
 		}
