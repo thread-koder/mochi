@@ -117,10 +117,17 @@ func AnalyzeWorkload(c *gin.Context) {
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
-			c.JSON(http.StatusNotFound, gin.H{
-				"error":   "pod not found",
-				"details": err.Error(),
-			})
+			if isNotFoundError(err) {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error":   "pod not found",
+					"details": err.Error(),
+				})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error":   "failed to get pod",
+					"details": err.Error(),
+				})
+			}
 			return
 		}
 

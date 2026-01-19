@@ -2,52 +2,39 @@ package web
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strconv"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/internal/database"
 )
 
-// Helper function to parse integer from string
-func parseInt(s string) (int, error) {
-	result, err := strconv.Atoi(s)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse integer: %w", err)
+// Helper function to check if an error is a "not found" error
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
 	}
-	return result, nil
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return true
+	}
+
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "not found")
 }
 
-// Formats timestamp as "X minutes/hours/days ago"
-func formatTimeAgo(t time.Time) string {
-	now := time.Now()
-	diff := now.Sub(t)
-
-	if diff < time.Minute {
-		return "just now"
-	} else if diff < time.Hour {
-		minutes := int(diff.Minutes())
-		if minutes == 1 {
-			return "1 minute ago"
-		}
-		return fmt.Sprintf("%d minutes ago", minutes)
-	} else if diff < 24*time.Hour {
-		hours := int(diff.Hours())
-		if hours == 1 {
-			return "1 hour ago"
-		}
-		return fmt.Sprintf("%d hours ago", hours)
-	} else {
-		days := int(diff.Hours() / 24)
-		if days == 1 {
-			return "1 day ago"
-		}
-		return fmt.Sprintf("%d days ago", days)
-	}
+// Represents stats
+type Stats struct {
+	Namespaces  int `json:"namespaces"`
+	Workloads   int `json:"workloads"`
+	Pods        int `json:"pods"`
+	HealthScore int `json:"healthScore"`
 }
 
-// Gets statistics data
-func GetStatsData(ctx context.Context) (Stats, error) {
+// Gets stats
+func GetStats(ctx context.Context) (Stats, error) {
 	stats := Stats{}
 
 	if count, err := database.GetNamespaceCount(ctx); err == nil {
@@ -71,8 +58,15 @@ func GetStatsData(ctx context.Context) (Stats, error) {
 	return stats, nil
 }
 
-// Gets activity items
-func GetActivityItems(ctx context.Context, limit int) ([]ActivityItem, error) {
+// Represents an activity
+type Activity struct {
+	Type      string    `json:"type"`
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// Gets activities
+func GetActivities(ctx context.Context, limit int) ([]Activity, error) {
 	computeRecommendations, err := database.GetComputeRecommendations(
 		ctx,
 		nil, nil, nil, nil, nil,
@@ -83,7 +77,7 @@ func GetActivityItems(ctx context.Context, limit int) ([]ActivityItem, error) {
 		return nil, fmt.Errorf("failed to get compute recommendations: %w", err)
 	}
 
-	activities := make([]ActivityItem, 0, len(computeRecommendations))
+	activities := make([]Activity, 0, len(computeRecommendations))
 	for _, rec := range computeRecommendations {
 		var activityType string
 		var message string
@@ -99,7 +93,7 @@ func GetActivityItems(ctx context.Context, limit int) ([]ActivityItem, error) {
 			continue
 		}
 
-		activities = append(activities, ActivityItem{
+		activities = append(activities, Activity{
 			Type:      activityType,
 			Message:   message,
 			Timestamp: rec.CreatedAt,

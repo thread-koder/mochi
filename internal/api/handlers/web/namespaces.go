@@ -9,8 +9,8 @@ import (
 	"github.com/thread_koder/mochi/internal/database"
 )
 
-// Represents a namespace for the API response
-type NamespaceItem struct {
+// Represents a namespace
+type Namespace struct {
 	Name  string `json:"name"`
 	Phase string `json:"phase"`
 }
@@ -30,9 +30,9 @@ func GetNamespaces(c *gin.Context) {
 		return
 	}
 
-	items := make([]NamespaceItem, 0, len(namespaces))
+	items := make([]Namespace, 0, len(namespaces))
 	for _, ns := range namespaces {
-		items = append(items, NamespaceItem{
+		items = append(items, Namespace{
 			Name:  ns.Name,
 			Phase: ns.Phase,
 		})

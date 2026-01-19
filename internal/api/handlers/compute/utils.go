@@ -1,9 +1,13 @@
 package compute
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // Parses time range from query parameter (e.g., "24h", "7d", "1h30m")
@@ -51,4 +55,18 @@ func parseInt64(s string) (int64, error) {
 		return 0, fmt.Errorf("failed to parse int64: %w", err)
 	}
 	return result, nil
+}
+
+// Helper function to check if an error is a "not found" error
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return true
+	}
+
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "not found")
 }

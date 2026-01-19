@@ -91,10 +91,17 @@ func GenerateRecommendations(c *gin.Context) {
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
-			c.JSON(http.StatusNotFound, gin.H{
-				"error":   "pod not found",
-				"details": err.Error(),
-			})
+			if isNotFoundError(err) {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error":   "pod not found",
+					"details": err.Error(),
+				})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error":   "failed to get pod",
+					"details": err.Error(),
+				})
+			}
 			return
 		}
 
@@ -264,7 +271,7 @@ func GetRecommendationByID(c *gin.Context) {
 	recommendation, err := database.GetComputeRecommendationByID(ctx, id)
 	if err != nil {
 		c.Error(err)
-		if strings.Contains(err.Error(), "not found") {
+		if isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error":   "recommendation not found",
 				"details": err.Error(),
@@ -323,7 +330,7 @@ func GetLatestWorkloadRecommendation(c *gin.Context) {
 	recommendation, err := database.GetLatestComputeRecommendation(ctx, workloadType, workloadName, namespace)
 	if err != nil {
 		c.Error(err)
-		if strings.Contains(err.Error(), "not found") {
+		if isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error":   "recommendation not found",
 				"details": err.Error(),
@@ -368,7 +375,7 @@ func ApplyRecommendation(c *gin.Context) {
 		recommendation, err = database.GetComputeRecommendationByID(ctx, id)
 		if err != nil {
 			c.Error(err)
-			if strings.Contains(err.Error(), "not found") {
+			if isNotFoundError(err) {
 				c.JSON(http.StatusNotFound, gin.H{
 					"error":   "recommendation not found",
 					"details": err.Error(),
