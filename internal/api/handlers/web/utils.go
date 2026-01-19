@@ -46,7 +46,7 @@ func formatTimeAgo(t time.Time) string {
 	}
 }
 
-// Gets statistics data (shared by home handler and stats API endpoint)
+// Gets statistics data
 func GetStatsData(ctx context.Context) (Stats, error) {
 	stats := Stats{}
 
@@ -71,7 +71,7 @@ func GetStatsData(ctx context.Context) (Stats, error) {
 	return stats, nil
 }
 
-// Gets activity items (shared by home handler and activity API endpoint)
+// Gets activity items
 func GetActivityItems(ctx context.Context, limit int) ([]ActivityItem, error) {
 	computeRecommendations, err := database.GetComputeRecommendations(
 		ctx,

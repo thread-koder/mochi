@@ -36,7 +36,7 @@ func CacheMiddleware(ttl time.Duration) gin.HandlerFunc {
 		// Generate cache key from request
 		cacheKey := generateCacheKey(c)
 
-		// Try to get from cache
+		// Try to get from cache first
 		ctx := c.Request.Context()
 		cachedBytes, err := redis.Get(ctx, cacheKey)
 		if err == nil && cachedBytes != nil {

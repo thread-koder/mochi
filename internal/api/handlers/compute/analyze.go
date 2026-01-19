@@ -35,7 +35,7 @@ func AnalyzeNamespace(c *gin.Context) {
 		opts.SetTimeRange(timeRange)
 	}
 
-	// Create context with timeout
+	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
@@ -105,13 +105,13 @@ func AnalyzeWorkload(c *gin.Context) {
 		opts.SetTimeRange(timeRange)
 	}
 
-	// Create context with timeout
+	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	var pods []*database.Pod
 
-	// Handle standalone pods differently
+	// Handle standalone pods
 	if workloadType == "Pod" {
 		// Get the standalone pod by name
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)

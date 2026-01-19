@@ -314,7 +314,6 @@ func DetectAnomalies(dataPoints []DataPoint, thresholdMultiplier float64) (Anoma
 
 // Converts Prometheus Matrix to DataPoint slice
 func MatrixToDataPoints(matrix model.Matrix) []DataPoint {
-	// Calculate total capacity to avoid reallocations
 	totalSize := 0
 	for _, series := range matrix {
 		totalSize += len(series.Values)

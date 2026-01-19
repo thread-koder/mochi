@@ -79,13 +79,13 @@ func GenerateRecommendations(c *gin.Context) {
 		recConfig.Mode = mode
 	}
 
-	// Create context with timeout
+	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	var pods []*database.Pod
 
-	// Handle standalone pods differently
+	// Handle standalone pods
 	if workloadType == "Pod" {
 		// Get the standalone pod by name
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
@@ -196,7 +196,7 @@ func GetRecommendations(c *gin.Context) {
 		}
 	}
 
-	// Create context with timeout
+	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -256,7 +256,7 @@ func GetRecommendationByID(c *gin.Context) {
 		return
 	}
 
-	// Create context with timeout
+	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -315,7 +315,7 @@ func GetLatestWorkloadRecommendation(c *gin.Context) {
 		return
 	}
 
-	// Create context with timeout
+	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -342,7 +342,7 @@ func GetLatestWorkloadRecommendation(c *gin.Context) {
 
 // Applies a compute recommendation to the target workload
 func ApplyRecommendation(c *gin.Context) {
-	// Create context with timeout
+	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 

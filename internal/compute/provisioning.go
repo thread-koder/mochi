@@ -44,7 +44,7 @@ type ProvisioningResult struct {
 const (
 	// Optimal utilization range for requests
 	OptimalUtilizationMin = 0.4 // 40%
-	OptimalUtilizationMax = 0.6 // 60%
+	OptimalUtilizationMax = 0.7 // 70%
 	// Headroom for limits (peak should stay below this percentage of limit)
 	LimitHeadroom = 0.2 // 20% headroom
 )
@@ -58,13 +58,13 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization) (CP
 		Confidence:         0.0,
 	}
 
-	// Calculate confidence based on data quality
+	// Calculate confidence
 	// More data points and lower variance = higher confidence
 	if utilization.Stats.Mean == 0 {
 		// If mean is zero, we can't calculate confidence reliably
 		result.Confidence = 0.0
 	} else if utilization.Stats.StdDev > 0 {
-		// Simplified confidence: based on coefficient of variation
+		// Confidence: based on coefficient of variation
 		cv := utilization.Stats.StdDev / utilization.Stats.Mean
 		result.Confidence = math.Min(1.0, 1.0/(1.0+cv))
 	} else {
@@ -137,7 +137,7 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 		// If mean is zero, we can't calculate confidence reliably
 		result.Confidence = 0.0
 	} else if utilization.Stats.StdDev > 0 {
-		// Simplified confidence: based on coefficient of variation
+		// Confidence: based on coefficient of variation
 		cv := utilization.Stats.StdDev / utilization.Stats.Mean
 		result.Confidence = math.Min(1.0, 1.0/(1.0+cv))
 	} else {

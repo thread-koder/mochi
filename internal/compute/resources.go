@@ -597,7 +597,7 @@ func ensureLimitGreaterThanRequestValue(
 		return recommendedLimit
 	}
 
-	// If no limit recommendation, but we have a request, we might need to recommend a limit
+	// If no limit recommendation, but we have a request, we need to recommend a limit
 	if recommendedLimit == nil {
 		// If current limit exists and is >= request, no need to recommend
 		if currentLimit != nil && *currentLimit >= *effectiveRequest {

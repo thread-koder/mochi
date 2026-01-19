@@ -32,7 +32,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize logger with config
+	// Initialize logger
 	logger.Init(cfg.Log.Level, cfg.Log.Format)
 
 	log := logger.WithComponent("main")
@@ -85,19 +85,19 @@ func main() {
 	}
 	log.Info().Msg("Components initialized")
 
-	// Start server in a goroutine
+	// Start server
 	go func() {
 		if err := server.Start(); err != nil {
 			log.Fatal().Err(err).Msg("Failed to start API server")
 		}
 	}()
 
-	// Wait for interrupt signal to gracefully shutdown the server
+	// Wait for interrupt signal for graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	// Graceful shutdown with timeout
+	// Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

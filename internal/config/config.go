@@ -353,7 +353,6 @@ func (c *WorkerConfig) Validate() error {
 	if c.StaleResourceThreshold <= 0 {
 		return fmt.Errorf("stale_resource_threshold must be greater than 0, got: %d", c.StaleResourceThreshold)
 	}
-	// Ensure ExcludeNamespaces and IncludeNamespaces are initialized as slices (not nil)
 	if c.ExcludeNamespaces == nil {
 		c.ExcludeNamespaces = []string{}
 	}

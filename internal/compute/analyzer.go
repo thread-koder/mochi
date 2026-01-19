@@ -308,7 +308,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 
 	// Include workloads if requested
 	if includeWorkloads {
-		// No time series for workloads
+		// Disable time series for workloads
 		workloadOpts := opts
 		workloadOpts.IncludeTimeSeries = false
 		workloads, err := analyzeNamespaceWorkloads(ctx, namespace, workloadOpts)

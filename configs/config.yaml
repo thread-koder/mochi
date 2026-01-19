@@ -26,7 +26,7 @@ kubernetes:
   in_cluster: false # Set to true when running as a pod in cluster
   request_timeout: 30 # Request timeout in seconds
   qps: 50 # Queries per second (rate limiting)
-  burst: 100 # Burst limit for rate limiting
+  burst: 100 # Burst limit (rate limiting)
 
 prometheus:
   url: "http://localhost:9090" # Prometheus server URL

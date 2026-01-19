@@ -15,7 +15,7 @@ type ActivityItem struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Returns recent activity for the home page
+// Returns recent activities
 func GetActivity(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

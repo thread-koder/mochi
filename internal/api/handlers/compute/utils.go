@@ -8,8 +8,6 @@ import (
 
 // Parses time range from query parameter (e.g., "24h", "7d", "1h30m")
 func parseTimeRange(timeRangeStr string) (time.Duration, error) {
-	// Handle days (d)
-	// Convert "7d" to "168h", "1d" to "24h", etc.
 	if len(timeRangeStr) > 0 && timeRangeStr[len(timeRangeStr)-1] == 'd' {
 		// Extract the number part
 		daysStr := timeRangeStr[:len(timeRangeStr)-1]
@@ -20,7 +18,7 @@ func parseTimeRange(timeRangeStr string) (time.Duration, error) {
 		if days <= 0 {
 			return 0, fmt.Errorf("days must be positive")
 		}
-		// Convert days to hours (days * 24)
+		// Convert days to hours
 		hours := days * 24
 		timeRangeStr = fmt.Sprintf("%dh", hours)
 	}
