@@ -10,15 +10,13 @@ import (
 	"github.com/thread_koder/mochi/internal/database"
 )
 
-// Represents data for the namespace page
-type NamespaceData struct {
-	Title      string
-	Page       string
-	Namespace  *database.Namespace
-	Stats      NamespaceStats
-	Workloads  []WorkloadItem
-	Standalone []StandalonePodItem
-	System     []StandalonePodItem
+// Represents namespace API response
+type NamespaceResponse struct {
+	Namespace  *database.Namespace `json:"namespace"`
+	Stats      NamespaceStats      `json:"stats"`
+	Workloads  []Workload          `json:"workloads"`
+	Standalone []StandalonePod     `json:"standalone_pods"`
+	System     []StandalonePod     `json:"system_pods"`
 }
 
 // Represents namespace statistics
@@ -28,25 +26,25 @@ type NamespaceStats struct {
 	Containers int `json:"containers"`
 }
 
-// Represents a workload item for display
-type WorkloadItem struct {
-	Type      string `json:"type"`
-	Name      string `json:"name"`
-	Replicas  int    `json:"replicas"`
-	Ready     int    `json:"ready"`
-	CreatedAt string `json:"created_at"`
+// Represents a workload
+type Workload struct {
+	Type      string    `json:"type"`
+	Name      string    `json:"name"`
+	Replicas  int       `json:"replicas"`
+	Ready     int       `json:"ready"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
-// Represents a standalone pod item for display
-type StandalonePodItem struct {
-	Name      string `json:"name"`
-	Phase     string `json:"phase"`
-	Node      string `json:"node"`
-	CreatedAt string `json:"created_at"`
+// Represents a standalone pod
+type StandalonePod struct {
+	Name      string    `json:"name"`
+	Phase     string    `json:"phase"`
+	Node      string    `json:"node"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
-// Renders the namespace page
-func Namespace(c *gin.Context) {
+// Returns namespace page data
+func GetNamespace(c *gin.Context) {
 	namespaceName := c.Param("namespace")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -55,23 +53,27 @@ func Namespace(c *gin.Context) {
 	// Get namespace
 	namespace, err := database.GetNamespaceByName(ctx, namespaceName)
 	if err != nil {
-		c.Error(fmt.Errorf("failed to get namespace: %w", err))
-		c.HTML(http.StatusNotFound, "error.html", gin.H{
-			"Title":   "Not Found",
-			"Page":    "error",
-			"Message": fmt.Sprintf("Namespace '%s' not found", namespaceName),
-		})
+		c.Error(err)
+		if isNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error":   "namespace not found",
+				"details": err.Error(),
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "failed to get namespace",
+				"details": err.Error(),
+			})
+		}
 		return
 	}
 
-	data := NamespaceData{
-		Title:      namespace.Name,
-		Page:       "namespace",
+	response := NamespaceResponse{
 		Namespace:  namespace,
 		Stats:      NamespaceStats{},
-		Workloads:  make([]WorkloadItem, 0),
-		Standalone: make([]StandalonePodItem, 0),
-		System:     make([]StandalonePodItem, 0),
+		Workloads:  make([]Workload, 0),
+		Standalone: make([]StandalonePod, 0),
+		System:     make([]StandalonePod, 0),
 	}
 
 	// Get workloads
@@ -80,15 +82,15 @@ func Namespace(c *gin.Context) {
 		c.Error(fmt.Errorf("failed to get deployments: %w", err))
 	} else {
 		for _, dep := range deployments {
-			data.Workloads = append(data.Workloads, WorkloadItem{
+			response.Workloads = append(response.Workloads, Workload{
 				Type:      "Deployment",
 				Name:      dep.Name,
 				Replicas:  dep.Replicas,
 				Ready:     dep.ReadyReplicas,
-				CreatedAt: formatTimeAgo(dep.CreatedAt),
+				CreatedAt: dep.CreatedAt,
 			})
 		}
-		data.Stats.Workloads += len(deployments)
+		response.Stats.Workloads += len(deployments)
 	}
 
 	statefulsets, err := database.GetStatefulSetsByNamespace(ctx, namespace.Name)
@@ -96,15 +98,15 @@ func Namespace(c *gin.Context) {
 		c.Error(fmt.Errorf("failed to get statefulsets: %w", err))
 	} else {
 		for _, sts := range statefulsets {
-			data.Workloads = append(data.Workloads, WorkloadItem{
+			response.Workloads = append(response.Workloads, Workload{
 				Type:      "StatefulSet",
 				Name:      sts.Name,
 				Replicas:  sts.Replicas,
 				Ready:     sts.ReadyReplicas,
-				CreatedAt: formatTimeAgo(sts.CreatedAt),
+				CreatedAt: sts.CreatedAt,
 			})
 		}
-		data.Stats.Workloads += len(statefulsets)
+		response.Stats.Workloads += len(statefulsets)
 	}
 
 	daemonsets, err := database.GetDaemonSetsByNamespace(ctx, namespace.Name)
@@ -112,15 +114,15 @@ func Namespace(c *gin.Context) {
 		c.Error(fmt.Errorf("failed to get daemonsets: %w", err))
 	} else {
 		for _, ds := range daemonsets {
-			data.Workloads = append(data.Workloads, WorkloadItem{
+			response.Workloads = append(response.Workloads, Workload{
 				Type:      "DaemonSet",
 				Name:      ds.Name,
 				Replicas:  ds.DesiredNumberScheduled,
 				Ready:     ds.NumberReady,
-				CreatedAt: formatTimeAgo(ds.CreatedAt),
+				CreatedAt: ds.CreatedAt,
 			})
 		}
-		data.Stats.Workloads += len(daemonsets)
+		response.Stats.Workloads += len(daemonsets)
 	}
 
 	// Get standalone pods
@@ -133,11 +135,11 @@ func Namespace(c *gin.Context) {
 			if pod.NodeName != nil {
 				nodeName = *pod.NodeName
 			}
-			data.Standalone = append(data.Standalone, StandalonePodItem{
+			response.Standalone = append(response.Standalone, StandalonePod{
 				Name:      pod.Name,
 				Phase:     pod.Phase,
 				Node:      nodeName,
-				CreatedAt: formatTimeAgo(pod.CreatedAt),
+				CreatedAt: pod.CreatedAt,
 			})
 		}
 	}
@@ -152,11 +154,11 @@ func Namespace(c *gin.Context) {
 			if pod.NodeName != nil {
 				nodeName = *pod.NodeName
 			}
-			data.System = append(data.System, StandalonePodItem{
+			response.System = append(response.System, StandalonePod{
 				Name:      pod.Name,
 				Phase:     pod.Phase,
 				Node:      nodeName,
-				CreatedAt: formatTimeAgo(pod.CreatedAt),
+				CreatedAt: pod.CreatedAt,
 			})
 		}
 	}
@@ -166,7 +168,7 @@ func Namespace(c *gin.Context) {
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get pod count: %w", err))
 	} else {
-		data.Stats.Pods = podCount
+		response.Stats.Pods = podCount
 	}
 
 	// Get container count
@@ -174,8 +176,8 @@ func Namespace(c *gin.Context) {
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get container count: %w", err))
 	} else {
-		data.Stats.Containers = containerCount
+		response.Stats.Containers = containerCount
 	}
 
-	c.HTML(http.StatusOK, "namespace.html", data)
+	c.JSON(http.StatusOK, response)
 }

@@ -13,34 +13,23 @@ import (
 	"github.com/thread_koder/mochi/internal/redis"
 )
 
-// Represents data for the home page
-type HomeData struct {
-	Title        string
-	Page         string
-	ClusterName  string
-	Stats        Stats
-	HealthChecks map[string]bool
-	Activities   []ActivityItemDisplay
+// Represents home page API response
+type HomeResponse struct {
+	ClusterName  string          `json:"cluster_name"`
+	Stats        Stats           `json:"stats"`
+	HealthChecks map[string]bool `json:"health_checks"`
+	Activities   []Activity      `json:"activities"`
 }
 
-// Represents activity item with formatted time
-type ActivityItemDisplay struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
-	TimeAgo string `json:"time_ago"`
-}
-
-// Renders the home page
-func Home(c *gin.Context) {
+// Returns home page data
+func GetHome(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	data := HomeData{
-		Title:        "Home",
-		Page:         "home",
+	response := HomeResponse{
 		ClusterName:  "Kubernetes Cluster",
 		HealthChecks: make(map[string]bool),
-		Activities:   make([]ActivityItemDisplay, 0),
+		Activities:   make([]Activity, 0),
 	}
 
 	// Get cluster info for name
@@ -48,49 +37,40 @@ func Home(c *gin.Context) {
 		c.Error(fmt.Errorf("failed to get cluster info: %w", err))
 	} else {
 		if info.ClusterName != "" {
-			data.ClusterName = info.ClusterName
+			response.ClusterName = info.ClusterName
 		}
 	}
 
 	// Get stats
-	if stats, err := GetStatsData(ctx); err != nil {
+	if stats, err := GetStats(ctx); err != nil {
 		c.Error(fmt.Errorf("failed to get stats: %w", err))
 	} else {
-		data.Stats = stats
+		response.Stats = stats
 	}
 
 	// Get health checks
-	data.HealthChecks["database"] = database.HealthCheck(ctx) == nil
-	data.HealthChecks["kubernetes"] = kubernetes.HealthCheck(ctx) == nil
-	data.HealthChecks["prometheus"] = prometheus.HealthCheck(ctx) == nil
-	data.HealthChecks["redis"] = redis.HealthCheck(ctx) == nil
+	response.HealthChecks["database"] = database.HealthCheck(ctx) == nil
+	response.HealthChecks["kubernetes"] = kubernetes.HealthCheck(ctx) == nil
+	response.HealthChecks["prometheus"] = prometheus.HealthCheck(ctx) == nil
+	response.HealthChecks["redis"] = redis.HealthCheck(ctx) == nil
 
 	// Calculate health score
 	healthyCount := 0
-	for _, healthy := range data.HealthChecks {
+	for _, healthy := range response.HealthChecks {
 		if healthy {
 			healthyCount++
 		}
 	}
-	data.Stats.HealthScore = (healthyCount * 100) / len(data.HealthChecks)
-
-	// Get recent activity
-	if activities, err := GetActivityItems(ctx, 10); err != nil {
-		c.Error(fmt.Errorf("failed to get activity items: %w", err))
-	} else {
-		// Format activities for display
-		displayActivities := make([]ActivityItemDisplay, 0, len(activities))
-		for _, activity := range activities {
-			display := ActivityItemDisplay{
-				Type:    activity.Type,
-				Message: activity.Message,
-				TimeAgo: formatTimeAgo(activity.Timestamp),
-			}
-
-			displayActivities = append(displayActivities, display)
-		}
-		data.Activities = displayActivities
+	if len(response.HealthChecks) > 0 {
+		response.Stats.HealthScore = (healthyCount * 100) / len(response.HealthChecks)
 	}
 
-	c.HTML(http.StatusOK, "home.html", data)
+	// Get recent activities
+	if activities, err := GetActivities(ctx, 10); err != nil {
+		c.Error(fmt.Errorf("failed to get activities: %w", err))
+	} else {
+		response.Activities = activities
+	}
+
+	c.JSON(http.StatusOK, response)
 }

@@ -20,17 +20,14 @@ func setupRoutes(router *gin.Engine) {
 	router.GET("/health/prometheus", handlers.PrometheusHealth)
 	router.GET("/health/redis", handlers.RedisHealth)
 
-	// Web UI routes
-	router.GET("/", webHandlers.Home)
-	router.GET("/namespaces/:namespace", webHandlers.Namespace)
-
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
 		// Web UI API endpoints (no caching)
-		v1.GET("/stats", webHandlers.GetStats)
-		v1.GET("/activity", webHandlers.GetActivity)
+		v1.GET("/home", webHandlers.GetHome)
 		v1.GET("/namespaces", webHandlers.GetNamespaces)
+		v1.GET("/namespaces/:namespace", webHandlers.GetNamespace)
+		v1.GET("/workloads/:namespace/:type/:name", webHandlers.GetWorkload)
 
 		// Compute domain
 		compute := v1.Group("/compute")
