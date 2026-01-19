@@ -121,7 +121,7 @@ func (w *ResourceSyncWorker) sync() {
 	}
 	log.Info().Msg("Resources sync process completed")
 
-	// Run cleanup after sync
+	// Run cleanup
 	w.cleanup(ctx)
 }
 
@@ -130,7 +130,7 @@ func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	log := logger.WithComponent("workers")
 
 	log.Info().Msg("Starting resource cleanup process...")
-	// Clean up stale resources (resources that haven't been synced recently)
+	// Clean up stale resources
 	staleThreshold := time.Now().Add(-w.staleThreshold)
 	if err := database.DeletePodsNotSyncedSince(ctx, staleThreshold); err != nil {
 		log.Warn().Err(err).Msg("Failed to delete stale pods")
