@@ -12,21 +12,21 @@ import (
 
 // Represents workload API response
 type WorkloadResponse struct {
-	Namespace         string        `json:"namespace"`
-	WorkloadType      string        `json:"workload_type"`
-	WorkloadName      string        `json:"workload_name"`
-	WorkloadReplicas  int           `json:"workload_replicas"`
-	WorkloadReady     int           `json:"workload_ready"`
-	WorkloadCreatedAt time.Time     `json:"workload_created_at"`
-	Pods              []Pod         `json:"pods"`
-	Containers        []Container   `json:"containers"`
-	Stats             WorkloadStats `json:"stats"`
+	Namespace  string        `json:"namespace"`
+	Type       string        `json:"type"`
+	Name       string        `json:"name"`
+	Replicas   int           `json:"replicas"`
+	Ready      int           `json:"ready"`
+	CreatedAt  time.Time     `json:"created_at"`
+	Pods       []Pod         `json:"pods"`
+	Containers []Container   `json:"containers"`
+	Stats      WorkloadStats `json:"stats"`
 }
 
 // Represents workload statistics
 type WorkloadStats struct {
-	PodCount       int `json:"pod_count"`
-	ContainerCount int `json:"container_count"`
+	Pods       int `json:"pods"`
+	Containers int `json:"containers"`
 }
 
 // Represents a pod
@@ -75,12 +75,12 @@ func GetWorkload(c *gin.Context) {
 	defer cancel()
 
 	response := WorkloadResponse{
-		Namespace:    namespaceName,
-		WorkloadType: workloadType,
-		WorkloadName: workloadName,
-		Pods:         make([]Pod, 0),
-		Containers:   make([]Container, 0),
-		Stats:        WorkloadStats{},
+		Namespace:  namespaceName,
+		Type:       workloadType,
+		Name:       workloadName,
+		Pods:       make([]Pod, 0),
+		Containers: make([]Container, 0),
+		Stats:      WorkloadStats{},
 	}
 
 	// Get workload metadata based on type
@@ -103,9 +103,9 @@ func GetWorkload(c *gin.Context) {
 			}
 			return
 		}
-		response.WorkloadReplicas = dep.Replicas
-		response.WorkloadReady = dep.ReadyReplicas
-		response.WorkloadCreatedAt = dep.CreatedAt
+		response.Replicas = dep.Replicas
+		response.Ready = dep.ReadyReplicas
+		response.CreatedAt = dep.CreatedAt
 		pods, err = database.GetPodsByWorkload(ctx, "Deployment", workloadName, namespaceName)
 		if err != nil {
 			c.Error(fmt.Errorf("failed to get pods: %w", err))
@@ -128,9 +128,9 @@ func GetWorkload(c *gin.Context) {
 			}
 			return
 		}
-		response.WorkloadReplicas = sts.Replicas
-		response.WorkloadReady = sts.ReadyReplicas
-		response.WorkloadCreatedAt = sts.CreatedAt
+		response.Replicas = sts.Replicas
+		response.Ready = sts.ReadyReplicas
+		response.CreatedAt = sts.CreatedAt
 		pods, err = database.GetPodsByWorkload(ctx, "StatefulSet", workloadName, namespaceName)
 		if err != nil {
 			c.Error(fmt.Errorf("failed to get pods: %w", err))
@@ -153,9 +153,9 @@ func GetWorkload(c *gin.Context) {
 			}
 			return
 		}
-		response.WorkloadReplicas = ds.DesiredNumberScheduled
-		response.WorkloadReady = ds.NumberReady
-		response.WorkloadCreatedAt = ds.CreatedAt
+		response.Replicas = ds.DesiredNumberScheduled
+		response.Ready = ds.NumberReady
+		response.CreatedAt = ds.CreatedAt
 		pods, err = database.GetPodsByWorkload(ctx, "DaemonSet", workloadName, namespaceName)
 		if err != nil {
 			c.Error(fmt.Errorf("failed to get pods: %w", err))
@@ -186,16 +186,16 @@ func GetWorkload(c *gin.Context) {
 			})
 			return
 		}
-		response.WorkloadReplicas = 1
+		response.Replicas = 1
 		if pod.Phase == "Running" {
-			response.WorkloadReady = 1
+			response.Ready = 1
 		}
-		response.WorkloadCreatedAt = pod.CreatedAt
+		response.CreatedAt = pod.CreatedAt
 		pods = []*database.Pod{pod}
 	}
 
 	// Process pods
-	response.Stats.PodCount = len(pods)
+	response.Stats.Pods = len(pods)
 	uniqueContainers := make(map[string]Container)
 
 	for _, pod := range pods {
@@ -257,7 +257,7 @@ func GetWorkload(c *gin.Context) {
 		response.Containers = append(response.Containers, container)
 	}
 
-	response.Stats.ContainerCount = len(response.Containers)
+	response.Stats.Containers = len(response.Containers)
 
 	c.JSON(http.StatusOK, response)
 }

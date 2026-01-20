@@ -38,7 +38,5 @@ func GetNamespaces(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"namespaces": items,
-	})
+	c.JSON(http.StatusOK, items)
 }

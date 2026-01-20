@@ -13,7 +13,7 @@ import (
 	"github.com/thread_koder/mochi/internal/redis"
 )
 
-// Represents home page API response
+// Represents home API response
 type HomeResponse struct {
 	ClusterName  string          `json:"cluster_name"`
 	Stats        Stats           `json:"stats"`
