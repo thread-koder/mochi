@@ -3,9 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
-	"html/template"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -36,17 +34,6 @@ func NewServer(cfg *config.APIConfig) (*Server, error) {
 	// Apply middleware
 	router.Use(gin.Recovery())
 	router.Use(middleware.LoggingMiddleware())
-
-	// Load HTML templates
-	tmpl, err := loadTemplates()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load templates: %w", err)
-	} else {
-		router.SetHTMLTemplate(tmpl)
-	}
-
-	// Serve static files
-	router.Static("/static", "./web/static")
 
 	// Setup routes
 	setupRoutes(router)
@@ -92,20 +79,4 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// Loads HTML templates from filesystem
-func loadTemplates() (*template.Template, error) {
-	tmpl, err := template.ParseGlob("web/templates/*.html")
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse templates: %w", err)
-	}
-
-	// Parse base template if it exists separately
-	basePath := filepath.Join("web/templates", "base.html")
-	if _, err := tmpl.ParseFiles(basePath); err != nil {
-		// Base template might already be included, ignore error
-	}
-
-	return tmpl, nil
 }
