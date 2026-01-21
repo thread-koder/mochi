@@ -30,7 +30,7 @@ type Stats struct {
 	Namespaces  int `json:"namespaces"`
 	Workloads   int `json:"workloads"`
 	Pods        int `json:"pods"`
-	HealthScore int `json:"healthScore"`
+	HealthScore int `json:"health_score"`
 }
 
 // Gets stats
