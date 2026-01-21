@@ -12,11 +12,12 @@ import (
 
 // Represents namespace API response
 type NamespaceResponse struct {
-	Namespace  *database.Namespace `json:"namespace"`
-	Stats      NamespaceStats      `json:"stats"`
-	Workloads  []Workload          `json:"workloads"`
-	Standalone []StandalonePod     `json:"standalone_pods"`
-	System     []StandalonePod     `json:"system_pods"`
+	Name       string          `json:"name"`
+	Phase      string          `json:"phase"`
+	Stats      NamespaceStats  `json:"stats"`
+	Workloads  []Workload      `json:"workloads"`
+	Standalone []StandalonePod `json:"standalone_pods"`
+	System     []StandalonePod `json:"system_pods"`
 }
 
 // Represents namespace statistics
@@ -69,7 +70,8 @@ func GetNamespace(c *gin.Context) {
 	}
 
 	response := NamespaceResponse{
-		Namespace:  namespace,
+		Name:       namespace.Name,
+		Phase:      namespace.Phase,
 		Stats:      NamespaceStats{},
 		Workloads:  make([]Workload, 0),
 		Standalone: make([]StandalonePod, 0),
