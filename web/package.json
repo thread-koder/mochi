@@ -1,0 +1,31 @@
+{
+  "name": "web",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@nuxt/eslint": "1.13.0",
+    "@nuxt/icon": "2.2.1",
+    "@tailwindcss/vite": "^4.1.18",
+    "@vueuse/nuxt": "14.1.0",
+    "chart.js": "^4.5.1",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "eslint": "^9.39.2",
+    "motion-v": "^1.9.0",
+    "nuxt": "^4.3.0",
+    "nuxt-api-party": "3.4.2",
+    "tailwindcss": "^4.1.18",
+    "vue": "^3.5.27",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@iconify-json/lucide": "^1.2.86",
+    "typescript": "^5.9.3"
+  }
+}

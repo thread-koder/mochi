@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+@theme static {
+  /* Fonts */
+  --font-heading: 'Karla', sans-serif;
+  --font-body: 'Inconsolata', monospace;
+  --font-sans: var(--font-body);
+  
+  /* Text Sizes */
+  --text-xs: 0.875rem;    /* 14px */
+  --text-sm: 1rem;        /* 16px */
+  --text-base: 1.125rem;   /* 18px */
+  --text-lg: 1.25rem;      /* 20px */
+  --text-xl: 1.375rem;     /* 22px */
+  --text-2xl: 1.625rem;    /* 26px */
+  --text-3xl: 2rem;        /* 32px */
+  --text-4xl: 2.375rem;    /* 38px */
+  --text-5xl: 3.125rem;    /* 50px */
+  --text-6xl: 3.875rem;    /* 62px */
+  
+  /* Light Theme Palette (Default) */
+  /* Base colors */
+  --color-primary: var(--color-purple-600);
+  --color-secondary: var(--color-cyan-600);
+  --color-tertiary: var(--color-pink-600);
+  --color-success: var(--color-green-600);
+  --color-error: var(--color-red-600);
+  --color-warning: var(--color-amber-600);
+  --color-info: var(--color-blue-600);
+  
+  /* Light colors */
+  --color-primary-light: var(--color-purple-500);
+  --color-secondary-light: var(--color-cyan-500);
+  --color-tertiary-light: var(--color-pink-500);
+  --color-success-light: var(--color-green-500);
+  --color-error-light: var(--color-red-500);
+  --color-warning-light: var(--color-amber-500);
+  --color-info-light: var(--color-blue-500);
+  
+  /* Surface Colors (Backgrounds) */
+  --color-surface: var(--color-slate-50);
+  --color-surface-elevated: var(--color-slate-100);
+  
+  /* On-Surface Colors */
+  --color-on-surface: var(--color-slate-900);
+  --color-on-surface-secondary: var(--color-slate-800);
+  --color-on-surface-subtle: var(--color-slate-700);
+  --color-on-surface-muted: var(--color-slate-600);
+}
+
+/* Dark Theme Palette */
+.dark {
+  /* Base colors */
+  --color-primary: var(--color-purple-400);
+  --color-secondary: var(--color-cyan-400);
+  --color-tertiary: var(--color-pink-400);
+  --color-success: var(--color-green-400);
+  --color-error: var(--color-red-400);
+  --color-warning: var(--color-amber-400);
+  --color-info: var(--color-blue-400);
+  
+  /* Light colors */
+  --color-primary-light: var(--color-purple-300);
+  --color-secondary-light: var(--color-cyan-300);
+  --color-tertiary-light: var(--color-pink-300);
+  --color-success-light: var(--color-green-300);
+  --color-error-light: var(--color-red-300);
+  --color-warning-light: var(--color-amber-300);
+  --color-info-light: var(--color-blue-300);
+  
+  /* Surface Colors (Backgrounds) */
+  --color-surface: var(--color-slate-950);
+  --color-surface-elevated: var(--color-slate-900);
+  
+  /* On-Surface Colors */
+  --color-on-surface: var(--color-slate-100);
+  --color-on-surface-secondary: var(--color-slate-200);
+  --color-on-surface-subtle: var(--color-slate-300);
+  --color-on-surface-muted: var(--color-slate-400);
+}
+
+@layer base {
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-surface-elevated);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-primary);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-primary-light);
+  }
+
+  /* Transitions */
+  * {
+    transition: all 0.2s ease;
+  }
+
+  /* Avoid layout shift */
+  iconify-icon {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+  }
+}
+
+@layer components {
+  /* Glassmorphism effect */
+  .glass {
+    background-color: rgb(from var(--color-surface-elevated) r g b / 80%);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgb(from var(--color-primary) r g b / 20%);
+  }
+
+  /* Magnetic card */
+  .magnetic-card {
+    will-change: transform;
+  }
+
+  /* Theme Switcher Animations */
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      opacity: 0.7;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .theme-switcher {
+    animation: pulse-glow 2s ease-in-out infinite;
+    will-change: opacity;
+  }
+
+  .theme-switcher:hover {
+    animation: none;
+    opacity: 1;
+  }
+
+  .theme-switcher:active {
+    transform: scale(0.95) !important;
+  }
+}
