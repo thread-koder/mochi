@@ -74,7 +74,8 @@ type ContainerAnalysis struct {
 	ContainerName string             `json:"container_name"`
 	Utilization   UtilizationResult  `json:"utilization"`
 	Provisioning  ProvisioningResult `json:"provisioning"`
-	TimeSeries    *ResourceMetrics   `json:"time_series,omitempty"` // Optional: raw datapoints for charting
+	Stability     StabilityResult    `json:"stability"`
+	TimeSeries    *TimeSeries        `json:"time_series,omitempty"` // Optional: raw datapoints for charting
 }
 
 // Represents analysis results for a pod
@@ -83,7 +84,8 @@ type PodAnalysis struct {
 	PodName     string              `json:"pod_name"`
 	Containers  []ContainerAnalysis `json:"containers"`            // Individual container analyses
 	Utilization UtilizationResult   `json:"utilization"`           // Aggregated from containers
-	TimeSeries  *ResourceMetrics    `json:"time_series,omitempty"` // Optional: raw datapoints for charting
+	Stability   StabilityResult     `json:"stability"`             // Aggregated from containers
+	TimeSeries  *TimeSeries         `json:"time_series,omitempty"` // Optional: raw datapoints for charting
 }
 
 // Represents analysis results for a workload
@@ -93,15 +95,17 @@ type WorkloadAnalysis struct {
 	Namespace    string            `json:"namespace"`
 	Pods         []PodAnalysis     `json:"pods"` // Individual pod analyses
 	Utilization  UtilizationResult `json:"utilization"`
-	TimeSeries   *ResourceMetrics  `json:"time_series,omitempty"` // Optional: raw datapoints for charting
+	Stability    StabilityResult   `json:"stability"`             // Aggregated from pods
+	TimeSeries   *TimeSeries       `json:"time_series,omitempty"` // Optional: raw datapoints for charting
 }
 
 // Represents analysis results for a namespace
 type NamespaceAnalysis struct {
 	Namespace   string             `json:"namespace"`
 	Utilization UtilizationResult  `json:"utilization"`           // Aggregated from all workloads/pods
-	TimeSeries  *ResourceMetrics   `json:"time_series,omitempty"` // Optional: raw datapoints for charting
+	Stability   StabilityResult    `json:"stability"`             // Aggregated from all workloads/pods
 	Workloads   []WorkloadAnalysis `json:"workloads,omitempty"`   // Optional: individual workload analyses
+	TimeSeries  *TimeSeries        `json:"time_series,omitempty"` // Optional: raw datapoints for charting
 }
 
 // Analyzes a single container's resource utilization and provisioning
@@ -132,6 +136,12 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 		return ContainerAnalysis{}, fmt.Errorf("failed to analyze utilization: %w", err)
 	}
 
+	// Analyze stability
+	stability, err := AnalyzeStability(metrics)
+	if err != nil {
+		return ContainerAnalysis{}, fmt.Errorf("failed to analyze stability: %w", err)
+	}
+
 	// Parse resource specs
 	specs, err := ParseContainerSpecs(container)
 	if err != nil {
@@ -147,12 +157,16 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 	result := ContainerAnalysis{
 		ContainerName: container.Name,
 		Utilization:   utilization,
+		Stability:     stability,
 		Provisioning:  provisioning,
 	}
 
 	// Include time series if requested
 	if opts.IncludeTimeSeries {
-		result.TimeSeries = &metrics
+		result.TimeSeries = &TimeSeries{
+			CPU:    metrics.CPU,
+			Memory: metrics.Memory,
+		}
 	}
 
 	return result, nil
@@ -167,12 +181,14 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 
 	// Analyze each container individually
 	containerAnalyses := make([]ContainerAnalysis, 0, len(containers))
+	stabilities := make([]StabilityResult, 0, len(containers))
 	for _, container := range containers {
 		analysis, err := AnalyzeContainer(ctx, container, opts)
 		if err != nil {
 			return PodAnalysis{}, fmt.Errorf("failed to analyze container: %w", err)
 		}
 		containerAnalyses = append(containerAnalyses, analysis)
+		stabilities = append(stabilities, analysis.Stability)
 	}
 
 	// Aggregate metrics from all containers for pod-level utilization
@@ -197,11 +213,15 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 		PodName:     pod.Name,
 		Containers:  containerAnalyses,
 		Utilization: utilization,
+		Stability:   AggregateStability(stabilities),
 	}
 
 	// Include time series if requested
 	if opts.IncludeTimeSeries {
-		result.TimeSeries = &metrics
+		result.TimeSeries = &TimeSeries{
+			CPU:    metrics.CPU,
+			Memory: metrics.Memory,
+		}
 	}
 
 	return result, nil
@@ -221,7 +241,8 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 
 	// Analyze each pod individually
 	podAnalyses := make([]PodAnalysis, 0, len(pods))
-	// Disable time series for pod analysis
+	stabilities := make([]StabilityResult, 0, len(pods))
+	// Disable time series for pods
 	podOpts := opts
 	podOpts.IncludeTimeSeries = false
 	for _, pod := range pods {
@@ -237,6 +258,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 			return WorkloadAnalysis{}, fmt.Errorf("failed to analyze pod: %w", err)
 		}
 		podAnalyses = append(podAnalyses, podAnalysis)
+		stabilities = append(stabilities, podAnalysis.Stability)
 	}
 
 	// Aggregate metrics from all pods for workload-level utilization
@@ -262,11 +284,15 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 		Namespace:    namespace,
 		Pods:         podAnalyses,
 		Utilization:  utilization,
+		Stability:    AggregateStability(stabilities),
 	}
 
 	// Include time series if requested
 	if opts.IncludeTimeSeries {
-		result.TimeSeries = &metrics
+		result.TimeSeries = &TimeSeries{
+			CPU:    metrics.CPU,
+			Memory: metrics.Memory,
+		}
 	}
 
 	return result, nil
@@ -303,19 +329,26 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 
 	// Include time series if requested
 	if opts.IncludeTimeSeries {
-		result.TimeSeries = &metrics
+		result.TimeSeries = &TimeSeries{
+			CPU:    metrics.CPU,
+			Memory: metrics.Memory,
+		}
 	}
 
-	// Include workloads if requested
-	if includeWorkloads {
-		// Disable time series for workloads
-		workloadOpts := opts
-		workloadOpts.IncludeTimeSeries = false
-		workloads, err := analyzeNamespaceWorkloads(ctx, namespace, workloadOpts)
-		if err != nil {
-			return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace workloads: %w", err)
+	// Disable time series for workloads
+	workloadOpts := opts
+	workloadOpts.IncludeTimeSeries = false
+	workloads, err := analyzeNamespaceWorkloads(ctx, namespace, workloadOpts)
+	if err == nil {
+		stabilities := make([]StabilityResult, 0, len(workloads))
+		for _, w := range workloads {
+			stabilities = append(stabilities, w.Stability)
 		}
-		result.Workloads = workloads
+		result.Stability = AggregateStability(stabilities)
+
+		if includeWorkloads {
+			result.Workloads = workloads
+		}
 	}
 
 	return result, nil
@@ -422,30 +455,41 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		Step:  opts.RangeStep,
 	}
 
-	// Query CPU metrics
-	cpuMatrix, _, err := prometheus.QueryPodCPURange(ctx, r, prometheus.QueryOptions{
+	queryOpts := prometheus.QueryOptions{
 		Namespace:     container.Namespace,
 		Pod:           container.PodName,
 		Container:     container.Name,
 		RangeDuration: "5m",
-	})
+	}
+
+	// Query basic metrics
+	cpuMatrix, _, err := prometheus.QueryPodCPURange(ctx, r, queryOpts)
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query CPU metrics: %w", err)
 	}
 
-	// Query memory metrics
-	memoryMatrix, _, err := prometheus.QueryPodMemoryRange(ctx, r, prometheus.QueryOptions{
-		Namespace: container.Namespace,
-		Pod:       container.PodName,
-		Container: container.Name,
-	})
+	memoryMatrix, _, err := prometheus.QueryPodMemoryRange(ctx, r, queryOpts)
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query memory metrics: %w", err)
 	}
 
+	// Query pressure and health metrics
+	throttlingMatrix, _, _ := prometheus.QueryPodCPUThrottlingRange(ctx, r, queryOpts)
+	cpuPressureMatrix, _, _ := prometheus.QueryPodCPUPressureRange(ctx, r, queryOpts)
+	memFailMatrix, _, _ := prometheus.QueryPodMemoryFailCountRange(ctx, r, queryOpts)
+	memOOMMatrix, _, _ := prometheus.QueryPodMemoryOOMRange(ctx, r, queryOpts)
+	memPressureMatrix, _, _ := prometheus.QueryPodMemoryPressureRange(ctx, r, queryOpts)
+	restartsMatrix, _, _ := prometheus.QueryContainerRestartsRange(ctx, r, queryOpts)
+
 	return ResourceMetrics{
-		CPU:    MatrixToDataPoints(cpuMatrix),
-		Memory: MatrixToDataPoints(memoryMatrix),
+		CPU:            MatrixToDataPoints(cpuMatrix),
+		Memory:         MatrixToDataPoints(memoryMatrix),
+		CPUThrottling:  MatrixToDataPoints(throttlingMatrix),
+		CPUPressure:    MatrixToDataPoints(cpuPressureMatrix),
+		MemoryFailCnt:  MatrixToDataPoints(memFailMatrix),
+		MemoryOOM:      MatrixToDataPoints(memOOMMatrix),
+		MemoryPressure: MatrixToDataPoints(memPressureMatrix),
+		Restarts:       MatrixToDataPoints(restartsMatrix),
 	}, nil
 }
 
@@ -460,12 +504,14 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		Step:  opts.RangeStep,
 	}
 
-	// Query CPU metrics for all containers in the pod
-	cpuMatrix, _, err := prometheus.QueryPodCPURange(ctx, r, prometheus.QueryOptions{
+	queryOpts := prometheus.QueryOptions{
 		Namespace:     pod.Namespace,
 		Pod:           pod.Name,
 		RangeDuration: "5m",
-	})
+	}
+
+	// Query basic metrics
+	cpuMatrix, _, err := prometheus.QueryPodCPURange(ctx, r, queryOpts)
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query pod CPU metrics: %w", err)
 	}
@@ -474,10 +520,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	aggregatedCPU := aggregateDataPointsByTimestamp(cpuDataPoints)
 
 	// Query memory metrics for all containers in the pod
-	memoryMatrix, _, err := prometheus.QueryPodMemoryRange(ctx, r, prometheus.QueryOptions{
-		Namespace: pod.Namespace,
-		Pod:       pod.Name,
-	})
+	memoryMatrix, _, err := prometheus.QueryPodMemoryRange(ctx, r, queryOpts)
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query pod memory metrics: %w", err)
 	}
@@ -493,7 +536,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 
 // Aggregates metrics from all pods in a workload
 func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts AnalysisOptions) (ResourceMetrics, error) {
-	var aggregatedCPU, aggregatedMemory []DataPoint
+	var metrics ResourceMetrics
 
 	// Set up time range
 	end := time.Now()
@@ -504,40 +547,23 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		Step:  opts.RangeStep,
 	}
 
-	// Aggregate CPU metrics from all pods
 	for _, pod := range pods {
-		// Query all containers in the pod
-		cpuMatrix, _, err := prometheus.QueryPodCPURange(ctx, r, prometheus.QueryOptions{
+		queryOpts := prometheus.QueryOptions{
 			Namespace:     pod.Namespace,
 			Pod:           pod.Name,
 			RangeDuration: "5m",
-		})
-		if err != nil {
-			return ResourceMetrics{}, fmt.Errorf("failed to query pod CPU metrics: %w", err)
 		}
 
-		cpuDataPoints := MatrixToDataPoints(cpuMatrix)
-		aggregatedCPU = mergeDataPointsByTime(aggregatedCPU, cpuDataPoints)
+		// CPU
+		cpuMatrix, _, _ := prometheus.QueryPodCPURange(ctx, r, queryOpts)
+		metrics.CPU = mergeDataPointsByTime(metrics.CPU, MatrixToDataPoints(cpuMatrix))
+
+		// Memory
+		memoryMatrix, _, _ := prometheus.QueryPodMemoryRange(ctx, r, queryOpts)
+		metrics.Memory = mergeDataPointsByTime(metrics.Memory, MatrixToDataPoints(memoryMatrix))
 	}
 
-	// Aggregate memory metrics from all pods
-	for _, pod := range pods {
-		memoryMatrix, _, err := prometheus.QueryPodMemoryRange(ctx, r, prometheus.QueryOptions{
-			Namespace: pod.Namespace,
-			Pod:       pod.Name,
-		})
-		if err != nil {
-			return ResourceMetrics{}, fmt.Errorf("failed to query pod memory metrics: %w", err)
-		}
-
-		memoryDataPoints := MatrixToDataPoints(memoryMatrix)
-		aggregatedMemory = mergeDataPointsByTime(aggregatedMemory, memoryDataPoints)
-	}
-
-	return ResourceMetrics{
-		CPU:    aggregatedCPU,
-		Memory: aggregatedMemory,
-	}, nil
+	return metrics, nil
 }
 
 // Fetches namespace metrics
@@ -551,19 +577,19 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		Step:  opts.RangeStep,
 	}
 
-	// Query CPU metrics
-	cpuMatrix, _, err := prometheus.QueryNamespaceCPURange(ctx, r, prometheus.QueryOptions{
+	queryOpts := prometheus.QueryOptions{
 		Namespace:     namespace,
 		RangeDuration: "5m",
-	})
+	}
+
+	// Query CPU metrics
+	cpuMatrix, _, err := prometheus.QueryNamespaceCPURange(ctx, r, queryOpts)
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query namespace CPU metrics: %w", err)
 	}
 
 	// Query memory metrics
-	memoryMatrix, _, err := prometheus.QueryNamespaceMemoryRange(ctx, r, prometheus.QueryOptions{
-		Namespace: namespace,
-	})
+	memoryMatrix, _, err := prometheus.QueryNamespaceMemoryRange(ctx, r, queryOpts)
 	if err != nil {
 		return ResourceMetrics{}, fmt.Errorf("failed to query namespace memory metrics: %w", err)
 	}
