@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/thread_koder/mochi/internal/database"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // Represents compute resource recommendations for a workload
@@ -76,6 +77,7 @@ func GenerateContainerRecommendation(
 		specs.CPURequest,
 		containerAnalysis.Utilization.CPU,
 		containerAnalysis.Provisioning.CPU,
+		containerAnalysis.Stability,
 		config,
 	)
 	if err != nil {
@@ -87,6 +89,7 @@ func GenerateContainerRecommendation(
 		specs.CPULimit,
 		containerAnalysis.Utilization.CPU,
 		containerAnalysis.Provisioning.CPU,
+		containerAnalysis.Stability,
 		config,
 		cpuRequestRecValue,
 	)
@@ -99,6 +102,7 @@ func GenerateContainerRecommendation(
 		specs.MemoryRequest,
 		containerAnalysis.Utilization.Memory,
 		containerAnalysis.Provisioning.Memory,
+		containerAnalysis.Stability,
 		config,
 	)
 	if err != nil {
@@ -110,6 +114,7 @@ func GenerateContainerRecommendation(
 		specs.MemoryLimit,
 		containerAnalysis.Utilization.Memory,
 		containerAnalysis.Provisioning.Memory,
+		containerAnalysis.Stability,
 		config,
 		memoryRequestRecValue,
 	)
@@ -119,10 +124,10 @@ func GenerateContainerRecommendation(
 
 	// Ensure limits are >= requests
 	cpuLimitRecValue = ensureLimitGreaterThanRequestValue(
-		cpuLimitRecValue, cpuRequestRecValue, specs.CPULimit, specs.CPURequest,
+		cpuLimitRecValue, cpuRequestRecValue, specs.CPULimit, specs.CPURequest, config.Mode,
 	)
 	memoryLimitRecValue = ensureLimitGreaterThanRequestValue(
-		memoryLimitRecValue, memoryRequestRecValue, specs.MemoryLimit, specs.MemoryRequest,
+		memoryLimitRecValue, memoryRequestRecValue, specs.MemoryLimit, specs.MemoryRequest, config.Mode,
 	)
 
 	// Calculate overall confidence
@@ -241,16 +246,31 @@ func GenerateWorkloadRecommendations(
 				continue
 			}
 
-			// For each unique container name, take the recommendation with higher confidence
+			// For each unique container name, take the Maximum recommended values across all replicas
 			existingRec, exists := containerRecsMap[container.Name]
 			if !exists {
 				// First instance of this container name
 				containerRecsMap[container.Name] = rec
 			} else {
-				// Replace if new recommendation has higher confidence
+				// Max CPU Request
+				updateMaxQuantity(&existingRec.CPU.RecommendedRequest, rec.CPU.RecommendedRequest)
+				// Max CPU Limit
+				updateMaxQuantity(&existingRec.CPU.RecommendedLimit, rec.CPU.RecommendedLimit)
+				// Max Memory Request
+				updateMaxQuantity(&existingRec.Memory.RecommendedRequest, rec.Memory.RecommendedRequest)
+				// Max Memory Limit
+				updateMaxQuantity(&existingRec.Memory.RecommendedLimit, rec.Memory.RecommendedLimit)
+
+				// Keep highest confidence score
 				if rec.ConfidenceScore > existingRec.ConfidenceScore {
-					containerRecsMap[container.Name] = rec
+					existingRec.ConfidenceScore = rec.ConfidenceScore
 				}
+
+				// Recalculate change percentages based on new max values
+				existingRec.CPU.RequestChangePercent = calculateChangePercentFromStrings(existingRec.CPU.CurrentRequest, existingRec.CPU.RecommendedRequest)
+				existingRec.CPU.LimitChangePercent = calculateChangePercentFromStrings(existingRec.CPU.CurrentLimit, existingRec.CPU.RecommendedLimit)
+				existingRec.Memory.RequestChangePercent = calculateChangePercentFromStrings(existingRec.Memory.CurrentRequest, existingRec.Memory.RecommendedRequest)
+				existingRec.Memory.LimitChangePercent = calculateChangePercentFromStrings(existingRec.Memory.CurrentLimit, existingRec.Memory.RecommendedLimit)
 			}
 		}
 	}
@@ -273,28 +293,6 @@ func GenerateWorkloadRecommendations(
 	return result, nil
 }
 
-// Calculates change percentage between current and recommended values
-// Returns 100.0 if current is nil (new resource)
-func calculateChangePercent(current, recommended *float64) *float64 {
-	if recommended == nil {
-		return nil
-	}
-
-	if current == nil || *current == 0 {
-		// New resource or zero current, return 100.0%
-		val := 100.0
-		return &val
-	}
-
-	// Calculate percentage
-	changePercent := ((*recommended - *current) / *current) * 100.0
-
-	// Round to 1 decimal place
-	rounded := math.Round(changePercent*10) / 10
-
-	return &rounded
-}
-
 // Converts a compute Recommendation to a database ComputeRecommendation
 func ComputeRecommendationToDB(rec Recommendation) (*database.ComputeRecommendation, error) {
 	recommendationsJSON, err := json.Marshal(rec.Recommendations)
@@ -315,4 +313,70 @@ func ComputeRecommendationToDB(rec Recommendation) (*database.ComputeRecommendat
 		UpdatedAt:          now,
 		GeneratedAt:        now,
 	}, nil
+}
+
+// Updates a target quantity string if the source is larger
+func updateMaxQuantity(target **string, source *string) {
+	if source == nil {
+		return
+	}
+	if *target == nil {
+		*target = source
+		return
+	}
+
+	q1, err1 := resource.ParseQuantity(**target)
+	q2, err2 := resource.ParseQuantity(*source)
+	if err1 != nil || err2 != nil {
+		return
+	}
+
+	if q2.Cmp(q1) > 0 {
+		*target = source
+	}
+}
+
+// Calculates change percent from quantity strings
+func calculateChangePercentFromStrings(currentStr, recommendedStr *string) *float64 {
+	if recommendedStr == nil {
+		return nil
+	}
+
+	var curVal float64
+	if currentStr != nil && *currentStr != "" {
+		q, err := resource.ParseQuantity(*currentStr)
+		if err == nil {
+			curVal = q.AsFloat64Slow()
+		}
+	}
+
+	qRec, err := resource.ParseQuantity(*recommendedStr)
+	if err != nil {
+		return nil
+	}
+	recVal := qRec.AsFloat64Slow()
+
+	return calculateChangePercent(&curVal, &recVal)
+}
+
+// Calculates change percentage between current and recommended values
+// Returns 100.0 if current is nil (new resource)
+func calculateChangePercent(current, recommended *float64) *float64 {
+	if recommended == nil {
+		return nil
+	}
+
+	if current == nil || *current == 0 {
+		// New resource or zero current, return 100.0%
+		val := 100.0
+		return &val
+	}
+
+	// Calculate percentage
+	changePercent := ((*recommended - *current) / *current) * 100.0
+
+	// Round to 1 decimal place
+	rounded := math.Round(changePercent*10) / 10
+
+	return &rounded
 }
