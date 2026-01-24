@@ -6,44 +6,64 @@ import (
 
 // Builds a PromQL query for pod CPU usage
 func BuildPodCPUQuery(namespace, pod, container string, rangeDuration string) string {
-	baseQuery := `rate(container_cpu_usage_seconds_total{container!="POD",container!=""`
-
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
-
-	query := baseQuery
-	if namespace != "" {
-		query += fmt.Sprintf(`,namespace="%s"`, namespace)
-	}
-	if pod != "" {
-		query += fmt.Sprintf(`,pod="%s"`, pod)
-	}
-	if container != "" {
-		query += fmt.Sprintf(`,container="%s"`, container)
-	}
-	query += fmt.Sprintf(`}[%s])`, rangeDuration)
-
-	return query
+	return fmt.Sprintf("rate(%s)", BuildContainerMetricQuery("container_cpu_usage_seconds_total", namespace, pod, container, rangeDuration))
 }
 
 // Builds a PromQL query for pod memory usage
 func BuildPodMemoryQuery(namespace, pod, container string) string {
-	baseQuery := `container_memory_working_set_bytes{container!="POD",container!=""`
+	return BuildContainerMetricQuery("container_memory_working_set_bytes", namespace, pod, container, "")
+}
 
-	query := baseQuery
-	if namespace != "" {
-		query += fmt.Sprintf(`,namespace="%s"`, namespace)
+// Builds a PromQL query for pod CPU throttling (CFS)
+func BuildPodCPUThrottlingQuery(namespace, pod, container string, rangeDuration string) string {
+	if rangeDuration == "" {
+		rangeDuration = "5m"
 	}
-	if pod != "" {
-		query += fmt.Sprintf(`,pod="%s"`, pod)
-	}
-	if container != "" {
-		query += fmt.Sprintf(`,container="%s"`, container)
-	}
-	query += `}`
+	return fmt.Sprintf("rate(%s)", BuildContainerMetricQuery("container_cpu_cfs_throttled_periods_total", namespace, pod, container, rangeDuration))
+}
 
-	return query
+// Builds a PromQL query for pod CPU pressure (stalled)
+func BuildPodCPUPressureQuery(namespace, pod, container string, rangeDuration string) string {
+	if rangeDuration == "" {
+		rangeDuration = "5m"
+	}
+	return fmt.Sprintf("rate(%s)", BuildContainerMetricQuery("container_pressure_cpu_stalled_seconds_total", namespace, pod, container, rangeDuration))
+}
+
+// Builds a PromQL query for pod memory fail count
+func BuildPodMemoryFailCountQuery(namespace, pod, container string, rangeDuration string) string {
+	if rangeDuration == "" {
+		rangeDuration = "5m"
+	}
+	return fmt.Sprintf("rate(%s)", BuildContainerMetricQuery("container_memory_failcnt", namespace, pod, container, rangeDuration))
+}
+
+// Builds a PromQL query for pod memory OOM events
+func BuildPodMemoryOOMQuery(namespace, pod, container string, rangeDuration string) string {
+	if rangeDuration == "" {
+		rangeDuration = "5m"
+	}
+	return fmt.Sprintf("rate(%s)", BuildContainerMetricQuery("container_oom_events_total", namespace, pod, container, rangeDuration))
+}
+
+// Builds a PromQL query for pod memory pressure (stalled)
+func BuildPodMemoryPressureQuery(namespace, pod, container string, rangeDuration string) string {
+	if rangeDuration == "" {
+		rangeDuration = "5m"
+	}
+	return fmt.Sprintf("rate(%s)", BuildContainerMetricQuery("container_pressure_memory_stalled_seconds_total", namespace, pod, container, rangeDuration))
+}
+
+// Builds a PromQL query for container restarts
+func BuildContainerRestartsQuery(namespace, pod, container string, rangeDuration string) string {
+	if rangeDuration == "" {
+		rangeDuration = "5m"
+	}
+	query := fmt.Sprintf(`kube_pod_container_status_restarts_total{namespace="%s",pod="%s",container="%s"}`, namespace, pod, container)
+	return fmt.Sprintf("increase(%s[%s])", query, rangeDuration)
 }
 
 // Builds a PromQL query for namespace CPU aggregation
@@ -69,5 +89,25 @@ func BuildNamespaceMemoryQuery(namespace string) string {
 	}
 	query += `}) by (namespace)`
 
+	return query
+}
+
+// Helper to build container-scoped queries
+func BuildContainerMetricQuery(metric, namespace, pod, container, rangeDuration string) string {
+	query := fmt.Sprintf(`%s{container!="POD",container!=""`, metric)
+	if namespace != "" {
+		query += fmt.Sprintf(`,namespace="%s"`, namespace)
+	}
+	if pod != "" {
+		query += fmt.Sprintf(`,pod="%s"`, pod)
+	}
+	if container != "" {
+		query += fmt.Sprintf(`,container="%s"`, container)
+	}
+	query += `}`
+
+	if rangeDuration != "" {
+		query += fmt.Sprintf(`[%s]`, rangeDuration)
+	}
 	return query
 }
