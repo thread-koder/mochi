@@ -7,9 +7,19 @@ interface DataPoint {
   timestamp: string
 }
 
-interface ResourceMetrics {
+interface TimeSeries {
   cpu: DataPoint[]
   memory: DataPoint[]
+}
+
+interface StabilityResult {
+  cpu_throttling: number
+  cpu_pressure: number
+  memory_fail_cnt: number
+  memory_oom: number
+  memory_pressure: number
+  restarts: number
+  stability_score: number
 }
 
 interface PercentileResult {
@@ -93,8 +103,9 @@ interface ProvisioningResult {
 interface ContainerAnalysis {
   container_name: string
   utilization: UtilizationResult
+  stability: StabilityResult
   provisioning: ProvisioningResult
-  time_series?: ResourceMetrics
+  time_series?: TimeSeries
 }
 
 interface PodAnalysis {
@@ -102,7 +113,8 @@ interface PodAnalysis {
   pod_name: string
   containers: ContainerAnalysis[]
   utilization: UtilizationResult
-  time_series?: ResourceMetrics
+  stability: StabilityResult
+  time_series?: TimeSeries
 }
 
 interface WorkloadAnalysis {
@@ -111,13 +123,15 @@ interface WorkloadAnalysis {
   namespace: string
   pods: PodAnalysis[]
   utilization: UtilizationResult
-  time_series?: ResourceMetrics
+  stability: StabilityResult
+  time_series?: TimeSeries
 }
 
 interface NamespaceAnalysis {
   namespace: string
   utilization: UtilizationResult
-  time_series?: ResourceMetrics
+  stability: StabilityResult
+  time_series?: TimeSeries
   workloads?: WorkloadAnalysis[]
 }
 
