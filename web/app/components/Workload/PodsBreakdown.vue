@@ -172,7 +172,7 @@
 </template>
 
 <script setup lang="ts">
-import type * as Compute from '#shared/types/compute/analysis'
+import type * as Compute from '#shared/types/compute'
 
 const props = defineProps<{
   pods?: Compute.WorkloadAnalysis['pods']

@@ -136,5 +136,6 @@ interface NamespaceAnalysis {
 }
 
 type WorkloadContainerAnalysis = WorkloadAnalysis['pods'][number]['containers'][number]
+type ProvisioningType = WorkloadContainerAnalysis['provisioning']['cpu']
 
-export type { UtilizationResult, NamespaceAnalysis, WorkloadAnalysis, WorkloadContainerAnalysis }
+export type { UtilizationResult, NamespaceAnalysis, WorkloadAnalysis, WorkloadContainerAnalysis, ProvisioningType }
