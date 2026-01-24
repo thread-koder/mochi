@@ -45,8 +45,14 @@ const (
 	// Optimal utilization range for requests
 	OptimalUtilizationMin = 0.4 // 40%
 	OptimalUtilizationMax = 0.7 // 70%
+
 	// Headroom for limits (peak should stay below this percentage of limit)
-	LimitHeadroom = 0.2 // 20% headroom
+	CPUHeadroom    = 0.2 // 20% headroom (80% utilization)
+	MemoryHeadroom = 0.2 // 20% headroom (80% utilization)
+
+	// Burst factor for CPU (if limit/request ratio is high)
+	BurstFactorThreshold = 5.0
+	BurstOptimalMin      = 0.1 // Allow lower request utilization for bursty workloads
 )
 
 // Analyzes CPU provisioning based on specs and utilization
@@ -54,7 +60,7 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization) (CP
 	result := CPUProvisioning{
 		IsOverProvisioned:  false,
 		IsUnderProvisioned: false,
-		Efficiency:         0.5, // Default neutral
+		Efficiency:         1.0, // Start at optimal then penalize
 		Confidence:         0.0,
 	}
 
@@ -72,13 +78,31 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization) (CP
 		result.Confidence = 1.0
 	}
 
+	hasRequest := specs.CPURequest != nil && *specs.CPURequest > 0
+	hasLimit := specs.CPULimit != nil && *specs.CPULimit > 0
+
+	// Handle missing resources
+	if !hasRequest {
+		result.IsUnderProvisioned = true
+		result.Efficiency = math.Min(result.Efficiency, 0.2)
+	}
+	if !hasLimit {
+		result.IsUnderProvisioned = true
+		result.Efficiency = math.Min(result.Efficiency, 0.2)
+	}
+
 	// Analyze request utilization
-	if specs.CPURequest != nil && *specs.CPURequest > 0 {
-		// Use P95 for request utilization
+	if hasRequest {
 		result.RequestUtilization = utilization.Stats.Percentile.P95 / *specs.CPURequest
 
+		minThreshold := OptimalUtilizationMin
+		// Handle burst factor: if limit is much higher than request, more lenient
+		if hasLimit && (*specs.CPULimit / *specs.CPURequest) >= BurstFactorThreshold {
+			minThreshold = BurstOptimalMin
+		}
+
 		// Check for over-provisioning (P95 usage below optimal range)
-		if result.RequestUtilization < OptimalUtilizationMin {
+		if result.RequestUtilization < minThreshold {
 			result.IsOverProvisioned = true
 		}
 
@@ -86,39 +110,43 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization) (CP
 		if result.RequestUtilization > OptimalUtilizationMax {
 			result.IsUnderProvisioned = true
 		}
+
+		// Calculate request-based efficiency
+		var requestEfficiency float64
+		if result.RequestUtilization >= minThreshold && result.RequestUtilization <= OptimalUtilizationMax {
+			requestEfficiency = 1.0
+		} else if result.RequestUtilization < minThreshold {
+			requestEfficiency = result.RequestUtilization / minThreshold
+		} else {
+			if result.RequestUtilization > 1.0 {
+				requestEfficiency = 0.0
+			} else {
+				requestEfficiency = 1.0 - ((result.RequestUtilization - OptimalUtilizationMax) / (1.0 - OptimalUtilizationMax))
+			}
+		}
+		result.Efficiency = math.Min(result.Efficiency, requestEfficiency)
 	}
 
 	// Analyze limit utilization
-	if specs.CPULimit != nil && *specs.CPULimit > 0 {
+	if hasLimit {
 		result.LimitUtilization = utilization.Stats.Max / *specs.CPULimit
 
 		// Check for under-provisioning on limits (peak too close to limit, needs headroom)
-		if result.LimitUtilization > (1.0 - LimitHeadroom) {
+		if result.LimitUtilization > (1.0 - CPUHeadroom) {
 			result.IsUnderProvisioned = true
+			// Penalize efficiency for approaching limits
+			limitPenalty := 1.0
+			if result.LimitUtilization > 1.0 {
+				limitPenalty = 0.0
+			} else {
+				limitPenalty = (1.0 - result.LimitUtilization) / CPUHeadroom
+			}
+			result.Efficiency = math.Min(result.Efficiency, limitPenalty)
 		}
 	}
 
-	// Calculate efficiency score
-	// Efficiency is higher when utilization is in optimal range
-	if specs.CPURequest != nil && *specs.CPURequest > 0 {
-		utilRatio := result.RequestUtilization
-		if utilRatio >= OptimalUtilizationMin && utilRatio <= OptimalUtilizationMax {
-			result.Efficiency = 1.0 // Optimal
-		} else if utilRatio < OptimalUtilizationMin {
-			// Over-provisioned: efficiency decreases as ratio decreases
-			result.Efficiency = utilRatio / OptimalUtilizationMin
-		} else {
-			// Under-provisioned or approaching limit
-			if utilRatio > 1.0 {
-				result.Efficiency = 0.0 // Exceeding request
-			} else {
-				// Between optimal max and 1.0
-				result.Efficiency = 1.0 - ((utilRatio - OptimalUtilizationMax) / (1.0 - OptimalUtilizationMax))
-			}
-		}
-		// Clamp to 0-1
-		result.Efficiency = math.Max(0.0, math.Min(1.0, result.Efficiency))
-	}
+	// Clamp to 0-1
+	result.Efficiency = math.Max(0.0, math.Min(1.0, result.Efficiency))
 
 	return result, nil
 }
@@ -128,7 +156,7 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 	result := MemoryProvisioning{
 		IsOverProvisioned:  false,
 		IsUnderProvisioned: false,
-		Efficiency:         0.5, // Default neutral
+		Efficiency:         1.0, // Start at optimal then penalize
 		Confidence:         0.0,
 	}
 
@@ -145,9 +173,21 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 		result.Confidence = 1.0
 	}
 
+	hasRequest := specs.MemoryRequest != nil && *specs.MemoryRequest > 0
+	hasLimit := specs.MemoryLimit != nil && *specs.MemoryLimit > 0
+
+	// Handle missing resources
+	if !hasRequest {
+		result.IsUnderProvisioned = true
+		result.Efficiency = math.Min(result.Efficiency, 0.2)
+	}
+	if !hasLimit {
+		result.IsUnderProvisioned = true
+		result.Efficiency = math.Min(result.Efficiency, 0.1)
+	}
+
 	// Analyze request utilization
-	if specs.MemoryRequest != nil && *specs.MemoryRequest > 0 {
-		// Use P95 for request utilization
+	if hasRequest {
 		result.RequestUtilization = utilization.Stats.Percentile.P95 / *specs.MemoryRequest
 
 		// Check for over-provisioning (P95 usage below optimal range)
@@ -159,38 +199,43 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 		if result.RequestUtilization > OptimalUtilizationMax {
 			result.IsUnderProvisioned = true
 		}
+
+		// Calculate request-based efficiency
+		var requestEfficiency float64
+		if result.RequestUtilization >= OptimalUtilizationMin && result.RequestUtilization <= OptimalUtilizationMax {
+			requestEfficiency = 1.0
+		} else if result.RequestUtilization < OptimalUtilizationMin {
+			requestEfficiency = result.RequestUtilization / OptimalUtilizationMin
+		} else {
+			if result.RequestUtilization > 1.0 {
+				requestEfficiency = 0.0
+			} else {
+				requestEfficiency = 1.0 - ((result.RequestUtilization - OptimalUtilizationMax) / (1.0 - OptimalUtilizationMax))
+			}
+		}
+		result.Efficiency = math.Min(result.Efficiency, requestEfficiency)
 	}
 
 	// Analyze limit utilization
-	if specs.MemoryLimit != nil && *specs.MemoryLimit > 0 {
+	if hasLimit {
 		result.LimitUtilization = utilization.Stats.Max / *specs.MemoryLimit
 
 		// Check for under-provisioning on limits (peak too close to limit, needs headroom)
-		if result.LimitUtilization > (1.0 - LimitHeadroom) {
+		if result.LimitUtilization > (1.0 - MemoryHeadroom) {
 			result.IsUnderProvisioned = true
+			// Penalize efficiency for approaching limits
+			limitPenalty := 1.0
+			if result.LimitUtilization > 1.0 {
+				limitPenalty = 0.0
+			} else {
+				limitPenalty = (1.0 - result.LimitUtilization) / MemoryHeadroom
+			}
+			result.Efficiency = math.Min(result.Efficiency, limitPenalty)
 		}
 	}
 
-	// Calculate efficiency score
-	if specs.MemoryRequest != nil && *specs.MemoryRequest > 0 {
-		utilRatio := result.RequestUtilization
-		if utilRatio >= OptimalUtilizationMin && utilRatio <= OptimalUtilizationMax {
-			result.Efficiency = 1.0 // Optimal
-		} else if utilRatio < OptimalUtilizationMin {
-			// Over-provisioned: efficiency decreases as ratio decreases
-			result.Efficiency = utilRatio / OptimalUtilizationMin
-		} else {
-			// Under-provisioned or approaching limit
-			if utilRatio > 1.0 {
-				result.Efficiency = 0.0 // Exceeding request
-			} else {
-				// Between optimal max and 1.0
-				result.Efficiency = 1.0 - ((utilRatio - OptimalUtilizationMax) / (1.0 - OptimalUtilizationMax))
-			}
-		}
-		// Clamp to 0-1
-		result.Efficiency = math.Max(0.0, math.Min(1.0, result.Efficiency))
-	}
+	// Clamp to 0-1
+	result.Efficiency = math.Max(0.0, math.Min(1.0, result.Efficiency))
 
 	return result, nil
 }
@@ -213,8 +258,9 @@ func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult) (Pr
 	}
 
 	// Calculate overall efficiency (weighted average)
-	cpuWeight := 0.5
-	memoryWeight := 0.5
+	// Memory is more critical
+	cpuWeight := 0.3
+	memoryWeight := 0.7
 	result.Efficiency = (result.CPU.Efficiency * cpuWeight) + (result.Memory.Efficiency * memoryWeight)
 
 	return result, nil
