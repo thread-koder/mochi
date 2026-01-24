@@ -4,10 +4,22 @@ import (
 	"fmt"
 )
 
-// Represents resource utilization metrics
-type ResourceMetrics struct {
+// Represents utilization time series
+type TimeSeries struct {
 	CPU    []DataPoint `json:"cpu"`
 	Memory []DataPoint `json:"memory"`
+}
+
+// Represents resource metrics (raw data)
+type ResourceMetrics struct {
+	CPU            []DataPoint `json:"cpu"`
+	Memory         []DataPoint `json:"memory"`
+	CPUThrottling  []DataPoint `json:"cpu_throttling,omitempty"`
+	CPUPressure    []DataPoint `json:"cpu_pressure,omitempty"`
+	MemoryFailCnt  []DataPoint `json:"memory_fail_cnt,omitempty"`
+	MemoryOOM      []DataPoint `json:"memory_oom,omitempty"`
+	MemoryPressure []DataPoint `json:"memory_pressure,omitempty"`
+	Restarts       []DataPoint `json:"restarts,omitempty"`
 }
 
 // Represents CPU utilization analysis results
@@ -59,7 +71,7 @@ func AnalyzeCPUUtilization(cpuData []DataPoint) (CPUUtilization, error) {
 	}
 
 	// Detect anomalies
-	anomalies, err := DetectAnomalies(cpuData, 3.0) // 3 standard deviations
+	anomalies, err := DetectAnomalies(cpuData, 4.0) // 4 standard deviations
 	if err != nil {
 		// If anomaly detection fails, use empty result
 		anomalies = AnomalyResult{
@@ -104,7 +116,7 @@ func AnalyzeMemoryUtilization(memoryData []DataPoint) (MemoryUtilization, error)
 	}
 
 	// Detect anomalies
-	anomalies, err := DetectAnomalies(memoryData, 3.0) // 3 standard deviations
+	anomalies, err := DetectAnomalies(memoryData, 4.0) // 4 standard deviations
 	if err != nil {
 		// If anomaly detection fails, use empty result
 		anomalies = AnomalyResult{

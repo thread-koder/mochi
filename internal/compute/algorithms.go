@@ -233,7 +233,7 @@ func CalculateStats(dataPoints []DataPoint) (StatsResult, error) {
 	}
 
 	// Calculate basic statistics
-	mean := calculateMean(values)
+	mean := CalculateMean(values)
 	median := calculateMedian(values)
 	stdDev := calculateStdDev(values, mean)
 
@@ -286,12 +286,15 @@ func DetectAnomalies(dataPoints []DataPoint, thresholdMultiplier float64) (Anoma
 		deviation := math.Abs(dp.Value - stats.Mean)
 		stdDevs := deviation / stats.StdDev
 
-		// Check if value exceeds threshold
-		if deviation > threshold {
+		// Check if value exceeds threshold and is significantly different from mean
+		// Noise floor: deviation must be at least 10% of the mean to be considered significant
+		isSignificant := stats.Mean == 0 || (deviation/stats.Mean) > 0.1
+
+		if deviation > threshold && isSignificant {
 			severity := SeverityLow
-			if stdDevs > 3.0 {
+			if stdDevs > 5.0 {
 				severity = SeverityHigh
-			} else if stdDevs > 2.0 {
+			} else if stdDevs > 4.0 {
 				severity = SeverityMedium
 			}
 
@@ -330,6 +333,11 @@ func MatrixToDataPoints(matrix model.Matrix) []DataPoint {
 		}
 	}
 
+	// Sort by timestamp to ensure chronological order
+	sort.Slice(dataPoints, func(i, j int) bool {
+		return dataPoints[i].Timestamp.Before(dataPoints[j].Timestamp)
+	})
+
 	return dataPoints
 }
 
@@ -348,7 +356,7 @@ func VectorToDataPoints(vector model.Vector) []DataPoint {
 }
 
 // Calculates the mean of a slice of values
-func calculateMean(values []float64) float64 {
+func CalculateMean(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
@@ -358,6 +366,15 @@ func calculateMean(values []float64) float64 {
 		sum += v
 	}
 	return sum / float64(len(values))
+}
+
+// Helper to extract values from data points
+func ExtractValues(dataPoints []DataPoint) []float64 {
+	values := make([]float64, len(dataPoints))
+	for i, dp := range dataPoints {
+		values[i] = dp.Value
+	}
+	return values
 }
 
 // Calculates the median of a slice of values
