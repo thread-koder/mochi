@@ -3,7 +3,7 @@
     <h2 class="text-2xl font-bold font-heading mb-4">
       Summary
     </h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <!-- CPU Metrics -->
       <div class="space-y-3">
         <p class="text-on-surface-secondary font-medium">
@@ -94,7 +94,7 @@
           </span>
           <span
             v-else
-            class="text-sm text-on-surface-secondary"
+            class="text-sm text-on-surface-secondary py-1 rounded"
           >
             No anomalies
           </span>
@@ -191,9 +191,79 @@
           </span>
           <span
             v-else
-            class="text-sm text-on-surface-secondary px-2 py-1 rounded"
+            class="text-sm text-on-surface-secondary py-1 rounded"
           >
             No anomalies
+          </span>
+        </div>
+      </div>
+
+      <!-- Stability Metrics -->
+      <div class="space-y-3">
+        <p class="text-on-surface-secondary font-medium">
+          Stability
+        </p>
+        <div>
+          <p class="text-sm text-on-surface-secondary mb-1">
+            Health Score
+          </p>
+          <p
+            class="text-2xl font-bold"
+            :class="scoreColor(stability?.stability_score, { midThreshold: 0.6, type: 'text' })"
+          >
+            {{ formatPercentage(stability?.stability_score ?? 0) }}
+          </p>
+        </div>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              CPU Throttling
+            </p>
+            <p class="text-tertiary-light font-medium">
+              {{ formatRate(stability?.cpu_throttling ?? 0) }}
+            </p>
+          </div>
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              CPU Pressure
+            </p>
+            <p class="text-tertiary-light font-medium">
+              {{ formatPercentage(stability?.cpu_pressure ?? 0) }}
+            </p>
+          </div>
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              Memory Fail
+            </p>
+            <p class="text-tertiary-light font-medium">
+              {{ stability?.memory_fail_cnt ?? 0 }}
+            </p>
+          </div>
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              Memory Pressure
+            </p>
+            <p class="text-tertiary-light font-medium">
+              {{ formatPercentage(stability?.memory_pressure ?? 0) }}
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 pt-2">
+          <span class="text-sm text-on-surface-secondary">OOM:</span>
+          <span
+            class="text-sm font-medium"
+            :class="(stability?.memory_oom ?? 0) > 0 ? 'text-error-light' : 'text-on-surface'"
+          >
+            {{ stability?.memory_oom ?? 0 }}
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-on-surface-secondary">Restarts:</span>
+          <span
+            class="text-sm font-medium py-1 rounded"
+            :class="(stability?.restarts ?? 0) > 0 ? 'text-error-light' : 'text-on-surface'"
+          >
+            {{ stability?.restarts ?? 0 }}
           </span>
         </div>
       </div>
@@ -206,5 +276,6 @@ import type * as Compute from '#shared/types/compute'
 
 defineProps<{
   utilization?: Compute.UtilizationResult
+  stability?: Compute.StabilityResult
 }>()
 </script>

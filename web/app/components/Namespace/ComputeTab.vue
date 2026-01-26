@@ -33,7 +33,10 @@
       class="space-y-6"
     >
       <!-- Summary Metrics -->
-      <ComputeSummaryMetrics :utilization="analysis.utilization" />
+      <ComputeSummaryMetrics
+        :utilization="analysis.utilization"
+        :stability="analysis.stability"
+      />
 
       <!-- Resource Utilization Charts -->
       <div
