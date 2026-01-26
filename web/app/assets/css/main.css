@@ -1,23 +1,24 @@
 @import "tailwindcss";
+@source "../../../shared/utils/color.ts";
 
 @theme static {
   /* Fonts */
-  --font-heading: 'Karla', sans-serif;
-  --font-body: 'Inconsolata', monospace;
+  --font-heading: "Karla", sans-serif;
+  --font-body: "Inconsolata", monospace;
   --font-sans: var(--font-body);
-  
+
   /* Text Sizes */
-  --text-xs: 0.875rem;    /* 14px */
-  --text-sm: 1rem;        /* 16px */
-  --text-base: 1.125rem;   /* 18px */
-  --text-lg: 1.25rem;      /* 20px */
-  --text-xl: 1.375rem;     /* 22px */
-  --text-2xl: 1.625rem;    /* 26px */
-  --text-3xl: 2rem;        /* 32px */
-  --text-4xl: 2.375rem;    /* 38px */
-  --text-5xl: 3.125rem;    /* 50px */
-  --text-6xl: 3.875rem;    /* 62px */
-  
+  --text-xs: 0.875rem; /* 14px */
+  --text-sm: 1rem; /* 16px */
+  --text-base: 1.125rem; /* 18px */
+  --text-lg: 1.25rem; /* 20px */
+  --text-xl: 1.375rem; /* 22px */
+  --text-2xl: 1.625rem; /* 26px */
+  --text-3xl: 2rem; /* 32px */
+  --text-4xl: 2.375rem; /* 38px */
+  --text-5xl: 3.125rem; /* 50px */
+  --text-6xl: 3.875rem; /* 62px */
+
   /* Light Theme Palette (Default) */
   /* Base colors */
   --color-primary: var(--color-purple-900);
@@ -27,7 +28,7 @@
   --color-error: var(--color-red-900);
   --color-warning: var(--color-amber-900);
   --color-info: var(--color-blue-900);
-  
+
   /* Light colors */
   --color-primary-light: var(--color-purple-800);
   --color-secondary-light: var(--color-cyan-800);
@@ -36,11 +37,11 @@
   --color-error-light: var(--color-red-800);
   --color-warning-light: var(--color-amber-800);
   --color-info-light: var(--color-blue-800);
-  
+
   /* Surface Colors (Backgrounds) */
   --color-surface: var(--color-slate-50);
   --color-surface-elevated: var(--color-slate-100);
-  
+
   /* On-Surface Colors */
   --color-on-surface: var(--color-slate-950);
   --color-on-surface-secondary: var(--color-slate-900);
@@ -58,7 +59,7 @@
   --color-error: var(--color-red-400);
   --color-warning: var(--color-amber-400);
   --color-info: var(--color-blue-400);
-  
+
   /* Light colors */
   --color-primary-light: var(--color-purple-300);
   --color-secondary-light: var(--color-cyan-300);
@@ -67,11 +68,11 @@
   --color-error-light: var(--color-red-300);
   --color-warning-light: var(--color-amber-300);
   --color-info-light: var(--color-blue-300);
-  
+
   /* Surface Colors (Backgrounds) */
   --color-surface: var(--color-slate-950);
   --color-surface-elevated: var(--color-slate-900);
-  
+
   /* On-Surface Colors */
   --color-on-surface: var(--color-slate-100);
   --color-on-surface-secondary: var(--color-slate-200);

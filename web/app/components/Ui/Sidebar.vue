@@ -66,7 +66,7 @@
         >
           <span>{{ ns.name }}</span>
           <span
-            :class="`w-2 h-2 rounded-full ${phaseColor(ns.phase)}`"
+            :class="['w-2 h-2 rounded-full', phaseColor(ns.phase)]"
             :title="ns.phase"
           />
         </NuxtLink>

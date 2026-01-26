@@ -41,7 +41,7 @@
         :value="data?.stats.health_score ?? 0"
         trailing="%"
         icon="lucide:heart"
-        color="text-success-light"
+        :color="scoreColor(data?.stats.health_score, { midThreshold: 75, highThreshold: 100, type: 'text' })"
       />
     </div>
 
