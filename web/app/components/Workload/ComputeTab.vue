@@ -1,7 +1,14 @@
 <template>
   <div class="mt-6">
     <!-- Time Range Selector -->
-    <UiTimeRangeSelector v-model="timeRange" />
+    <div class="glass rounded-xl p-4 mb-6">
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <label class="text-sm text-on-surface-secondary">
+          Analysis Time Range:
+        </label>
+        <UiTimeRangeSelector v-model="timeRange" />
+      </div>
+    </div>
 
     <!-- Loading State -->
     <div
