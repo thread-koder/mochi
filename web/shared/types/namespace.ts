@@ -29,8 +29,8 @@ interface NamespaceResponse {
   phase: string
   stats: NamespaceStats
   workloads: Workload[]
-  standalone_pods: StandalonePod[]
-  system_pods: StandalonePod[]
+  standalone: StandalonePod[]
+  system: StandalonePod[]
 }
 
 export type { Namespace, NamespaceResponse }
