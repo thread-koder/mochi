@@ -11,7 +11,6 @@
         <select
           v-model="sortMetric"
           class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-1 text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50"
-          @change="sortPods"
         >
           <option value="current">
             Current
@@ -29,7 +28,6 @@
         <select
           v-model="sortResource"
           class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-1 text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50"
-          @change="sortPods"
         >
           <option value="cpu">
             CPU
@@ -180,15 +178,13 @@ const props = defineProps<{
 
 const sortMetric = ref<'current' | 'p95' | 'mean' | 'max'>('p95')
 const sortResource = ref<'cpu' | 'memory'>('cpu')
-const filteredPods = ref<Compute.WorkloadAnalysis['pods']>([])
 
-const sortPods = () => {
-  if (!props.pods || props.pods.length === 0) {
-    filteredPods.value = []
-    return
-  }
+const filteredPods = computed(() => {
+  if (!props.pods) return []
 
-  filteredPods.value = [...props.pods].sort((a, b) => {
+  const filtered = [...props.pods]
+
+  filtered.sort((a, b) => {
     let aValue: number | undefined
     let bValue: number | undefined
     const resource = sortResource.value
@@ -212,9 +208,7 @@ const sortPods = () => {
 
     return (bValue ?? 0) - (aValue ?? 0)
   })
-}
 
-watch(() => props.pods, () => {
-  sortPods()
-}, { immediate: true })
+  return filtered
+})
 </script>
