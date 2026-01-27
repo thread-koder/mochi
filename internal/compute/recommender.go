@@ -16,7 +16,7 @@ type Recommendation struct {
 	WorkloadType       string                    `json:"workload_type"` // Deployment, StatefulSet, DaemonSet, Pod
 	WorkloadName       string                    `json:"workload_name"`
 	Namespace          string                    `json:"namespace"`
-	RecommendationMode string                    `json:"recommendation_mode"` // "cost_optimized", "burstable", or "guaranteed"
+	RecommendationMode RecommendationMode        `json:"recommendation_mode"` // "cost_optimized", "burstable", or "guaranteed"
 	Recommendations    []ContainerRecommendation `json:"recommendations"`
 	AnalysisTimeRange  string                    `json:"analysis_time_range"`
 }
@@ -285,7 +285,7 @@ func GenerateWorkloadRecommendations(
 		WorkloadType:       workloadType,
 		WorkloadName:       workloadName,
 		Namespace:          namespace,
-		RecommendationMode: string(config.Mode),
+		RecommendationMode: config.Mode,
 		Recommendations:    recommendations,
 		AnalysisTimeRange:  analysisOpts.TimeRange.String(),
 	}
@@ -305,7 +305,7 @@ func ComputeRecommendationToDB(rec Recommendation) (*database.ComputeRecommendat
 		WorkloadType:       rec.WorkloadType,
 		WorkloadName:       rec.WorkloadName,
 		Namespace:          rec.Namespace,
-		RecommendationMode: rec.RecommendationMode,
+		RecommendationMode: string(rec.RecommendationMode),
 		Recommendations:    recommendationsJSON,
 		Status:             "pending",
 		AnalysisTimeRange:  rec.AnalysisTimeRange,
