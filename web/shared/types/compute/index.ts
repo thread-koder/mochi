@@ -138,6 +138,42 @@ interface NamespaceAnalysis {
 type WorkloadContainerAnalysis = WorkloadAnalysis['pods'][number]['containers'][number]
 type ProvisioningType = WorkloadContainerAnalysis['provisioning']['cpu']
 
+type RecommendationMode = 'cost_optimized' | 'burstable' | 'guaranteed'
+
+interface CPURecommendation {
+  current_request?: string | null
+  recommended_request?: string | null
+  request_change_percent?: number | null
+  current_limit?: string | null
+  recommended_limit?: string | null
+  limit_change_percent?: number | null
+}
+
+interface MemoryRecommendation {
+  current_request?: string | null
+  recommended_request?: string | null
+  request_change_percent?: number | null
+  current_limit?: string | null
+  recommended_limit?: string | null
+  limit_change_percent?: number | null
+}
+
+interface ContainerRecommendation {
+  container_name: string
+  cpu: CPURecommendation
+  memory: MemoryRecommendation
+  confidence_score: number
+}
+
+interface Recommendation {
+  workload_type: string
+  workload_name: string
+  namespace: string
+  recommendation_mode: RecommendationMode
+  recommendations: ContainerRecommendation[]
+  analysis_time_range: string
+}
+
 export type {
   UtilizationResult,
   NamespaceAnalysis,
@@ -145,4 +181,5 @@ export type {
   WorkloadContainerAnalysis,
   ProvisioningType,
   StabilityResult,
+  Recommendation,
 }
