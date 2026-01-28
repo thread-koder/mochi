@@ -66,3 +66,16 @@ export const formatRate = (value: number): string => {
   if (value < 0.01) return value.toFixed(3)
   return value.toFixed(2)
 }
+
+/**
+ * Formats a change percentage to a human-readable string.
+ * @param percent - The change percentage to format.
+ * @returns A human-readable string.
+ */
+export const formatChangePercent = (percent: number | null | undefined): string => {
+  if (percent === null || percent === undefined) {
+    return ''
+  }
+  const sign = percent >= 0 ? '+' : ''
+  return `${sign}${percent.toFixed(1)}%`
+}
