@@ -29,10 +29,11 @@
         >
           <div
             v-show="isOpen"
-            class="relative z-10 glass rounded-xl p-4 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            v-bind="$attrs"
+            :id="`${title}-modal`"
+            class="relative z-10 glass rounded-xl p-6 w-full overflow-y-auto"
             role="dialog"
             aria-modal="true"
-            v-bind="$attrs"
             :aria-labelledby="title"
           >
             <!-- Header -->
