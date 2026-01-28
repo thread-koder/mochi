@@ -1,12 +1,25 @@
 <template>
   <div class="mt-6">
-    <!-- Time Range Selector -->
+    <!-- Action Bar -->
     <div class="glass rounded-xl p-4 mb-6">
       <div class="flex items-center justify-between flex-wrap gap-4">
-        <label class="text-sm text-on-surface-secondary">
-          Analysis Time Range:
-        </label>
-        <UiTimeRangeSelector v-model="timeRange" />
+        <div class="flex items-center gap-4 flex-wrap">
+          <label class="text-sm text-on-surface-secondary">
+            Analysis Time Range:
+          </label>
+          <UiTimeRangeSelector v-model="timeRange" />
+        </div>
+        <button
+          class="px-4 py-2 rounded-lg text-sm font-medium text-primary-light bg-primary/20
+           hover:bg-primary/30 transition-all cursor-pointer flex items-center gap-2"
+          @click="showGenerateModal = true"
+        >
+          <Icon
+            name="lucide:lightbulb"
+            class="text-base"
+          />
+          <span>Generate Recommendation</span>
+        </button>
       </div>
     </div>
 
@@ -85,6 +98,24 @@
       <!-- Containers Breakdown -->
       <WorkloadContainersBreakdown :pods="analysis.pods" />
     </div>
+
+    <ClientOnly>
+      <!-- Generate Recommendation Modal -->
+      <WorkloadGenerateRec
+        v-model="showGenerateModal"
+        :namespace="props.namespace"
+        :workload-type="props.workloadType"
+        :workload-name="props.workloadName"
+        :default-time-range="timeRange"
+        @generated="onRecommendationGenerated"
+      />
+
+      <!-- Recommendation Results Modal -->
+      <WorkloadRecResult
+        v-model="showResultModal"
+        :recommendation="generatedRecommendation"
+      />
+    </ClientOnly>
   </div>
 </template>
 
@@ -105,6 +136,10 @@ const timeRange = ref<string | null>(null)
 const analysisPending = ref(false)
 const analysisError = ref<FetchError | null>(null)
 const analysis = ref<Compute.WorkloadAnalysis | null>(null)
+
+const showGenerateModal = ref(false)
+const showResultModal = ref(false)
+const generatedRecommendation = ref<Compute.Recommendation | null>(null)
 
 const executeAnalysis = async () => {
   analysisPending.value = true
@@ -139,4 +174,10 @@ watch(() => props.isActive, async (isActive) => {
     timeRange.value = '24h'
   }
 }, { immediate: true })
+
+const onRecommendationGenerated = (recommendation: Compute.Recommendation) => {
+  generatedRecommendation.value = recommendation
+  showGenerateModal.value = false
+  showResultModal.value = true
+}
 </script>
