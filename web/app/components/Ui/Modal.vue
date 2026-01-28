@@ -15,7 +15,7 @@
         <!-- Backdrop -->
         <div
           class="absolute inset-0 bg-black/50"
-          @click.self="close"
+          @click.self="closeOnBackdropClick && close()"
         />
 
         <!-- Modal Content -->
@@ -70,8 +70,10 @@ defineOptions({
 withDefaults(defineProps<{
   title: string
   showClose?: boolean
+  closeOnBackdropClick?: boolean
 }>(), {
   showClose: true,
+  closeOnBackdropClick: true,
 })
 
 const isOpen = defineModel<boolean>({ required: true })
