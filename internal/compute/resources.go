@@ -3,8 +3,6 @@ package compute
 import (
 	"fmt"
 	"math"
-
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // Represents recommended resource values
@@ -628,51 +626,53 @@ func CalculateOverallConfidence(
 	return overallConfidence
 }
 
-// Ensures limit is greater than or equal to request
-func ensureLimitGreaterThanRequestValue(
-	recommendedLimit *float64,
+// Finalizes request and limit recommendations based on mode and constraints.
+func finalizeResourceRecommendations(
 	recommendedRequest *float64,
-	currentLimit *float64,
+	recommendedLimit *float64,
 	currentRequest *float64,
+	currentLimit *float64,
 	mode RecommendationMode,
-) *float64 {
-	// Determine the effective request value (prefer recommended, fall back to current)
-	var effectiveRequest *float64
-	if recommendedRequest != nil {
-		effectiveRequest = recommendedRequest
-	} else if currentRequest != nil {
-		effectiveRequest = currentRequest
-	}
-
-	// If no request value exists, return limit as-is
-	if effectiveRequest == nil {
-		return recommendedLimit
-	}
-
-	// For Guaranteed mode, Limit MUST equal Request
+) (*float64, *float64) {
+	// For Guaranteed mode, both request and limit MUST be equal
 	if mode == ModeGuaranteed {
-		limitValue := *effectiveRequest
-		return &limitValue
-	}
-
-	// If no limit recommendation, but we have a request, we need to recommend a limit
-	if recommendedLimit == nil {
-		// If current limit exists and is >= request, no need to recommend
-		if currentLimit != nil && *currentLimit >= *effectiveRequest {
-			return nil
+		if recommendedRequest == nil && recommendedLimit == nil {
+			return nil, nil
 		}
-		// Otherwise, recommend a limit equal to request (minimum)
-		limitValue := *effectiveRequest
-		return &limitValue
+
+		var maxValue float64
+		if recommendedRequest != nil && recommendedLimit != nil {
+			maxValue = max(*recommendedRequest, *recommendedLimit)
+		} else if recommendedRequest != nil {
+			maxValue = *recommendedRequest
+		} else {
+			maxValue = *recommendedLimit
+		}
+
+		return &maxValue, &maxValue
 	}
 
-	// Ensure recommended limit is at least equal to effective request
-	if *recommendedLimit < *effectiveRequest {
-		limitValue := *effectiveRequest
-		return &limitValue
+	// If no limit recommendation but we have a request
+	if recommendedLimit == nil && recommendedRequest != nil {
+		if currentLimit != nil && *currentLimit >= *recommendedRequest {
+			return recommendedRequest, nil
+		}
+		// Recommend a limit equal to request
+		limitValue := *recommendedRequest
+		return recommendedRequest, &limitValue
 	}
 
-	return recommendedLimit
+	// If no request but we have a limit, ensure it's >= current request
+	if recommendedRequest == nil && recommendedLimit != nil {
+		// If current request exists and recommended limit is less than it, adjust limit
+		if currentRequest != nil && *recommendedLimit < *currentRequest {
+			limitValue := *currentRequest
+			return nil, &limitValue
+		}
+		return nil, recommendedLimit
+	}
+
+	return recommendedRequest, recommendedLimit
 }
 
 // Formats CPU cores as Kubernetes resource quantity string
@@ -691,7 +691,31 @@ func formatCPUQuantity(cores float64) string {
 
 // Formats memory bytes as Kubernetes resource quantity string
 func formatMemoryQuantity(bytes int64) string {
-	// Use Kubernetes resource.Quantity to format properly
-	qty := resource.NewQuantity(bytes, resource.BinarySI)
-	return qty.String()
+	// Ensure non-negative
+	bytes = max(bytes, 0)
+
+	const (
+		KiB = 1024
+		MiB = 1024 * KiB
+		GiB = 1024 * MiB
+		TiB = 1024 * GiB
+	)
+
+	// Format to nearest unit
+	switch {
+	case bytes >= TiB:
+		value := math.Round(float64(bytes) / TiB)
+		return fmt.Sprintf("%dTi", int64(value))
+	case bytes >= GiB:
+		value := math.Round(float64(bytes) / GiB)
+		return fmt.Sprintf("%dGi", int64(value))
+	case bytes >= MiB:
+		value := math.Round(float64(bytes) / MiB)
+		return fmt.Sprintf("%dMi", int64(value))
+	case bytes >= KiB:
+		value := math.Round(float64(bytes) / KiB)
+		return fmt.Sprintf("%dKi", int64(value))
+	default:
+		return fmt.Sprintf("%d", bytes)
+	}
 }

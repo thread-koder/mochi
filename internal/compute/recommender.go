@@ -122,12 +122,12 @@ func GenerateContainerRecommendation(
 		return nil, fmt.Errorf("failed to calculate memory limit recommendation: %w", err)
 	}
 
-	// Ensure limits are >= requests
-	cpuLimitRecValue = ensureLimitGreaterThanRequestValue(
-		cpuLimitRecValue, cpuRequestRecValue, specs.CPULimit, specs.CPURequest, config.Mode,
+	cpuRequestRecValue, cpuLimitRecValue = finalizeResourceRecommendations(
+		cpuRequestRecValue, cpuLimitRecValue, specs.CPURequest, specs.CPULimit, config.Mode,
 	)
-	memoryLimitRecValue = ensureLimitGreaterThanRequestValue(
-		memoryLimitRecValue, memoryRequestRecValue, specs.MemoryLimit, specs.MemoryRequest, config.Mode,
+
+	memoryRequestRecValue, memoryLimitRecValue = finalizeResourceRecommendations(
+		memoryRequestRecValue, memoryLimitRecValue, specs.MemoryRequest, specs.MemoryLimit, config.Mode,
 	)
 
 	// Calculate overall confidence
