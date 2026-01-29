@@ -30,8 +30,8 @@
 
     <!-- Standalone Pods -->
     <NamespacePodsList
-      v-if="nsData?.standalone && nsData.standalone.length > 0"
-      :pods="nsData.standalone"
+      v-if="nsData?.standalone_pods && nsData.standalone_pods.length > 0"
+      :pods="nsData.standalone_pods"
       :namespace="nsData.name"
       title="Standalone Pods"
       badge-label="Pod"
@@ -40,8 +40,8 @@
 
     <!-- System Pods -->
     <NamespacePodsList
-      v-if="nsData?.system && nsData.system.length > 0"
-      :pods="nsData.system"
+      v-if="nsData?.system_pods && nsData.system_pods.length > 0"
+      :pods="nsData.system_pods"
       :namespace="nsData.name"
       title="System Pods"
       badge-label="System"

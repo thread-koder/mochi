@@ -50,7 +50,7 @@
 import type * as Namespace from '#shared/types/namespace'
 
 defineProps<{
-  pods?: Namespace.NamespaceResponse['standalone'] | Namespace.NamespaceResponse['system']
+  pods?: Namespace.NamespaceResponse['standalone_pods'] | Namespace.NamespaceResponse['system_pods']
   namespace: string
   title: string
   badgeLabel: string
