@@ -81,10 +81,9 @@ type RedisConfig struct {
 
 // Holds worker configuration
 type WorkerConfig struct {
-	ResourceSyncInterval   int      `mapstructure:"resource_sync_interval"`   // Resource sync interval in seconds
-	StaleResourceThreshold int      `mapstructure:"stale_resource_threshold"` // Stale resource threshold in seconds
-	ExcludeNamespaces      []string `mapstructure:"exclude_namespaces"`       // List of namespaces to exclude from syncing
-	IncludeNamespaces      []string `mapstructure:"include_namespaces"`       // If non-empty, only sync these namespaces (exclude_namespaces ignored)
+	ResourceSyncInterval int      `mapstructure:"resource_sync_interval"` // Resource sync interval in seconds
+	ExcludeNamespaces    []string `mapstructure:"exclude_namespaces"`     // List of namespaces to exclude from syncing
+	IncludeNamespaces    []string `mapstructure:"include_namespaces"`     // If non-empty, only sync these namespaces (exclude_namespaces ignored)
 }
 
 var AppConfig *Config
@@ -181,8 +180,7 @@ func setDefaults() {
 	viper.SetDefault("redis.cache_ttl", 300)
 
 	// Worker defaults
-	viper.SetDefault("workers.resource_sync_interval", 180)   // 3 minutes
-	viper.SetDefault("workers.stale_resource_threshold", 300) // 5 minutes
+	viper.SetDefault("workers.resource_sync_interval", 120) // 2 minutes
 	viper.SetDefault("workers.exclude_namespaces", []string{"default", "kube-system", "kube-public", "kube-node-lease"})
 	viper.SetDefault("workers.include_namespaces", []string{})
 }
@@ -349,9 +347,6 @@ func (c *RedisConfig) Validate() error {
 func (c *WorkerConfig) Validate() error {
 	if c.ResourceSyncInterval <= 0 {
 		return fmt.Errorf("resource_sync_interval must be greater than 0, got: %d", c.ResourceSyncInterval)
-	}
-	if c.StaleResourceThreshold <= 0 {
-		return fmt.Errorf("stale_resource_threshold must be greater than 0, got: %d", c.StaleResourceThreshold)
 	}
 	if c.ExcludeNamespaces == nil {
 		c.ExcludeNamespaces = []string{}
