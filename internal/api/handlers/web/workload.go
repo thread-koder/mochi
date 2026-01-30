@@ -200,8 +200,8 @@ func GetWorkload(c *gin.Context) {
 
 	for _, pod := range pods {
 		nodeName := ""
-		if pod.NodeName != nil {
-			nodeName = *pod.NodeName
+		if pod.Node != nil {
+			nodeName = *pod.Node
 		}
 
 		podDetail := Pod{

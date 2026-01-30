@@ -134,8 +134,8 @@ func GetNamespace(c *gin.Context) {
 	} else {
 		for _, pod := range standalonePods {
 			nodeName := ""
-			if pod.NodeName != nil {
-				nodeName = *pod.NodeName
+			if pod.Node != nil {
+				nodeName = *pod.Node
 			}
 			response.Standalone = append(response.Standalone, StandalonePod{
 				Name:      pod.Name,
@@ -153,8 +153,8 @@ func GetNamespace(c *gin.Context) {
 	} else {
 		for _, pod := range systemPods {
 			nodeName := ""
-			if pod.NodeName != nil {
-				nodeName = *pod.NodeName
+			if pod.Node != nil {
+				nodeName = *pod.Node
 			}
 			response.System = append(response.System, StandalonePod{
 				Name:      pod.Name,

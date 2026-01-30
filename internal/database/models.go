@@ -11,7 +11,7 @@ type Pod struct {
 	Name          string          `json:"name" db:"name"`
 	Namespace     string          `json:"namespace" db:"namespace"`
 	UID           string          `json:"uid" db:"uid"`
-	NodeName      *string         `json:"node_name,omitempty" db:"node_name"`
+	Node          *string         `json:"node,omitempty" db:"node"`
 	Phase         string          `json:"phase" db:"phase"`
 	RestartPolicy *string         `json:"restart_policy,omitempty" db:"restart_policy"`
 	Labels        json.RawMessage `json:"labels" db:"labels"`
