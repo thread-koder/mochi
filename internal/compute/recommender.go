@@ -131,7 +131,7 @@ func GenerateContainerRecommendation(
 	)
 
 	// Calculate overall confidence
-	overallConfidence := CalculateOverallConfidence(
+	overallConfidence := calculateOverallConfidence(
 		containerAnalysis.Provisioning.CPU,
 		containerAnalysis.Provisioning.Memory,
 	)

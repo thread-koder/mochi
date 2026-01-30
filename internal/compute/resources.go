@@ -101,106 +101,62 @@ func CalculateCPURequestRecommendation(
 	}
 
 	// Start with P95 as baseline (steady-state usage)
-	percentile := utilization.Stats.Percentile.P95
-	baselineP95 := percentile
+	percentileP95 := utilization.Stats.Percentile.P95
+	percentileP99 := utilization.Stats.Percentile.P99
+	peakUsage := utilization.Stats.Max
+
+	// Calculate coefficient of variation
 	cv := 0.0
 	if utilization.Stats.Mean > 0 {
 		cv = utilization.Stats.StdDev / utilization.Stats.Mean
 	}
 
-	// Detect bursty workloads: if Max is significantly higher than percentile, it indicates occasional spikes
-	peakUsage := utilization.Stats.Max
-	isBurstWorkload := false
-	if percentile > 0 && peakUsage > percentile*config.BurstThreshold {
-		isBurstWorkload = true
-		// Use a higher percentile or weighted approach
-		// Check if P99 is much higher than P95
-		if utilization.Stats.Percentile.P99 > percentile*1.5 {
-			percentile = utilization.Stats.Percentile.P99
-			// Check if Max is still significantly higher than P99
-			if peakUsage > percentile*config.BurstThreshold {
-				percentile = calculateWeightedPercentile(percentile, peakUsage, baselineP95)
-			}
-		} else {
-			weightedPercentile := calculateWeightedPercentile(percentile, peakUsage, baselineP95)
+	// Detect bursty workloads and adjust percentile
+	adjustedPercentile, isBursty := detectAndAdjustBurstyWorkload(
+		percentileP95, percentileP99, peakUsage, config.BurstThreshold,
+	)
 
-			// Validate: if weighted result is still too extreme (> 5x P95), use P99 instead
-			if weightedPercentile > percentile*5.0 {
-				// Use P99 if available, otherwise use the weighted result
-				if utilization.Stats.Percentile.P99 > 0 {
-					percentile = utilization.Stats.Percentile.P99
-					// Check if Max is still higher than P99
-					if peakUsage > percentile*config.BurstThreshold {
-						percentile = calculateWeightedPercentile(percentile, peakUsage, baselineP95)
-					}
-				} else {
-					percentile = weightedPercentile
-				}
-			} else {
-				percentile = weightedPercentile
-			}
-		}
-	}
-
-	// Apply Emergency Boost for CPU Throttling
-	pressureFactor := 1.0
-	if stability.CPUThrottling > 0.1 {
-		// Severe throttling (>10% throttling)
-		pressureFactor = 1.5 + math.Min(0.5, stability.CPUThrottling)
-	} else if stability.CPUThrottling > 0.01 {
-		// Minor throttling (>1% throttling)
-		pressureFactor = 1.2
-	}
-
-	// Apply Pressure boost
-	if stability.CPUPressure > 0.2 {
-		// Severe pressure (>20% stalled)
-		pressureFactor *= 1.2
-	}
+	// Calculate pressure factors
+	cpuThrottlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
+	cpuPressureFactor := calculateCPUPressureFactor(stability.CPUPressure)
+	pressureFactor := cpuThrottlingFactor * cpuPressureFactor
 
 	// Calculate recommended request based on mode
 	var recommendedCores float64
 	switch config.Mode {
 	case ModeGuaranteed:
-		// Guaranteed mode: use peak usage with safety margin
-		recommendedCores = peakUsage * config.RequestSafetyMargin * pressureFactor
+		// Guaranteed mode: use peak usage
+		baseMargin := config.RequestSafetyMargin * 1.1 // Higher base for guaranteed
+		safetyMargin := calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			isBursty,
+		)
+		recommendedCores = peakUsage * safetyMargin * pressureFactor
 	case ModeCostOptimized:
-		// Cost-optimized mode: use percentile with minimal safety margin (1.1x)
-		recommendedCores = percentile * 1.1 * pressureFactor
+		// Cost-optimized mode: use adjusted percentile
+		baseMargin := 1.1 // Minimal base
+		safetyMargin := calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			isBursty,
+		)
+		recommendedCores = adjustedPercentile * safetyMargin * pressureFactor
 	default:
-		// Burstable mode: calculate safety margin with all dynamic adjustments
-		safetyMargin := config.RequestSafetyMargin
-
-		// Adjust safety margin based on trend
-		if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
-			// Increasing trend with strong signal = add extra headroom
-			safetyMargin *= 1.1
-		} else if utilization.Trend.Direction == DirectionDecreasing && utilization.Trend.Strength > 0.5 {
-			// Decreasing trend = can be slightly less conservative
-			safetyMargin *= 0.95
-		}
-
-		// Adjust safety margin based on variance
-		if cv > 0.5 {
-			// High variance = more conservative
-			safetyMargin *= 1.15
-		} else if cv < 0.2 && cv > 0 {
-			// Low variance = can be more precise
-			safetyMargin *= 0.98
-		}
-
-		// Adjust safety margin based on anomalies
-		if utilization.Anomalies.AnomalyCount > 10 {
-			safetyMargin *= 1.1
-		}
-
-		// Add safety margin for bursty workloads
-		if isBurstWorkload {
-			safetyMargin *= 1.15
-		}
-
-		// Burstable mode: use percentile directly with safety margin
-		recommendedCores = percentile * safetyMargin * pressureFactor
+		// Burstable mode: use adjusted percentile
+		baseMargin := config.RequestSafetyMargin // Standard base
+		safetyMargin := calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			isBursty,
+		)
+		recommendedCores = adjustedPercentile * safetyMargin * pressureFactor
 	}
 
 	// Validation: ensure recommended accounts for actual usage patterns
@@ -268,28 +224,57 @@ func CalculateCPULimitRecommendation(
 	// Use peak (max) for limit recommendation
 	peakUsage := utilization.Stats.Max
 
-	// Apply Pressure Factor for CPU Limits
+	// Calculate coefficient of variation
+	cv := 0.0
+	if utilization.Stats.Mean > 0 {
+		cv = utilization.Stats.StdDev / utilization.Stats.Mean
+	}
+
+	// Calculate CPU throttling pressure factor
+	// For limits use a lower threshold (5%)
 	pressureFactor := 1.0
 	if stability.CPUThrottling > 0.05 {
-		pressureFactor = 1.3
+		// Scale smoothly: 5% = 1.1x, 10% = 1.3x, 15%+ = 1.5x (capped)
+		if stability.CPUThrottling < 0.1 {
+			pressureFactor = 1.0 + (stability.CPUThrottling-0.05)/0.05*0.3
+		} else {
+			pressureFactor = 1.3 + math.Min(0.2, (stability.CPUThrottling-0.1)*2.0)
+		}
 	}
 
 	// Calculate safety margin based on mode
 	var safetyMargin float64
 	switch config.Mode {
 	case ModeCostOptimized:
-		// Cost-optimized mode: minimal safety margin (1.1x)
-		safetyMargin = 1.1
+		// Cost-optimized mode: minimal base margin
+		baseMargin := 1.1
+		safetyMargin = calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			false, // Limits don't need burst detection
+		)
 	case ModeGuaranteed:
-		// Guaranteed mode: limit equals request
-		safetyMargin = config.LimitSafetyMargin
+		// Guaranteed mode: base margin
+		baseMargin := config.LimitSafetyMargin
+		safetyMargin = calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			false, // Limits don't need burst detection
+		)
 	default:
-		// Burstable mode: base + trend only
-		safetyMargin = config.LimitSafetyMargin
-		if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
-			// Increasing trend = add extra headroom for future growth
-			safetyMargin *= 1.1
-		}
+		// Burstable mode: base margin
+		baseMargin := config.LimitSafetyMargin
+		safetyMargin = calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			false, // Limits don't need burst detection
+		)
 	}
 
 	// Calculate recommended limit
@@ -353,101 +338,69 @@ func CalculateMemoryRequestRecommendation(
 	}
 
 	// Start with P95 as baseline (steady-state usage)
-	percentile := utilization.Stats.Percentile.P95
-	baselineP95 := percentile
+	percentileP95 := utilization.Stats.Percentile.P95
+	percentileP99 := utilization.Stats.Percentile.P99
+	peakUsage := utilization.Stats.Max
+
+	// Calculate coefficient of variation
 	cv := 0.0
 	if utilization.Stats.Mean > 0 {
 		cv = utilization.Stats.StdDev / utilization.Stats.Mean
 	}
 
-	// Detect bursty workloads: if Max is significantly higher than percentile, it indicates occasional spikes
-	peakUsage := utilization.Stats.Max
-	isBurstWorkload := false
-	if percentile > 0 && peakUsage > percentile*config.BurstThreshold {
-		isBurstWorkload = true
-		// Use a higher percentile or weighted approach
-		// Check if P99 is much higher than P95
-		if utilization.Stats.Percentile.P99 > percentile*1.5 {
-			percentile = utilization.Stats.Percentile.P99
-			// Check if Max is still significantly higher than P99
-			if peakUsage > percentile*config.BurstThreshold {
-				percentile = calculateWeightedPercentile(percentile, peakUsage, baselineP95)
-			}
-		} else {
-			weightedPercentile := calculateWeightedPercentile(percentile, peakUsage, baselineP95)
+	// Detect bursty workloads and adjust percentile
+	adjustedPercentile, isBursty := detectAndAdjustBurstyWorkload(
+		percentileP95, percentileP99, peakUsage, config.BurstThreshold,
+	)
 
-			// Validate: if weighted result is still too extreme (> 5x P95), use P99 instead
-			if weightedPercentile > percentile*5.0 {
-				// Use P99 if available, otherwise use the weighted result
-				if utilization.Stats.Percentile.P99 > 0 {
-					percentile = utilization.Stats.Percentile.P99
-					// Check if Max is still higher than P99
-					if peakUsage > percentile*config.BurstThreshold {
-						percentile = calculateWeightedPercentile(percentile, peakUsage, baselineP95)
-					}
-				} else {
-					percentile = weightedPercentile
-				}
-			} else {
-				percentile = weightedPercentile
-			}
-		}
-	}
-
-	// Apply Emergency Boost for Memory Health
-	pressureFactor := 1.0
+	// Apply memory pressure factor: if OOM detected, use peak instead of percentile
 	if stability.MemoryOOM > 0 {
-		// OOM detected
-		pressureFactor = 1.3
-		percentile = math.Max(percentile, peakUsage)
-	} else if stability.MemoryFailCnt > 0 || stability.MemoryPressure > 0.1 {
-		// Allocation failures or high pressure
-		pressureFactor = 1.2
+		adjustedPercentile = math.Max(adjustedPercentile, peakUsage)
 	}
+
+	// Calculate memory pressure factor
+	pressureFactor := calculateMemoryPressureFactor(
+		stability.MemoryOOM,
+		stability.MemoryFailCnt,
+		stability.MemoryPressure,
+	)
 
 	// Calculate recommended request based on mode
 	var recommendedBytes float64
 	switch config.Mode {
 	case ModeGuaranteed:
-		// Guaranteed mode: use peak usage with high safety margin
-		recommendedBytes = peakUsage * config.RequestSafetyMargin * 1.1 * pressureFactor
+		// Guaranteed mode: use peak usage
+		baseMargin := config.RequestSafetyMargin * 1.1 // Higher base
+		safetyMargin := calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			isBursty,
+		)
+		recommendedBytes = peakUsage * safetyMargin * pressureFactor
 	case ModeCostOptimized:
-		// Cost-optimized mode: use percentile with minimal safety margin (1.1x)
-		recommendedBytes = percentile * 1.1 * pressureFactor
+		// Cost-optimized mode: use adjusted percentile
+		baseMargin := 1.1 // Minimal base
+		safetyMargin := calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			isBursty,
+		)
+		recommendedBytes = adjustedPercentile * safetyMargin * pressureFactor
 	default:
-		// Burstable mode: calculate safety margin with all dynamic adjustments
-		safetyMargin := config.RequestSafetyMargin * 1.1
-
-		// Adjust safety margin based on trend
-		if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
-			// Increasing trend with strong signal = add extra headroom
-			safetyMargin *= 1.1
-		} else if utilization.Trend.Direction == DirectionDecreasing && utilization.Trend.Strength > 0.5 {
-			// Decreasing trend = can be slightly less conservative
-			safetyMargin *= 0.95
-		}
-
-		// Adjust safety margin based on variance
-		if cv > 0.5 {
-			// High variance = more conservative
-			safetyMargin *= 1.15
-		} else if cv < 0.2 && cv > 0 {
-			// Low variance = can be more precise
-			safetyMargin *= 0.98
-		}
-
-		// Adjust safety margin based on anomalies
-		if utilization.Anomalies.AnomalyCount > 10 {
-			safetyMargin *= 1.1
-		}
-
-		// Add safety margin for bursty workloads
-		if isBurstWorkload {
-			safetyMargin *= 1.15
-		}
-
-		// Burstable mode: use percentile directly with safety margin
-		recommendedBytes = percentile * safetyMargin * pressureFactor
+		// Burstable mode: use adjusted percentile
+		baseMargin := config.RequestSafetyMargin * 1.1 // Higher base
+		safetyMargin := calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			isBursty,
+		)
+		recommendedBytes = adjustedPercentile * safetyMargin * pressureFactor
 	}
 
 	// Validate: ensure recommended accounts for actual usage patterns
@@ -515,28 +468,58 @@ func CalculateMemoryLimitRecommendation(
 	// Use peak (max) for limit recommendation
 	peakUsage := utilization.Stats.Max
 
-	// Apply Pressure Factor for Memory Limits
-	pressureFactor := 1.0
-	if stability.MemoryOOM > 0 || stability.MemoryPressure > 0.05 {
-		pressureFactor = 1.3
+	// Calculate coefficient of variation
+	cv := 0.0
+	if utilization.Stats.Mean > 0 {
+		cv = utilization.Stats.StdDev / utilization.Stats.Mean
+	}
+
+	// Calculate memory pressure factor
+	pressureFactor := calculateMemoryPressureFactor(
+		stability.MemoryOOM,
+		stability.MemoryFailCnt,
+		stability.MemoryPressure,
+	)
+	// For limits apply additional scaling if pressure is high
+	if stability.MemoryPressure > 0.05 {
+		// Scale: 5% = 1.0x, 10% = 1.1x, 20%+ = 1.2x (capped)
+		pressureBoost := 1.0 + math.Min(0.2, (stability.MemoryPressure-0.05)*2.0)
+		pressureFactor = math.Max(pressureFactor, pressureBoost)
 	}
 
 	// Calculate safety margin based on mode
 	var safetyMargin float64
 	switch config.Mode {
 	case ModeCostOptimized:
-		// Cost-optimized mode: minimal safety margin (1.1x)
-		safetyMargin = 1.1
+		// Cost-optimized mode: minimal base margin
+		baseMargin := 1.1
+		safetyMargin = calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			false, // Limits don't need burst detection
+		)
 	case ModeGuaranteed:
-		// Guaranteed mode: limit equals request
-		safetyMargin = config.LimitSafetyMargin * 1.1
+		// Guaranteed mode: higher base margin
+		baseMargin := config.LimitSafetyMargin * 1.1
+		safetyMargin = calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			false, // Limits don't need burst detection
+		)
 	default:
-		// Burstable mode: base + trend only
-		safetyMargin = config.LimitSafetyMargin * 1.1
-		if utilization.Trend.Direction == DirectionIncreasing && utilization.Trend.Strength > 0.5 {
-			// Increasing trend = add extra headroom for future growth
-			safetyMargin *= 1.1
-		}
+		// Burstable mode: higher base margin
+		baseMargin := config.LimitSafetyMargin * 1.1
+		safetyMargin = calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			false, // Limits don't need burst detection
+		)
 	}
 
 	// Calculate recommended limit
@@ -580,6 +563,134 @@ func CalculateMemoryLimitRecommendation(
 	return &recommendedBytes, nil
 }
 
+// Calculates CPU throttling pressure factor using gradual scaling
+func calculateCPUThrottlingPressureFactor(throttling float64) float64 {
+	if throttling <= 0.01 {
+		// No significant throttling (< 1%)
+		return 1.0
+	}
+	if throttling < 0.1 {
+		// Minor throttling (1% to 10%): scale smoothly from 1.0 to 1.5
+		return 1.0 + (throttling-0.01)/0.09*0.5
+	}
+	// Severe throttling (>= 10%): scale from 1.5 to 2.0+ (capped at 2.5)
+	return 1.5 + math.Min(1.0, (throttling-0.1)*5.0)
+}
+
+// Calculates CPU pressure factor using gradual scaling
+func calculateCPUPressureFactor(pressure float64) float64 {
+	if pressure <= 0.2 {
+		// No significant pressure (< 20%)
+		return 1.0
+	}
+	// Scale smoothly: 20% = 1.0x, 40% = 1.2x, 60%+ = 1.4x (capped)
+	return 1.0 + math.Min(0.4, (pressure-0.2)*2.0)
+}
+
+// Calculates memory pressure factor using gradual scaling
+func calculateMemoryPressureFactor(oom float64, failCnt float64, pressure float64) float64 {
+	pressureFactor := 1.0
+
+	// OOM events scale based on count
+	if oom > 0 {
+		// Standard: 1 OOM = 1.35x, 2 OOM = 1.45x, 3 OOM = 1.55x, 4+ OOM = 1.6x (capped)
+		extraPerOOM := math.Max(0, (oom-1)*0.1)
+		pressureFactor = 1.35 + math.Min(0.25, extraPerOOM)
+	} else if failCnt > 0 || pressure > 0.1 {
+		// Allocation failures or high pressure
+		if pressure > 0.1 {
+			// Scale: 10% = 1.1x, 20% = 1.2x, 30%+ = 1.3x (capped)
+			pressureFactor = 1.1 + math.Min(0.2, (pressure-0.1)*2.0)
+		} else {
+			// Failures without high pressure: small boost
+			pressureFactor = 1.1
+		}
+	}
+
+	return pressureFactor
+}
+
+// Detects bursty workload and adjusts percentile accordingly
+func detectAndAdjustBurstyWorkload(
+	percentileP95, percentileP99, peakUsage float64,
+	burstThreshold float64,
+) (adjustedPercentile float64, isBursty bool) {
+	baselineP95 := percentileP95
+	adjustedPercentile = percentileP95
+
+	// Detect bursty workloads: if Max is significantly higher than percentile
+	if percentileP95 > 0 && peakUsage > percentileP95*burstThreshold {
+		isBursty = true
+		// Use a higher percentile or weighted approach
+		if percentileP99 > percentileP95*1.5 {
+			adjustedPercentile = percentileP99
+			if peakUsage > adjustedPercentile*burstThreshold {
+				adjustedPercentile = calculateWeightedPercentile(adjustedPercentile, peakUsage, baselineP95)
+			}
+		} else {
+			weightedPercentile := calculateWeightedPercentile(percentileP95, peakUsage, baselineP95)
+
+			// Validate: if weighted result is still too extreme (> 5x P95), use P99 instead
+			if weightedPercentile > percentileP95*5.0 {
+				// Use P99 if available, otherwise use the weighted result
+				if percentileP99 > 0 {
+					adjustedPercentile = percentileP99
+					if peakUsage > adjustedPercentile*burstThreshold {
+						adjustedPercentile = calculateWeightedPercentile(adjustedPercentile, peakUsage, baselineP95)
+					}
+				} else {
+					adjustedPercentile = weightedPercentile
+				}
+			} else {
+				adjustedPercentile = weightedPercentile
+			}
+		}
+	}
+
+	return adjustedPercentile, isBursty
+}
+
+// Calculates dynamic safety margin adjustments based on utilization patterns
+func calculateDynamicSafetyMargin(
+	baseMargin float64,
+	trend TrendResult,
+	cv float64,
+	anomalyCount int,
+	isBursty bool,
+) float64 {
+	safetyMargin := baseMargin
+
+	// Adjust safety margin based on trend
+	if trend.Direction == DirectionIncreasing && trend.Strength > 0.5 {
+		// Increasing trend with strong signal = add extra headroom
+		safetyMargin *= 1.1
+	} else if trend.Direction == DirectionDecreasing && trend.Strength > 0.5 {
+		// Decreasing trend = can be slightly less conservative
+		safetyMargin *= 0.95
+	}
+
+	// Adjust safety margin based on variance
+	if cv > 0.5 {
+		// High variance = more conservative
+		safetyMargin *= 1.15
+	} else if cv < 0.2 && cv > 0 {
+		// Low variance = can be more precise
+		safetyMargin *= 0.98
+	}
+
+	// Adjust safety margin based on anomalies
+	if anomalyCount > 10 {
+		safetyMargin *= 1.1
+	}
+
+	// Add safety margin for bursty workloads
+	if isBursty {
+		safetyMargin *= 1.15
+	}
+
+	return safetyMargin
+}
+
 // Calculates the maximum weight to use for weighted percentile calculation based on gap ratio
 func calculateMaxWeightForGap(gapRatio float64) float64 {
 	if gapRatio > 50.0 {
@@ -609,7 +720,7 @@ func calculateWeightedPercentile(percentile, peakUsage, baselineP95 float64) flo
 }
 
 // Calculates overall confidence score from CPU and memory provisioning
-func CalculateOverallConfidence(
+func calculateOverallConfidence(
 	cpuProvisioning CPUProvisioning,
 	memoryProvisioning MemoryProvisioning,
 ) float64 {
@@ -655,21 +766,23 @@ func finalizeResourceRecommendations(
 	// If no limit recommendation but we have a request
 	if recommendedLimit == nil && recommendedRequest != nil {
 		if currentLimit != nil && *currentLimit >= *recommendedRequest {
-			return recommendedRequest, nil
+			return recommendedRequest, currentLimit
 		}
 		// Recommend a limit equal to request
-		limitValue := *recommendedRequest
-		return recommendedRequest, &limitValue
+		return recommendedRequest, recommendedRequest
 	}
 
-	// If no request but we have a limit, ensure it's >= current request
+	// If no request but we have a limit
 	if recommendedRequest == nil && recommendedLimit != nil {
-		// If current request exists and recommended limit is less than it, adjust limit
+		// If recommended limit is less than current request, adjust limit
 		if currentRequest != nil && *recommendedLimit < *currentRequest {
-			limitValue := *currentRequest
-			return nil, &limitValue
+			return currentRequest, currentRequest
 		}
-		return nil, recommendedLimit
+		if currentRequest != nil {
+			return currentRequest, recommendedLimit
+		}
+		// No current request: use recommended limit for both
+		return recommendedLimit, recommendedLimit
 	}
 
 	return recommendedRequest, recommendedLimit
