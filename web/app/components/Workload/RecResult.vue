@@ -6,8 +6,28 @@
     :close-on-backdrop-click="false"
   >
     <div class="space-y-6">
+      <!-- Empty state: no recommendations -->
+      <div
+        v-if="!hasRecommendations"
+        class="py-12 px-6 rounded-lg bg-primary/5 border border-primary/10 text-center"
+      >
+        <Icon
+          name="lucide:inbox"
+          class="mx-auto text-4xl text-on-surface-muted mb-4"
+        />
+        <p class="text-sm font-medium text-on-surface mb-1">
+          Workload is stable, no recommendations available.
+        </p>
+        <p class="text-xs text-on-surface-muted">
+          Try a different time range or recommendation mode.
+        </p>
+      </div>
+
       <!-- Recommendations Table -->
-      <div class="overflow-x-auto">
+      <div
+        v-else
+        class="overflow-x-auto"
+      >
         <table class="w-full">
           <thead>
             <tr class="border-b border-primary/20">
@@ -220,7 +240,7 @@
       <!-- Action Buttons -->
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-primary/20">
         <button
-          v-if="applied"
+          v-if="applied || !hasRecommendations"
           class="px-4 py-2 rounded-lg text-sm font-medium text-primary-light bg-primary/20
            hover:bg-primary/30 transition-all cursor-pointer flex items-center gap-2"
           @click="close"
@@ -232,11 +252,11 @@
           <span>Close</span>
         </button>
         <button
-          v-else
+          v-if="hasRecommendations && !applied"
           class="px-4 py-2 rounded-lg text-sm font-medium text-primary-light bg-primary/20
            hover:bg-primary/30 transition-all cursor-pointer disabled:opacity-50
            disabled:cursor-not-allowed flex items-center gap-2"
-          :disabled="applying || applied"
+          :disabled="applying"
           @click="applyRecommendation"
         >
           <Icon
@@ -271,6 +291,10 @@ const applied = ref(false)
 const error = ref<FetchError | null>(null)
 
 const { parseError } = useApiError()
+
+const hasRecommendations = computed(
+  () => (props.recommendation?.recommendations?.length ?? 0) > 0,
+)
 
 const close = () => {
   isOpen.value = false
