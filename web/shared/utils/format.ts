@@ -55,19 +55,6 @@ export const formatPercentage = (value: number): string => {
 }
 
 /**
- * Formats a rate value to a human-readable string.
- * @param value - The rate value to format.
- * @returns A human-readable string.
- */
-export const formatRate = (value: number): string => {
-  if (value === undefined || value === null || isNaN(value)) return 'N/A'
-  if (value === 0) return '0'
-  if (value < 0.001) return value.toFixed(4)
-  if (value < 0.01) return value.toFixed(3)
-  return value.toFixed(2)
-}
-
-/**
  * Formats a change percentage to a human-readable string.
  * @param percent - The change percentage to format.
  * @returns A human-readable string.

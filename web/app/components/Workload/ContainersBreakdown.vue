@@ -349,7 +349,7 @@
                             class="text-xs font-medium"
                             :class="metricColor(container.stability?.cpu_throttling ?? 0, 0.1)"
                           >
-                            {{ formatRate(container.stability?.cpu_throttling ?? 0) }}
+                            {{ formatPercentage(container.stability?.cpu_throttling ?? 0) }}
                           </span>
                         </div>
                         <!-- CPU Pressure -->

@@ -220,7 +220,7 @@
               CPU Throttling
             </p>
             <p class="text-tertiary-light font-medium">
-              {{ formatRate(stability?.cpu_throttling ?? 0) }}
+              {{ formatPercentage(stability?.cpu_throttling ?? 0) }}
             </p>
           </div>
           <div>
