@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/internal/logger"
@@ -82,20 +81,12 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 	return nil
 }
 
-// Deletes nodes that haven't been synced since the specified time
-func DeleteNodesNotSyncedSince(ctx context.Context, since time.Time) error {
-	log := logger.WithComponent("database")
-
-	query := `DELETE FROM nodes WHERE synced_at < $1`
-	result, err := Pool.Exec(ctx, query, since)
-	if err != nil {
-		return fmt.Errorf("failed to delete stale nodes: %w", err)
+// Removes nodes whose uid is not in the list.
+func PruneNodes(ctx context.Context, uids []string) error {
+	if len(uids) == 0 {
+		_, err := Pool.Exec(ctx, `DELETE FROM nodes`)
+		return err
 	}
-
-	deleted := result.RowsAffected()
-	if deleted > 0 {
-		log.Debug().Int64("count", deleted).Msg("Stale nodes deleted")
-	}
-
-	return nil
+	_, err := Pool.Exec(ctx, `DELETE FROM nodes WHERE NOT (uid = ANY($1::text[]))`, uids)
+	return err
 }

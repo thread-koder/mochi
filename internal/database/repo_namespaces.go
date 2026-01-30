@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/internal/logger"
@@ -115,20 +114,12 @@ func GetNamespaceByName(ctx context.Context, name string) (*Namespace, error) {
 	return &ns, nil
 }
 
-// Deletes namespaces that haven't been synced since the specified time
-func DeleteNamespacesNotSyncedSince(ctx context.Context, since time.Time) error {
-	log := logger.WithComponent("database")
-
-	query := `DELETE FROM namespaces WHERE synced_at < $1`
-	result, err := Pool.Exec(ctx, query, since)
-	if err != nil {
-		return fmt.Errorf("failed to delete stale namespaces: %w", err)
+// Removes namespaces whose uid is not in the list.
+func PruneNamespaces(ctx context.Context, uids []string) error {
+	if len(uids) == 0 {
+		_, err := Pool.Exec(ctx, `DELETE FROM namespaces`)
+		return err
 	}
-
-	deleted := result.RowsAffected()
-	if deleted > 0 {
-		log.Debug().Int64("count", deleted).Msg("Stale namespaces deleted")
-	}
-
-	return nil
+	_, err := Pool.Exec(ctx, `DELETE FROM namespaces WHERE NOT (uid = ANY($1::text[]))`, uids)
+	return err
 }

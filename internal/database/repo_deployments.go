@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/internal/logger"
@@ -135,20 +134,12 @@ func GetDeploymentByName(ctx context.Context, name string, namespace string) (*D
 	return &dep, nil
 }
 
-// Deletes deployments that haven't been synced since the specified time
-func DeleteDeploymentsNotSyncedSince(ctx context.Context, since time.Time) error {
-	log := logger.WithComponent("database")
-
-	query := `DELETE FROM deployments WHERE synced_at < $1`
-	result, err := Pool.Exec(ctx, query, since)
-	if err != nil {
-		return fmt.Errorf("failed to delete stale deployments: %w", err)
+// Removes deployments in the namespace whose uid is not in the list.
+func PruneDeployments(ctx context.Context, namespace string, uids []string) error {
+	if len(uids) == 0 {
+		_, err := Pool.Exec(ctx, `DELETE FROM deployments WHERE namespace = $1`, namespace)
+		return err
 	}
-
-	deleted := result.RowsAffected()
-	if deleted > 0 {
-		log.Debug().Int64("count", deleted).Msg("Stale deployments deleted")
-	}
-
-	return nil
+	_, err := Pool.Exec(ctx, `DELETE FROM deployments WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	return err
 }

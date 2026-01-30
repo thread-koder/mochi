@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/internal/logger"
@@ -117,20 +116,12 @@ func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, er
 	return containers, nil
 }
 
-// Deletes containers that haven't been synced since the specified time
-func DeleteContainersNotSyncedSince(ctx context.Context, since time.Time) error {
-	log := logger.WithComponent("database")
-
-	query := `DELETE FROM containers WHERE synced_at < $1`
-	result, err := Pool.Exec(ctx, query, since)
-	if err != nil {
-		return fmt.Errorf("failed to delete stale containers: %w", err)
+// Removes containers in the namespace whose pod_uid is not in the list.
+func PruneContainers(ctx context.Context, namespace string, podUIDs []string) error {
+	if len(podUIDs) == 0 {
+		_, err := Pool.Exec(ctx, `DELETE FROM containers WHERE namespace = $1`, namespace)
+		return err
 	}
-
-	deleted := result.RowsAffected()
-	if deleted > 0 {
-		log.Debug().Int64("count", deleted).Msg("Stale containers deleted")
-	}
-
-	return nil
+	_, err := Pool.Exec(ctx, `DELETE FROM containers WHERE namespace = $1 AND NOT (pod_uid = ANY($2::text[]))`, namespace, podUIDs)
+	return err
 }

@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/internal/logger"
@@ -135,20 +134,12 @@ func GetDaemonSetByName(ctx context.Context, name string, namespace string) (*Da
 	return &ds, nil
 }
 
-// Deletes daemonsets that haven't been synced since the specified time
-func DeleteDaemonSetsNotSyncedSince(ctx context.Context, since time.Time) error {
-	log := logger.WithComponent("database")
-
-	query := `DELETE FROM daemonsets WHERE synced_at < $1`
-	result, err := Pool.Exec(ctx, query, since)
-	if err != nil {
-		return fmt.Errorf("failed to delete stale daemonsets: %w", err)
+// Removes daemonsets in the namespace whose uid is not in the list.
+func PruneDaemonSets(ctx context.Context, namespace string, uids []string) error {
+	if len(uids) == 0 {
+		_, err := Pool.Exec(ctx, `DELETE FROM daemonsets WHERE namespace = $1`, namespace)
+		return err
 	}
-
-	deleted := result.RowsAffected()
-	if deleted > 0 {
-		log.Debug().Int64("count", deleted).Msg("Stale daemonsets deleted")
-	}
-
-	return nil
+	_, err := Pool.Exec(ctx, `DELETE FROM daemonsets WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	return err
 }

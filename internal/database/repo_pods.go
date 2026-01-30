@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/internal/logger"
@@ -27,7 +26,7 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 
 	query := `
 		INSERT INTO pods (
-			name, namespace, uid, node_name, phase, restart_policy,
+			name, namespace, uid, node, phase, restart_policy,
 			labels, annotations, owner_kind, owner_name, created_at, synced_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
@@ -35,7 +34,7 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
 			namespace = EXCLUDED.namespace,
-			node_name = EXCLUDED.node_name,
+			node = EXCLUDED.node,
 			phase = EXCLUDED.phase,
 			restart_policy = EXCLUDED.restart_policy,
 			labels = EXCLUDED.labels,
@@ -48,7 +47,7 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	batch := &pgx.Batch{}
 	for _, pod := range pods {
 		batch.Queue(query,
-			pod.Name, pod.Namespace, pod.UID, pod.NodeName, pod.Phase, pod.RestartPolicy,
+			pod.Name, pod.Namespace, pod.UID, pod.Node, pod.Phase, pod.RestartPolicy,
 			pod.Labels, pod.Annotations, pod.OwnerKind, pod.OwnerName,
 			pod.CreatedAt, pod.SyncedAt,
 		)
@@ -79,7 +78,7 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 // Gets a pod by name and namespace
 func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, error) {
 	query := `
-		SELECT id, name, namespace, uid, node_name, phase, restart_policy,
+		SELECT id, name, namespace, uid, node, phase, restart_policy,
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
@@ -89,7 +88,7 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 
 	var p Pod
 	err := Pool.QueryRow(ctx, query, name, namespace).Scan(
-		&p.ID, &p.Name, &p.Namespace, &p.UID, &p.NodeName, &p.Phase, &p.RestartPolicy,
+		&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.Phase, &p.RestartPolicy,
 		&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
 		&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 	)
@@ -112,7 +111,7 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 
 	// Direct query for other owner kinds
 	query := `
-		SELECT id, name, namespace, uid, node_name, phase, restart_policy,
+		SELECT id, name, namespace, uid, node, phase, restart_policy,
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
@@ -130,7 +129,7 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 	for rows.Next() {
 		var p Pod
 		err := rows.Scan(
-			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.NodeName, &p.Phase, &p.RestartPolicy,
+			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.Phase, &p.RestartPolicy,
 			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
 			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 		)
@@ -150,7 +149,7 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 // Gets standalone pods (pods without owner) in a namespace
 func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod, error) {
 	query := `
-		SELECT id, name, namespace, uid, node_name, phase, restart_policy,
+		SELECT id, name, namespace, uid, node, phase, restart_policy,
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
@@ -168,7 +167,7 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 	for rows.Next() {
 		var p Pod
 		err := rows.Scan(
-			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.NodeName, &p.Phase, &p.RestartPolicy,
+			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.Phase, &p.RestartPolicy,
 			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
 			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 		)
@@ -188,7 +187,7 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 // Gets pods by owner kind in a namespace
 func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string) ([]*Pod, error) {
 	query := `
-		SELECT id, name, namespace, uid, node_name, phase, restart_policy,
+		SELECT id, name, namespace, uid, node, phase, restart_policy,
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
@@ -206,7 +205,7 @@ func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string)
 	for rows.Next() {
 		var p Pod
 		err := rows.Scan(
-			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.NodeName, &p.Phase, &p.RestartPolicy,
+			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.Phase, &p.RestartPolicy,
 			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
 			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 		)
@@ -223,22 +222,14 @@ func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string)
 	return pods, nil
 }
 
-// Deletes pods that haven't been synced since the specified time
-func DeletePodsNotSyncedSince(ctx context.Context, since time.Time) error {
-	log := logger.WithComponent("database")
-
-	query := `DELETE FROM pods WHERE synced_at < $1`
-	result, err := Pool.Exec(ctx, query, since)
-	if err != nil {
-		return fmt.Errorf("failed to delete stale pods: %w", err)
+// Removes pods in the namespace whose uid is not in the list.
+func PrunePods(ctx context.Context, namespace string, uids []string) error {
+	if len(uids) == 0 {
+		_, err := Pool.Exec(ctx, `DELETE FROM pods WHERE namespace = $1`, namespace)
+		return err
 	}
-
-	deleted := result.RowsAffected()
-	if deleted > 0 {
-		log.Debug().Int64("count", deleted).Msg("Stale pods deleted")
-	}
-
-	return nil
+	_, err := Pool.Exec(ctx, `DELETE FROM pods WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	return err
 }
 
 // Gets all pods for a deployment
