@@ -1,11 +1,13 @@
--- Create statefulsets table
-CREATE TABLE IF NOT EXISTS statefulsets (
+-- Create replicasets table
+CREATE TABLE IF NOT EXISTS replicasets (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     namespace VARCHAR(255) NOT NULL REFERENCES namespaces(name) ON DELETE CASCADE,
     uid VARCHAR(255) NOT NULL UNIQUE,
     replicas INTEGER NOT NULL DEFAULT 0,
     ready_replicas INTEGER NOT NULL DEFAULT 0,
+    owner_kind VARCHAR(255),
+    owner_name VARCHAR(255),
     labels JSONB,
     annotations JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -15,16 +17,19 @@ CREATE TABLE IF NOT EXISTS statefulsets (
 );
 
 -- Create index on namespace and name
-CREATE INDEX IF NOT EXISTS idx_statefulsets_namespace_name ON statefulsets(namespace, name);
+CREATE INDEX IF NOT EXISTS idx_replicasets_namespace_name ON replicasets(namespace, name);
 
 -- Create index on uid
-CREATE INDEX IF NOT EXISTS idx_statefulsets_uid ON statefulsets(uid);
+CREATE INDEX IF NOT EXISTS idx_replicasets_uid ON replicasets(uid);
+
+-- Create index on owner
+CREATE INDEX IF NOT EXISTS idx_replicasets_owner ON replicasets(namespace, owner_kind, owner_name);
 
 -- Create index on synced_at
-CREATE INDEX IF NOT EXISTS idx_statefulsets_synced_at ON statefulsets(synced_at);
+CREATE INDEX IF NOT EXISTS idx_replicasets_synced_at ON replicasets(synced_at);
 
 -- Create trigger to automatically update updated_at
-CREATE TRIGGER update_statefulsets_updated_at
-    BEFORE UPDATE ON statefulsets
+CREATE TRIGGER update_replicasets_updated_at
+    BEFORE UPDATE ON replicasets
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

@@ -2,9 +2,9 @@
 CREATE TABLE IF NOT EXISTS containers (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    pod_uid VARCHAR(255) NOT NULL,
+    pod_uid VARCHAR(255) NOT NULL REFERENCES pods(uid) ON DELETE CASCADE,
     pod_name VARCHAR(255) NOT NULL,
-    namespace VARCHAR(255) NOT NULL,
+    namespace VARCHAR(255) NOT NULL REFERENCES namespaces(name) ON DELETE CASCADE,
     image VARCHAR(512) NOT NULL,
     image_pull_policy VARCHAR(50),
     ports JSONB,

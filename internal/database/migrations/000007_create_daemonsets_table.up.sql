@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS daemonsets (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    namespace VARCHAR(255) NOT NULL,
+    namespace VARCHAR(255) NOT NULL REFERENCES namespaces(name) ON DELETE CASCADE,
     uid VARCHAR(255) NOT NULL UNIQUE,
     desired_number_scheduled INTEGER NOT NULL DEFAULT 0,
     number_ready INTEGER NOT NULL DEFAULT 0,

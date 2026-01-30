@@ -2,9 +2,9 @@
 CREATE TABLE IF NOT EXISTS pods (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    namespace VARCHAR(255) NOT NULL,
+    namespace VARCHAR(255) NOT NULL REFERENCES namespaces(name) ON DELETE CASCADE,
     uid VARCHAR(255) NOT NULL UNIQUE,
-    node_name VARCHAR(255),
+    node VARCHAR(255) REFERENCES nodes(name) ON DELETE SET NULL,
     phase VARCHAR(50) NOT NULL,
     restart_policy VARCHAR(50),
     labels JSONB,
@@ -22,8 +22,8 @@ CREATE INDEX IF NOT EXISTS idx_pods_namespace_name ON pods(namespace, name);
 -- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_pods_uid ON pods(uid);
 
--- Create index on node_name
-CREATE INDEX IF NOT EXISTS idx_pods_node_name ON pods(node_name);
+-- Create index on node
+CREATE INDEX IF NOT EXISTS idx_pods_node ON pods(node);
 
 -- Create index on owner
 CREATE INDEX IF NOT EXISTS idx_pods_owner ON pods(owner_kind, owner_name);

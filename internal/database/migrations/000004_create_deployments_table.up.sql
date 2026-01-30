@@ -1,13 +1,12 @@
--- Create replicasets table
-CREATE TABLE IF NOT EXISTS replicasets (
+-- Create deployments table
+CREATE TABLE IF NOT EXISTS deployments (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    namespace VARCHAR(255) NOT NULL,
+    namespace VARCHAR(255) NOT NULL REFERENCES namespaces(name) ON DELETE CASCADE,
     uid VARCHAR(255) NOT NULL UNIQUE,
     replicas INTEGER NOT NULL DEFAULT 0,
     ready_replicas INTEGER NOT NULL DEFAULT 0,
-    owner_kind VARCHAR(255),
-    owner_name VARCHAR(255),
+    available_replicas INTEGER NOT NULL DEFAULT 0,
     labels JSONB,
     annotations JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -17,19 +16,16 @@ CREATE TABLE IF NOT EXISTS replicasets (
 );
 
 -- Create index on namespace and name
-CREATE INDEX IF NOT EXISTS idx_replicasets_namespace_name ON replicasets(namespace, name);
+CREATE INDEX IF NOT EXISTS idx_deployments_namespace_name ON deployments(namespace, name);
 
 -- Create index on uid
-CREATE INDEX IF NOT EXISTS idx_replicasets_uid ON replicasets(uid);
-
--- Create index on owner
-CREATE INDEX IF NOT EXISTS idx_replicasets_owner ON replicasets(namespace, owner_kind, owner_name);
+CREATE INDEX IF NOT EXISTS idx_deployments_uid ON deployments(uid);
 
 -- Create index on synced_at
-CREATE INDEX IF NOT EXISTS idx_replicasets_synced_at ON replicasets(synced_at);
+CREATE INDEX IF NOT EXISTS idx_deployments_synced_at ON deployments(synced_at);
 
 -- Create trigger to automatically update updated_at
-CREATE TRIGGER update_replicasets_updated_at
-    BEFORE UPDATE ON replicasets
+CREATE TRIGGER update_deployments_updated_at
+    BEFORE UPDATE ON deployments
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

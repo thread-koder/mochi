@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS endpoints (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    namespace VARCHAR(255) NOT NULL,
+    namespace VARCHAR(255) NOT NULL REFERENCES namespaces(name) ON DELETE CASCADE,
     uid VARCHAR(255) NOT NULL UNIQUE,
     addresses JSONB,
     ports JSONB,

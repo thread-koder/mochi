@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS services (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    namespace VARCHAR(255) NOT NULL,
+    namespace VARCHAR(255) NOT NULL REFERENCES namespaces(name) ON DELETE CASCADE,
     uid VARCHAR(255) NOT NULL UNIQUE,
     type VARCHAR(50) NOT NULL,
     cluster_ip VARCHAR(50),
