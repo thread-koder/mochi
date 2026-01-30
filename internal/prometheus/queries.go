@@ -19,8 +19,10 @@ type QueryOptions struct {
 	Container string
 	// Filters queries to a specific node
 	Node string
-	// The duration for range queries (e.g., "5m", "1h")
+	// Used for rate() sliding window
 	RangeDuration string
+	// Used for "total over period" queries (restarts, OOM, memory fail).
+	AnalysisRange string
 }
 
 // Represents pod-level metric results
@@ -80,13 +82,13 @@ func QueryPodCPUPressureRange(ctx context.Context, r v1.Range, opts QueryOptions
 
 // Queries pod memory fail count metrics over a time range
 func QueryPodMemoryFailCountRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query := BuildPodMemoryFailCountQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
+	query := BuildPodMemoryFailCountQuery(opts.Namespace, opts.Pod, opts.Container, opts.AnalysisRange)
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
 // Queries pod memory OOM metrics over a time range
 func QueryPodMemoryOOMRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query := BuildPodMemoryOOMQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
+	query := BuildPodMemoryOOMQuery(opts.Namespace, opts.Pod, opts.Container, opts.AnalysisRange)
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
@@ -98,7 +100,7 @@ func QueryPodMemoryPressureRange(ctx context.Context, r v1.Range, opts QueryOpti
 
 // Queries container restarts over a time range
 func QueryContainerRestartsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query := BuildContainerRestartsQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
+	query := BuildContainerRestartsQuery(opts.Namespace, opts.Pod, opts.Container, opts.AnalysisRange)
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 

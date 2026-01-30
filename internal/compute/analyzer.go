@@ -460,6 +460,7 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		Pod:           container.PodName,
 		Container:     container.Name,
 		RangeDuration: "5m",
+		AnalysisRange: opts.TimeRange.String(),
 	}
 
 	// Query basic metrics

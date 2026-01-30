@@ -145,10 +145,10 @@ func CalculateCPURequestRecommendation(
 	// Apply Emergency Boost for CPU Throttling
 	pressureFactor := 1.0
 	if stability.CPUThrottling > 0.1 {
-		// Severe throttling (>10% periods)
+		// Severe throttling (>10% throttling)
 		pressureFactor = 1.5 + math.Min(0.5, stability.CPUThrottling)
 	} else if stability.CPUThrottling > 0.01 {
-		// Minor throttling (>1% periods)
+		// Minor throttling (>1% throttling)
 		pressureFactor = 1.2
 	}
 

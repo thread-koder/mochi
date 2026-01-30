@@ -6,11 +6,11 @@ import (
 
 // Represents stability analysis results for a container
 type StabilityResult struct {
-	CPUThrottling  float64 `json:"cpu_throttling"`  // Average throttling rate (periods/sec)
-	CPUPressure    float64 `json:"cpu_pressure"`    // Average CPU pressure (seconds/sec)
-	MemoryFailCnt  float64 `json:"memory_fail_cnt"` // Memory allocation failures
-	MemoryOOM      float64 `json:"memory_oom"`      // OOM events
-	MemoryPressure float64 `json:"memory_pressure"` // Average memory pressure (seconds/sec)
+	CPUThrottling  float64 `json:"cpu_throttling"`  // CPU throttling percentage (0-1, where 1.0 = 100% throttling)
+	CPUPressure    float64 `json:"cpu_pressure"`    // CPU pressure percentage (0-1, where 1.0 = 100% stalled)
+	MemoryFailCnt  float64 `json:"memory_fail_cnt"` // Total memory allocation failures in period
+	MemoryOOM      float64 `json:"memory_oom"`      // Total OOM events in period
+	MemoryPressure float64 `json:"memory_pressure"` // Memory pressure percentage (0-1, where 1.0 = 100% stalled)
 	Restarts       float64 `json:"restarts"`        // Total restarts in period
 	StabilityScore float64 `json:"stability_score"` // Overall stability score (0-1)
 }
@@ -29,22 +29,19 @@ func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
 		result.CPUPressure = CalculateMean(ExtractValues(metrics.CPUPressure))
 	}
 	if len(metrics.MemoryFailCnt) > 0 {
-		result.MemoryFailCnt = CalculateMean(ExtractValues(metrics.MemoryFailCnt))
+		values := ExtractValues(metrics.MemoryFailCnt)
+		result.MemoryFailCnt = values[len(values)-1]
 	}
 	if len(metrics.MemoryOOM) > 0 {
-		// Sum of OOM events
-		for _, dp := range metrics.MemoryOOM {
-			result.MemoryOOM += dp.Value
-		}
+		values := ExtractValues(metrics.MemoryOOM)
+		result.MemoryOOM = values[len(values)-1]
 	}
 	if len(metrics.MemoryPressure) > 0 {
 		result.MemoryPressure = CalculateMean(ExtractValues(metrics.MemoryPressure))
 	}
 	if len(metrics.Restarts) > 0 {
-		// Sum of restarts
-		for _, dp := range metrics.Restarts {
-			result.Restarts += dp.Value
-		}
+		values := ExtractValues(metrics.Restarts)
+		result.Restarts = values[len(values)-1]
 	}
 
 	// 2. Calculate Stability Score (0-1)
@@ -84,7 +81,6 @@ func AggregateStability(stabilities []StabilityResult) StabilityResult {
 		StabilityScore: 1.0,
 	}
 
-	var totalScore float64
 	for _, s := range stabilities {
 		aggregated.CPUThrottling += s.CPUThrottling
 		aggregated.CPUPressure += s.CPUPressure
@@ -92,10 +88,9 @@ func AggregateStability(stabilities []StabilityResult) StabilityResult {
 		aggregated.MemoryOOM += s.MemoryOOM
 		aggregated.MemoryPressure += s.MemoryPressure
 		aggregated.Restarts += s.Restarts
-		totalScore += s.StabilityScore
 	}
 
-	// For rates/counts, sum or average depending on meaning
+	// Average percentages (CPU throttling, CPU pressure, memory pressure)
 	n := float64(len(stabilities))
 	aggregated.CPUThrottling /= n
 	aggregated.CPUPressure /= n
