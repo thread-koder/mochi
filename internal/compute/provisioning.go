@@ -84,11 +84,11 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization) (CP
 	// Handle missing resources
 	if !hasRequest {
 		result.IsUnderProvisioned = true
-		result.Efficiency = math.Min(result.Efficiency, 0.2)
+		result.Efficiency = 0.0
 	}
 	if !hasLimit {
 		result.IsUnderProvisioned = true
-		result.Efficiency = math.Min(result.Efficiency, 0.2)
+		result.Efficiency = 0.0
 	}
 
 	// Analyze request utilization
@@ -179,11 +179,11 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 	// Handle missing resources
 	if !hasRequest {
 		result.IsUnderProvisioned = true
-		result.Efficiency = math.Min(result.Efficiency, 0.2)
+		result.Efficiency = 0.0
 	}
 	if !hasLimit {
 		result.IsUnderProvisioned = true
-		result.Efficiency = math.Min(result.Efficiency, 0.1)
+		result.Efficiency = 0.0
 	}
 
 	// Analyze request utilization
