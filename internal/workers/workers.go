@@ -14,12 +14,11 @@ import (
 
 // Manages all background workers
 type WorkerPool struct {
-	ctx            context.Context
-	cancel         context.CancelFunc
-	wg             sync.WaitGroup
-	resourceSync   *ResourceSyncWorker
-	syncInterval   time.Duration
-	staleThreshold time.Duration
+	ctx          context.Context
+	cancel       context.CancelFunc
+	wg           sync.WaitGroup
+	resourceSync *ResourceSyncWorker
+	syncInterval time.Duration
 }
 
 // Creates a new worker pool
@@ -29,16 +28,13 @@ func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
 	}
 
 	syncInterval := time.Duration(cfg.ResourceSyncInterval) * time.Second
-	staleThreshold := time.Duration(cfg.StaleResourceThreshold) * time.Second
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &WorkerPool{
-		ctx:            ctx,
-		cancel:         cancel,
-		resourceSync:   NewResourceSyncWorker(ctx, syncInterval, staleThreshold),
-		syncInterval:   syncInterval,
-		staleThreshold: staleThreshold,
+		ctx:          ctx,
+		cancel:       cancel,
+		resourceSync: NewResourceSyncWorker(ctx, syncInterval),
+		syncInterval: syncInterval,
 	}, nil
 }
 
@@ -68,17 +64,15 @@ func (wp *WorkerPool) Stop() {
 
 // Worker for syncing Kubernetes resources to PostgreSQL
 type ResourceSyncWorker struct {
-	ctx            context.Context
-	interval       time.Duration
-	staleThreshold time.Duration
+	ctx      context.Context
+	interval time.Duration
 }
 
 // Creates a new resource sync worker
-func NewResourceSyncWorker(ctx context.Context, interval, staleThreshold time.Duration) *ResourceSyncWorker {
+func NewResourceSyncWorker(ctx context.Context, interval time.Duration) *ResourceSyncWorker {
 	return &ResourceSyncWorker{
-		ctx:            ctx,
-		interval:       interval,
-		staleThreshold: staleThreshold,
+		ctx:      ctx,
+		interval: interval,
 	}
 }
 
@@ -87,7 +81,6 @@ func (w *ResourceSyncWorker) Run() {
 	log := logger.WithComponent("workers")
 	log.Info().
 		Dur("interval", w.interval).
-		Dur("stale_threshold", w.staleThreshold).
 		Msg("Starting resource sync worker...")
 
 	ticker := time.NewTicker(w.interval)
@@ -125,43 +118,11 @@ func (w *ResourceSyncWorker) sync() {
 	w.cleanup(ctx)
 }
 
-// Performs cleanup operations for stale resources and recommendations
+// Performs cleanup operations
 func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	log := logger.WithComponent("workers")
 
-	log.Info().Msg("Starting resource cleanup process...")
-	// Clean up stale resources
-	staleThreshold := time.Now().Add(-w.staleThreshold)
-	if err := database.DeletePodsNotSyncedSince(ctx, staleThreshold); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete stale pods")
-	}
-	if err := database.DeleteNodesNotSyncedSince(ctx, staleThreshold); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete stale nodes")
-	}
-	if err := database.DeleteNamespacesNotSyncedSince(ctx, staleThreshold); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete stale namespaces")
-	}
-	if err := database.DeleteDeploymentsNotSyncedSince(ctx, staleThreshold); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete stale deployments")
-	}
-	if err := database.DeleteReplicaSetsNotSyncedSince(ctx, staleThreshold); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete stale replicasets")
-	}
-	if err := database.DeleteStatefulSetsNotSyncedSince(ctx, staleThreshold); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete stale statefulsets")
-	}
-	if err := database.DeleteDaemonSetsNotSyncedSince(ctx, staleThreshold); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete stale daemonsets")
-	}
-	if err := database.DeleteServicesNotSyncedSince(ctx, staleThreshold); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete stale services")
-	}
-	if err := database.DeleteEndpointsNotSyncedSince(ctx, staleThreshold); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete stale endpoints")
-	}
-	if err := database.DeleteContainersNotSyncedSince(ctx, staleThreshold); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete stale containers")
-	}
+	log.Info().Msg("Starting cleanup process...")
 	oldRecommendationsThreshold := time.Now().Add(-90 * 24 * time.Hour) // 90 days
 	if err := database.DeleteComputeRecommendationsOlderThan(ctx, oldRecommendationsThreshold); err != nil {
 		log.Warn().Err(err).Msg("Failed to delete old compute recommendations")
@@ -169,5 +130,5 @@ func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	if err := database.CleanupComputeRecommendationsForDeletedWorkloads(ctx); err != nil {
 		log.Warn().Err(err).Msg("Failed to cleanup compute recommendations for deleted workloads")
 	}
-	log.Info().Msg("Resource cleanup process completed")
+	log.Info().Msg("Cleanup process completed")
 }
