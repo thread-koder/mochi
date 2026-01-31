@@ -4,6 +4,16 @@ import (
 	"math"
 )
 
+// Max penalty per factor
+const (
+	maxPenaltyCPUThrottling  = 0.25 // 25% max penalty
+	maxPenaltyCPUPressure    = 0.15 // 15% max penalty
+	maxPenaltyMemoryFailCnt  = 0.25 // 25% max penalty
+	maxPenaltyMemoryPressure = 0.15 // 15% max penalty
+	maxPenaltyOOM            = 0.35 // 35% max penalty
+	maxPenaltyRestarts       = 0.35 // 35% max penalty
+)
+
 // Represents stability analysis results for a container
 type StabilityResult struct {
 	CPUThrottling  float64 `json:"cpu_throttling"`  // CPU throttling percentage (0-1, where 1.0 = 100% throttling)
@@ -45,28 +55,34 @@ func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
 	}
 
 	// 2. Calculate Stability Score (0-1)
+	var totalPenalty float64
 
-	// OOMs are critical
-	result.StabilityScore -= result.MemoryOOM * 0.5
+	// OOMs: critical
+	totalPenalty += math.Min(result.MemoryOOM*0.5, maxPenaltyOOM)
 
-	// Restarts are critical
-	result.StabilityScore -= result.Restarts * 0.3
+	// Memory allocation failures: pre-OOM signal
+	totalPenalty += math.Min(result.MemoryFailCnt*0.2, maxPenaltyMemoryFailCnt)
+
+	// Restarts: critical
+	totalPenalty += math.Min(result.Restarts*0.3, maxPenaltyRestarts)
 
 	// Throttling: penalize if > 10%
 	if result.CPUThrottling > 0.1 {
-		result.StabilityScore -= (result.CPUThrottling - 0.1) * 2.0
+		penalty := (result.CPUThrottling - 0.1) * 2.0
+		totalPenalty += math.Min(penalty, maxPenaltyCPUThrottling)
 	}
 
 	// Pressure: penalize if > 20% stalled
 	if result.CPUPressure > 0.2 {
-		result.StabilityScore -= (result.CPUPressure - 0.2) * 0.5
+		penalty := (result.CPUPressure - 0.2) * 0.5
+		totalPenalty += math.Min(penalty, maxPenaltyCPUPressure)
 	}
 	if result.MemoryPressure > 0.2 {
-		result.StabilityScore -= (result.MemoryPressure - 0.2) * 1.0
+		penalty := (result.MemoryPressure - 0.2) * 1.0
+		totalPenalty += math.Min(penalty, maxPenaltyMemoryPressure)
 	}
 
-	// Clamp score to 0-1
-	result.StabilityScore = math.Max(0.0, math.Min(1.0, result.StabilityScore))
+	result.StabilityScore = math.Max(0.0, math.Min(1.0, 1.0-totalPenalty))
 
 	return result, nil
 }
