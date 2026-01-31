@@ -7,10 +7,11 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	applyappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
+	applycorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 
 	"github.com/thread_koder/mochi/internal/database"
 	"github.com/thread_koder/mochi/internal/kubernetes"
@@ -65,47 +66,40 @@ func applyToDeployment(ctx context.Context, rec *database.ComputeRecommendation,
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	// Get the deployment
-	deployment, err := kubernetes.Clientset.AppsV1().Deployments(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
+	// Check if deployment exists
+	_, err := kubernetes.Clientset.AppsV1().Deployments(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("deployment not found: cannot apply recommendations to non-existent workload")
+		}
 		return fmt.Errorf("failed to get deployment: %w", err)
 	}
 
-	// Create a copy for patching
-	originalBytes, err := json.Marshal(deployment)
-	if err != nil {
-		return fmt.Errorf("failed to marshal original deployment: %w", err)
-	}
+	// Build apply configurations
+	depApplyConfig := applyappsv1.Deployment(rec.WorkloadName, rec.Namespace)
+	depApplyConfig.WithAnnotations(getMochiAnnotations(rec))
 
-	// Add Mochi annotations to workload metadata
-	addMochiAnnotations(&deployment.ObjectMeta, rec)
+	// Build pod spec configuration
+	podSpecConfig := buildPodSpecConfig(containerRecs)
 
-	// Apply container recommendations
-	if err := updateContainerResources(&deployment.Spec.Template.Spec, containerRecs); err != nil {
-		return fmt.Errorf("failed to update container resources: %w", err)
-	}
+	// Build deployment spec configuration
+	depSpecConfig := applyappsv1.DeploymentSpec().WithTemplate(applycorev1.PodTemplateSpec().WithSpec(podSpecConfig))
 
-	// Create patch
-	modifiedBytes, err := json.Marshal(deployment)
-	if err != nil {
-		return fmt.Errorf("failed to marshal modified deployment: %w", err)
-	}
+	// Apply deployment spec configuration
+	depApplyConfig.WithSpec(depSpecConfig)
 
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(originalBytes, modifiedBytes, deployment)
-	if err != nil {
-		return fmt.Errorf("failed to create patch: %w", err)
-	}
-
-	// Apply the patch
-	_, err = kubernetes.Clientset.AppsV1().Deployments(rec.Namespace).Patch(
+	// Apply recommendation
+	_, err = kubernetes.Clientset.AppsV1().Deployments(rec.Namespace).Apply(
 		ctx,
-		rec.WorkloadName,
-		types.StrategicMergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
+		depApplyConfig,
+		metav1.ApplyOptions{
+			FieldManager: "mochi-controller",
+			Force:        true,
+		},
 	)
+
 	if err != nil {
-		return fmt.Errorf("failed to patch deployment: %w", err)
+		return fmt.Errorf("failed to apply recommendation to deployment: %w", err)
 	}
 
 	return nil
@@ -117,47 +111,40 @@ func applyToStatefulSet(ctx context.Context, rec *database.ComputeRecommendation
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	// Get the statefulset
-	statefulSet, err := kubernetes.Clientset.AppsV1().StatefulSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
+	// Check if statefulset exists
+	_, err := kubernetes.Clientset.AppsV1().StatefulSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("statefulset not found: cannot apply recommendations to non-existent workload")
+		}
 		return fmt.Errorf("failed to get statefulset: %w", err)
 	}
 
-	// Create a copy for patching
-	originalBytes, err := json.Marshal(statefulSet)
-	if err != nil {
-		return fmt.Errorf("failed to marshal original statefulset: %w", err)
-	}
+	// Build apply configuration
+	stsApplyConfig := applyappsv1.StatefulSet(rec.WorkloadName, rec.Namespace)
+	stsApplyConfig.WithAnnotations(getMochiAnnotations(rec))
 
-	// Add Mochi annotations to workload metadata
-	addMochiAnnotations(&statefulSet.ObjectMeta, rec)
+	// Build pod spec configuration
+	podSpecConfig := buildPodSpecConfig(containerRecs)
 
-	// Apply container recommendations
-	if err := updateContainerResources(&statefulSet.Spec.Template.Spec, containerRecs); err != nil {
-		return fmt.Errorf("failed to update container resources: %w", err)
-	}
+	// Build statefulset spec configuration
+	stsSpecConfig := applyappsv1.StatefulSetSpec().WithTemplate(applycorev1.PodTemplateSpec().WithSpec(podSpecConfig))
 
-	// Create patch
-	modifiedBytes, err := json.Marshal(statefulSet)
-	if err != nil {
-		return fmt.Errorf("failed to marshal modified statefulset: %w", err)
-	}
+	// Apply statefulset spec configuration
+	stsApplyConfig.WithSpec(stsSpecConfig)
 
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(originalBytes, modifiedBytes, statefulSet)
-	if err != nil {
-		return fmt.Errorf("failed to create patch: %w", err)
-	}
-
-	// Apply the patch
-	_, err = kubernetes.Clientset.AppsV1().StatefulSets(rec.Namespace).Patch(
+	// Apply recommendation
+	_, err = kubernetes.Clientset.AppsV1().StatefulSets(rec.Namespace).Apply(
 		ctx,
-		rec.WorkloadName,
-		types.StrategicMergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
+		stsApplyConfig,
+		metav1.ApplyOptions{
+			FieldManager: "mochi-controller",
+			Force:        true,
+		},
 	)
+
 	if err != nil {
-		return fmt.Errorf("failed to patch statefulset: %w", err)
+		return fmt.Errorf("failed to apply recommendation to statefulset: %w", err)
 	}
 
 	return nil
@@ -169,47 +156,40 @@ func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, 
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	// Get the daemonset
-	daemonSet, err := kubernetes.Clientset.AppsV1().DaemonSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
+	// Check if daemonset exists
+	_, err := kubernetes.Clientset.AppsV1().DaemonSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("daemonset not found: cannot apply recommendations to non-existent workload")
+		}
 		return fmt.Errorf("failed to get daemonset: %w", err)
 	}
 
-	// Create a copy for patching
-	originalBytes, err := json.Marshal(daemonSet)
-	if err != nil {
-		return fmt.Errorf("failed to marshal original daemonset: %w", err)
-	}
+	// Build apply configuration
+	dsApplyConfig := applyappsv1.DaemonSet(rec.WorkloadName, rec.Namespace)
+	dsApplyConfig.WithAnnotations(getMochiAnnotations(rec))
 
-	// Add Mochi annotations to workload metadata
-	addMochiAnnotations(&daemonSet.ObjectMeta, rec)
+	// Build pod spec configuration
+	podSpecConfig := buildPodSpecConfig(containerRecs)
 
-	// Apply container recommendations
-	if err := updateContainerResources(&daemonSet.Spec.Template.Spec, containerRecs); err != nil {
-		return fmt.Errorf("failed to update container resources: %w", err)
-	}
+	// Build daemonset spec configuration
+	dsSpecConfig := applyappsv1.DaemonSetSpec().WithTemplate(applycorev1.PodTemplateSpec().WithSpec(podSpecConfig))
 
-	// Create patch
-	modifiedBytes, err := json.Marshal(daemonSet)
-	if err != nil {
-		return fmt.Errorf("failed to marshal modified daemonset: %w", err)
-	}
+	// Apply daemonset spec configuration
+	dsApplyConfig.WithSpec(dsSpecConfig)
 
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(originalBytes, modifiedBytes, daemonSet)
-	if err != nil {
-		return fmt.Errorf("failed to create patch: %w", err)
-	}
-
-	// Apply the patch
-	_, err = kubernetes.Clientset.AppsV1().DaemonSets(rec.Namespace).Patch(
+	// Apply recommendation
+	_, err = kubernetes.Clientset.AppsV1().DaemonSets(rec.Namespace).Apply(
 		ctx,
-		rec.WorkloadName,
-		types.StrategicMergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
+		dsApplyConfig,
+		metav1.ApplyOptions{
+			FieldManager: "mochi-controller",
+			Force:        true,
+		},
 	)
+
 	if err != nil {
-		return fmt.Errorf("failed to patch daemonset: %w", err)
+		return fmt.Errorf("failed to apply recommendation to daemonset: %w", err)
 	}
 
 	return nil
@@ -218,86 +198,49 @@ func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, 
 // Handles pod recommendation application
 // Pods are immutable, return an error explaining the limitation
 func applyToPod() error {
-	return fmt.Errorf("cannot apply recommendations to standalone pods: pods are immutable and cannot be patched. To apply resource changes, you must delete and recreate the pod manually, or use a Deployment/StatefulSet/DaemonSet instead")
+	return fmt.Errorf("cannot apply recommendations to standalone pod: pods are immutable. Resource changes require pod recreation or management via Deployment/StatefulSet/DaemonSet")
 }
 
-// Adds Mochi annotations to workload metadata
-func addMochiAnnotations(metadata *metav1.ObjectMeta, rec *database.ComputeRecommendation) {
-	if metadata.Annotations == nil {
-		metadata.Annotations = make(map[string]string)
+func getMochiAnnotations(rec *database.ComputeRecommendation) map[string]string {
+	return map[string]string{
+		AnnotationManagedBy:          "mochi",
+		AnnotationRecommendationID:   fmt.Sprintf("%d", rec.ID),
+		AnnotationRecommendationMode: rec.RecommendationMode,
+		AnnotationLastApplied:        time.Now().UTC().Format(time.RFC3339),
 	}
-
-	// Set managed-by annotation
-	metadata.Annotations[AnnotationManagedBy] = "mochi"
-
-	// Set recommendation ID
-	metadata.Annotations[AnnotationRecommendationID] = fmt.Sprintf("%d", rec.ID)
-
-	// Set recommendation mode
-	metadata.Annotations[AnnotationRecommendationMode] = rec.RecommendationMode
-
-	// Set last applied timestamp
-	metadata.Annotations[AnnotationLastApplied] = time.Now().UTC().Format(time.RFC3339)
 }
 
-// Updates container resources in a pod spec based on recommendations
-func updateContainerResources(podSpec *corev1.PodSpec, containerRecs []ContainerRecommendation) error {
-	// Create a map of container name to recommendation for quick lookup
-	recMap := make(map[string]ContainerRecommendation)
-	for _, rec := range containerRecs {
-		recMap[rec.ContainerName] = rec
+func buildPodSpecConfig(containerRecs []ContainerRecommendation) *applycorev1.PodSpecApplyConfiguration {
+	containers := make([]*applycorev1.ContainerApplyConfiguration, 0, len(containerRecs))
+	for _, containerRec := range containerRecs {
+		requests := corev1.ResourceList{}
+		limits := corev1.ResourceList{}
+
+		// Accumulate all CPU/Mem in the maps
+		if containerRec.CPU.RecommendedRequest != nil {
+			requests[corev1.ResourceCPU] = resource.MustParse(*containerRec.CPU.RecommendedRequest)
+		}
+		if containerRec.Memory.RecommendedRequest != nil {
+			requests[corev1.ResourceMemory] = resource.MustParse(*containerRec.Memory.RecommendedRequest)
+		}
+
+		if containerRec.CPU.RecommendedLimit != nil {
+			limits[corev1.ResourceCPU] = resource.MustParse(*containerRec.CPU.RecommendedLimit)
+		}
+		if containerRec.Memory.RecommendedLimit != nil {
+			limits[corev1.ResourceMemory] = resource.MustParse(*containerRec.Memory.RecommendedLimit)
+		}
+
+		res := applycorev1.ResourceRequirements()
+		if len(requests) > 0 {
+			res.WithRequests(requests)
+		}
+		if len(limits) > 0 {
+			res.WithLimits(limits)
+		}
+
+		containerApply := applycorev1.Container().WithName(containerRec.ContainerName).WithResources(res)
+		containers = append(containers, containerApply)
 	}
-
-	// Update each container in the pod spec
-	for i := range podSpec.Containers {
-		container := &podSpec.Containers[i]
-		rec, exists := recMap[container.Name]
-		if !exists {
-			continue // Skip containers without recommendations
-		}
-
-		// Initialize resources if nil
-		if container.Resources.Requests == nil {
-			container.Resources.Requests = make(corev1.ResourceList)
-		}
-		if container.Resources.Limits == nil {
-			container.Resources.Limits = make(corev1.ResourceList)
-		}
-
-		// Apply CPU recommendations
-		if rec.CPU.RecommendedRequest != nil {
-			qty, err := resource.ParseQuantity(*rec.CPU.RecommendedRequest)
-			if err != nil {
-				return fmt.Errorf("failed to parse CPU request %s for container %s: %w", *rec.CPU.RecommendedRequest, container.Name, err)
-			}
-			container.Resources.Requests[corev1.ResourceCPU] = qty
-		}
-
-		if rec.CPU.RecommendedLimit != nil {
-			qty, err := resource.ParseQuantity(*rec.CPU.RecommendedLimit)
-			if err != nil {
-				return fmt.Errorf("failed to parse CPU limit %s for container %s: %w", *rec.CPU.RecommendedLimit, container.Name, err)
-			}
-			container.Resources.Limits[corev1.ResourceCPU] = qty
-		}
-
-		// Apply memory recommendations
-		if rec.Memory.RecommendedRequest != nil {
-			qty, err := resource.ParseQuantity(*rec.Memory.RecommendedRequest)
-			if err != nil {
-				return fmt.Errorf("failed to parse memory request %s for container %s: %w", *rec.Memory.RecommendedRequest, container.Name, err)
-			}
-			container.Resources.Requests[corev1.ResourceMemory] = qty
-		}
-
-		if rec.Memory.RecommendedLimit != nil {
-			qty, err := resource.ParseQuantity(*rec.Memory.RecommendedLimit)
-			if err != nil {
-				return fmt.Errorf("failed to parse memory limit %s for container %s: %w", *rec.Memory.RecommendedLimit, container.Name, err)
-			}
-			container.Resources.Limits[corev1.ResourceMemory] = qty
-		}
-	}
-
-	return nil
+	return applycorev1.PodSpec().WithContainers(containers...)
 }
