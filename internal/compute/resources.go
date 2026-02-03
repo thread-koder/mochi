@@ -126,7 +126,7 @@ func CalculateCPURequestRecommendation(
 	switch config.Mode {
 	case ModeGuaranteed:
 		// Guaranteed mode: use peak usage
-		baseMargin := config.RequestSafetyMargin * 1.1 // Higher base for guaranteed
+		baseMargin := config.RequestSafetyMargin * 1.1 // Higher base
 		safetyMargin := calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -256,8 +256,8 @@ func CalculateCPULimitRecommendation(
 			false, // Limits don't need burst detection
 		)
 	case ModeGuaranteed:
-		// Guaranteed mode: base margin
-		baseMargin := config.LimitSafetyMargin
+		// Guaranteed mode: higher base margin
+		baseMargin := config.LimitSafetyMargin * 1.1
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -392,7 +392,7 @@ func CalculateMemoryRequestRecommendation(
 		recommendedBytes = adjustedPercentile * safetyMargin * pressureFactor
 	default:
 		// Burstable mode: use adjusted percentile
-		baseMargin := config.RequestSafetyMargin * 1.1 // Higher base
+		baseMargin := config.RequestSafetyMargin // Standard base
 		safetyMargin := calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -511,8 +511,8 @@ func CalculateMemoryLimitRecommendation(
 			false, // Limits don't need burst detection
 		)
 	default:
-		// Burstable mode: higher base margin
-		baseMargin := config.LimitSafetyMargin * 1.1
+		// Burstable mode: standard base margin
+		baseMargin := config.LimitSafetyMargin
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
