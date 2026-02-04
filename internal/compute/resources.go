@@ -50,7 +50,7 @@ func DefaultRecommendationConfig() RecommendationConfig {
 		MinCPURequest:          0.01,             // 10m minimum
 		MinMemoryRequest:       64 * 1024 * 1024, // 64Mi minimum
 		MinConfidenceThreshold: 0.5,              // 50% minimum confidence
-		BurstThreshold:         2.0,              // Max > 2x percentile = burst workload
+		BurstThreshold:         1.8,              // Max > 1.8x percentile = burst workload
 	}
 }
 
@@ -710,20 +710,20 @@ func calculateDynamicSafetyMargin(
 // Calculates the maximum weight to use for weighted percentile calculation based on gap ratio
 func calculateMaxWeightForGap(gapRatio float64) float64 {
 	if gapRatio > 50.0 {
-		// Very extreme gap (>50x): use 70% of Max to prevent throttling
-		return 0.7
+		// Very extreme gap (>50x): use 80% of Max
+		return 0.8
 	} else if gapRatio > 20.0 {
-		// Extreme gap (20-50x): use 60% of Max to prevent throttling
-		return 0.6
+		// Extreme gap (20-50x): use 70% of Max
+		return 0.7
 	} else if gapRatio > 10.0 {
-		// Very large gap (10-20x): use 50% of Max
-		return 0.5
+		// Very large gap (10-20x): use 60% of Max
+		return 0.6
 	} else if gapRatio > 5.0 {
-		// Large gap (5-10x): use 40% of Max
-		return 0.4
+		// Large gap (5-10x): use 50% of Max
+		return 0.5
 	} else {
-		// Moderate gap (2-5x): use 30% of Max
-		return 0.3
+		// Moderate gap (2-5x): use 45% of Max
+		return 0.45
 	}
 }
 
