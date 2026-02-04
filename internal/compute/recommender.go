@@ -130,6 +130,28 @@ func GenerateContainerRecommendation(
 		memoryRequestRecValue, memoryLimitRecValue, specs.MemoryRequest, specs.MemoryLimit, config.Mode,
 	)
 
+	// Preserve current values for resources that don't have recommendations
+	hasCPURecommendation := cpuRequestRecValue != nil || cpuLimitRecValue != nil
+	hasMemoryRecommendation := memoryRequestRecValue != nil || memoryLimitRecValue != nil
+
+	if hasCPURecommendation && !hasMemoryRecommendation {
+		// Preserve current memory values
+		if specs.MemoryRequest != nil {
+			memoryRequestRecValue = specs.MemoryRequest
+		}
+		if specs.MemoryLimit != nil {
+			memoryLimitRecValue = specs.MemoryLimit
+		}
+	} else if hasMemoryRecommendation && !hasCPURecommendation {
+		// Preserve current CPU values
+		if specs.CPURequest != nil {
+			cpuRequestRecValue = specs.CPURequest
+		}
+		if specs.CPULimit != nil {
+			cpuLimitRecValue = specs.CPULimit
+		}
+	}
+
 	// Calculate overall confidence
 	overallConfidence := calculateOverallConfidence(
 		containerAnalysis.Provisioning.CPU,
