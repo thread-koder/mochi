@@ -565,26 +565,32 @@ func CalculateMemoryLimitRecommendation(
 
 // Calculates CPU throttling pressure factor using gradual scaling
 func calculateCPUThrottlingPressureFactor(throttling float64) float64 {
-	if throttling <= 0.01 {
-		// No significant throttling (< 1%)
+	if throttling <= 0 {
 		return 1.0
 	}
-	if throttling < 0.1 {
-		// Minor throttling (1% to 10%): scale smoothly from 1.0 to 1.5
-		return 1.0 + (throttling-0.01)/0.09*0.5
+	if throttling < 0.01 {
+		// Very small throttling (0-1%): very gentle scaling from 1.0 to 1.01
+		return 1.0 + throttling*1.0
 	}
-	// Severe throttling (>= 10%): scale from 1.5 to 2.0+ (capped at 2.5)
-	return 1.5 + math.Min(1.0, (throttling-0.1)*5.0)
+	if throttling < 0.1 {
+		// Minor throttling (1% to 10%): moderate scaling from 1.01 to 1.5
+		return 1.01 + (throttling-0.01)/0.09*0.49
+	}
+	// Severe throttling (>= 10%): aggressive scaling from 1.5 to 3.5
+	return 1.5 + math.Min(2.0, (throttling-0.1)*5.0)
 }
 
 // Calculates CPU pressure factor using gradual scaling
 func calculateCPUPressureFactor(pressure float64) float64 {
-	if pressure <= 0.2 {
-		// No significant pressure (< 20%)
+	if pressure <= 0 {
 		return 1.0
 	}
-	// Scale smoothly: 20% = 1.0x, 40% = 1.2x, 60%+ = 1.4x (capped)
-	return 1.0 + math.Min(0.4, (pressure-0.2)*2.0)
+	if pressure < 0.2 {
+		// Low pressure (0-20%): very gentle scaling from 1.0 to 1.02
+		return 1.0 + pressure*0.1
+	}
+	// Higher pressure (>= 20%): moderate scaling from 1.02 to 1.4
+	return 1.02 + math.Min(0.38, (pressure-0.2)*2.0)
 }
 
 // Calculates memory pressure factor using gradual scaling
@@ -593,17 +599,27 @@ func calculateMemoryPressureFactor(oom float64, failCnt float64, pressure float6
 
 	// OOM events scale based on count
 	if oom > 0 {
-		// Standard: 1 OOM = 1.35x, 2 OOM = 1.45x, 3 OOM = 1.55x, 4+ OOM = 1.6x (capped)
-		extraPerOOM := math.Max(0, (oom-1)*0.1)
-		pressureFactor = 1.35 + math.Min(0.25, extraPerOOM)
-	} else if failCnt > 0 || pressure > 0.1 {
-		// Allocation failures or high pressure
-		if pressure > 0.1 {
-			// Scale: 10% = 1.1x, 20% = 1.2x, 30%+ = 1.3x (capped)
-			pressureFactor = 1.1 + math.Min(0.2, (pressure-0.1)*2.0)
-		} else {
-			// Failures without high pressure: small boost
+		// Standard: 1 OOM = 1.5x, 2 OOM = 1.7x, 3 OOM = 1.9x, 4+ OOM = 2.1x
+		extraPerOOM := math.Max(0, (oom-1)*0.2)
+		pressureFactor = 1.5 + math.Min(0.6, extraPerOOM)
+	} else {
+		// No OOM: consider allocation failures
+		if failCnt > 0 {
+			// Allocation failures: small boost from 1.0 to 1.1
 			pressureFactor = 1.1
+		}
+
+		// Memory pressure
+		if pressure > 0 {
+			if pressure < 0.1 {
+				// Low pressure (0-10%): very gentle scaling from 1.0 to 1.01
+				pressureBoost := pressure * 0.1
+				pressureFactor = math.Max(pressureFactor, 1.0+pressureBoost)
+			} else {
+				// Higher pressure (>= 10%): moderate scaling from 1.01 to 1.21
+				pressureBoost := 1.01 + math.Min(0.2, (pressure-0.1)*2.0)
+				pressureFactor = math.Max(pressureFactor, pressureBoost)
+			}
 		}
 	}
 
