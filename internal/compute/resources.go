@@ -31,6 +31,12 @@ type RecommendationConfig struct {
 	RequestSafetyMargin float64
 	// Safety margin multiplier for limits based on peak (default: 1.3 = 30% headroom)
 	LimitSafetyMargin float64
+	// Base margin for cost-optimized mode requests (default: 1.15 = 15% headroom)
+	CostOptimizedRequestMargin float64
+	// Base margin for cost-optimized mode limits (default: 1.2 = 20% headroom)
+	CostOptimizedLimitMargin float64
+	// Multiplier for guaranteed mode margins (default: 1.1)
+	GuaranteedMarginMultiplier float64
 	// Minimum CPU request in cores (default: 0.01 = 10m)
 	MinCPURequest float64
 	// Minimum memory request in bytes (default: 64Mi)
@@ -44,13 +50,16 @@ type RecommendationConfig struct {
 // Returns default recommendation configuration
 func DefaultRecommendationConfig() RecommendationConfig {
 	return RecommendationConfig{
-		Mode:                   ModeBurstable,    // Default: optimize for efficiency
-		RequestSafetyMargin:    1.2,              // 20% headroom
-		LimitSafetyMargin:      1.3,              // 30% headroom
-		MinCPURequest:          0.01,             // 10m minimum
-		MinMemoryRequest:       64 * 1024 * 1024, // 64Mi minimum
-		MinConfidenceThreshold: 0.5,              // 50% minimum confidence
-		BurstThreshold:         1.8,              // Max > 1.8x percentile = burst workload
+		Mode:                       ModeBurstable,    // Default: optimize for efficiency
+		RequestSafetyMargin:        1.2,              // 20% headroom
+		LimitSafetyMargin:          1.3,              // 30% headroom
+		CostOptimizedRequestMargin: 1.15,             // 15% headroom for cost-optimized requests
+		CostOptimizedLimitMargin:   1.2,              // 20% headroom for cost-optimized limits
+		GuaranteedMarginMultiplier: 1.1,              // 1.1x multiplier for guaranteed mode margins
+		MinCPURequest:              0.01,             // 10m minimum
+		MinMemoryRequest:           64 * 1024 * 1024, // 64Mi minimum
+		MinConfidenceThreshold:     0.5,              // 50% minimum confidence
+		BurstThreshold:             1.8,              // Max > 1.8x percentile = burst workload
 	}
 }
 
@@ -64,6 +73,15 @@ func (config RecommendationConfig) Validate() error {
 	}
 	if config.LimitSafetyMargin <= 0 {
 		return fmt.Errorf("LimitSafetyMargin must be positive, got: %v", config.LimitSafetyMargin)
+	}
+	if config.CostOptimizedRequestMargin <= 0 {
+		return fmt.Errorf("CostOptimizedRequestMargin must be positive, got: %v", config.CostOptimizedRequestMargin)
+	}
+	if config.CostOptimizedLimitMargin <= 0 {
+		return fmt.Errorf("CostOptimizedLimitMargin must be positive, got: %v", config.CostOptimizedLimitMargin)
+	}
+	if config.GuaranteedMarginMultiplier <= 0 {
+		return fmt.Errorf("GuaranteedMarginMultiplier must be positive, got: %v", config.GuaranteedMarginMultiplier)
 	}
 	if config.MinCPURequest < 0 {
 		return fmt.Errorf("MinCPURequest must be non-negative, got: %v", config.MinCPURequest)
@@ -124,20 +142,9 @@ func CalculateCPURequestRecommendation(
 	// Calculate recommended request based on mode
 	var recommendedCores float64
 	switch config.Mode {
-	case ModeGuaranteed:
-		// Guaranteed mode: use peak usage
-		baseMargin := config.RequestSafetyMargin * 1.1 // Higher base
-		safetyMargin := calculateDynamicSafetyMargin(
-			baseMargin,
-			utilization.Trend,
-			cv,
-			utilization.Anomalies.AnomalyCount,
-			isBursty,
-		)
-		recommendedCores = peakUsage * safetyMargin * pressureFactor
 	case ModeCostOptimized:
 		// Cost-optimized mode: use adjusted percentile
-		baseMargin := 1.1 // Minimal base
+		baseMargin := config.CostOptimizedRequestMargin
 		safetyMargin := calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -146,6 +153,17 @@ func CalculateCPURequestRecommendation(
 			isBursty,
 		)
 		recommendedCores = adjustedPercentile * safetyMargin * pressureFactor
+	case ModeGuaranteed:
+		// Guaranteed mode: use peak usage
+		baseMargin := config.RequestSafetyMargin * config.GuaranteedMarginMultiplier
+		safetyMargin := calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			isBursty,
+		)
+		recommendedCores = peakUsage * safetyMargin * pressureFactor
 	default:
 		// Burstable mode: use adjusted percentile
 		baseMargin := config.RequestSafetyMargin // Standard base
@@ -162,7 +180,7 @@ func CalculateCPURequestRecommendation(
 	// Validation: ensure recommended accounts for actual usage patterns
 	// Only use Mean if it's higher than the recommendation
 	if utilization.Stats.Mean > 0 && recommendedCores < utilization.Stats.Mean {
-		meanBased := utilization.Stats.Mean * 1.1
+		meanBased := utilization.Stats.Mean * 1.15
 		if meanBased > recommendedCores {
 			recommendedCores = meanBased
 		}
@@ -230,24 +248,17 @@ func CalculateCPULimitRecommendation(
 		cv = utilization.Stats.StdDev / utilization.Stats.Mean
 	}
 
-	// Calculate CPU throttling pressure factor
-	// For limits use a lower threshold (5%)
-	pressureFactor := 1.0
-	if stability.CPUThrottling > 0.05 {
-		// Scale smoothly: 5% = 1.1x, 10% = 1.3x, 15%+ = 1.5x (capped)
-		if stability.CPUThrottling < 0.1 {
-			pressureFactor = 1.0 + (stability.CPUThrottling-0.05)/0.05*0.3
-		} else {
-			pressureFactor = 1.3 + math.Min(0.2, (stability.CPUThrottling-0.1)*2.0)
-		}
-	}
+	// Calculate pressure factors
+	cpuThrottlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
+	cpuPressureFactor := calculateCPUPressureFactor(stability.CPUPressure)
+	pressureFactor := cpuThrottlingFactor * cpuPressureFactor
 
 	// Calculate safety margin based on mode
 	var safetyMargin float64
 	switch config.Mode {
 	case ModeCostOptimized:
 		// Cost-optimized mode: minimal base margin
-		baseMargin := 1.1
+		baseMargin := config.CostOptimizedLimitMargin
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -257,7 +268,7 @@ func CalculateCPULimitRecommendation(
 		)
 	case ModeGuaranteed:
 		// Guaranteed mode: higher base margin
-		baseMargin := config.LimitSafetyMargin * 1.1
+		baseMargin := config.LimitSafetyMargin * config.GuaranteedMarginMultiplier
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -368,20 +379,9 @@ func CalculateMemoryRequestRecommendation(
 	// Calculate recommended request based on mode
 	var recommendedBytes float64
 	switch config.Mode {
-	case ModeGuaranteed:
-		// Guaranteed mode: use peak usage
-		baseMargin := config.RequestSafetyMargin * 1.1 // Higher base
-		safetyMargin := calculateDynamicSafetyMargin(
-			baseMargin,
-			utilization.Trend,
-			cv,
-			utilization.Anomalies.AnomalyCount,
-			isBursty,
-		)
-		recommendedBytes = peakUsage * safetyMargin * pressureFactor
 	case ModeCostOptimized:
 		// Cost-optimized mode: use adjusted percentile
-		baseMargin := 1.1 // Minimal base
+		baseMargin := config.CostOptimizedRequestMargin
 		safetyMargin := calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -390,6 +390,17 @@ func CalculateMemoryRequestRecommendation(
 			isBursty,
 		)
 		recommendedBytes = adjustedPercentile * safetyMargin * pressureFactor
+	case ModeGuaranteed:
+		// Guaranteed mode: use peak usage
+		baseMargin := config.RequestSafetyMargin * config.GuaranteedMarginMultiplier
+		safetyMargin := calculateDynamicSafetyMargin(
+			baseMargin,
+			utilization.Trend,
+			cv,
+			utilization.Anomalies.AnomalyCount,
+			isBursty,
+		)
+		recommendedBytes = peakUsage * safetyMargin * pressureFactor
 	default:
 		// Burstable mode: use adjusted percentile
 		baseMargin := config.RequestSafetyMargin // Standard base
@@ -406,7 +417,7 @@ func CalculateMemoryRequestRecommendation(
 	// Validate: ensure recommended accounts for actual usage patterns
 	// Only use Mean if it's higher than the recommendation
 	if utilization.Stats.Mean > 0 && recommendedBytes < utilization.Stats.Mean {
-		meanBased := utilization.Stats.Mean * 1.1
+		meanBased := utilization.Stats.Mean * 1.15
 		if meanBased > recommendedBytes {
 			recommendedBytes = meanBased
 		}
@@ -480,19 +491,13 @@ func CalculateMemoryLimitRecommendation(
 		stability.MemoryFailCnt,
 		stability.MemoryPressure,
 	)
-	// For limits apply additional scaling if pressure is high
-	if stability.MemoryPressure > 0.05 {
-		// Scale: 5% = 1.0x, 10% = 1.1x, 20%+ = 1.2x (capped)
-		pressureBoost := 1.0 + math.Min(0.2, (stability.MemoryPressure-0.05)*2.0)
-		pressureFactor = math.Max(pressureFactor, pressureBoost)
-	}
 
 	// Calculate safety margin based on mode
 	var safetyMargin float64
 	switch config.Mode {
 	case ModeCostOptimized:
 		// Cost-optimized mode: minimal base margin
-		baseMargin := 1.1
+		baseMargin := config.CostOptimizedLimitMargin
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -502,7 +507,7 @@ func CalculateMemoryLimitRecommendation(
 		)
 	case ModeGuaranteed:
 		// Guaranteed mode: higher base margin
-		baseMargin := config.LimitSafetyMargin * 1.1
+		baseMargin := config.LimitSafetyMargin * config.GuaranteedMarginMultiplier
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -573,11 +578,11 @@ func calculateCPUThrottlingPressureFactor(throttling float64) float64 {
 		return 1.0 + throttling*1.0
 	}
 	if throttling < 0.1 {
-		// Minor throttling (1% to 10%): moderate scaling from 1.01 to 1.5
-		return 1.01 + (throttling-0.01)/0.09*0.49
+		// Minor throttling (1% to 10%): moderate scaling from 1.01 to 1.6
+		return 1.01 + (throttling-0.01)/0.09*0.59
 	}
-	// Severe throttling (>= 10%): aggressive scaling from 1.5 to 3.5
-	return 1.5 + math.Min(2.0, (throttling-0.1)*5.0)
+	// Severe throttling (>= 10%): aggressive scaling from 1.6, scales linearly to 100% (6.1x at 100%)
+	return 1.6 + (throttling-0.1)*5.0
 }
 
 // Calculates CPU pressure factor using gradual scaling
@@ -586,11 +591,11 @@ func calculateCPUPressureFactor(pressure float64) float64 {
 		return 1.0
 	}
 	if pressure < 0.2 {
-		// Low pressure (0-20%): very gentle scaling from 1.0 to 1.02
-		return 1.0 + pressure*0.1
+		// Low pressure (0-20%): gentle scaling from 1.0 to 1.05
+		return 1.0 + pressure*0.25
 	}
-	// Higher pressure (>= 20%): moderate scaling from 1.02 to 1.4
-	return 1.02 + math.Min(0.38, (pressure-0.2)*2.0)
+	// Higher pressure (>= 20%): moderate scaling from 1.05, scales linearly to 100% (3.05x at 100%)
+	return 1.05 + (pressure-0.2)*2.5
 }
 
 // Calculates memory pressure factor using gradual scaling
@@ -599,25 +604,25 @@ func calculateMemoryPressureFactor(oom float64, failCnt float64, pressure float6
 
 	// OOM events scale based on count
 	if oom > 0 {
-		// Standard: 1 OOM = 1.5x, 2 OOM = 1.7x, 3 OOM = 1.9x, 4+ OOM = 2.1x
-		extraPerOOM := math.Max(0, (oom-1)*0.2)
-		pressureFactor = 1.5 + math.Min(0.6, extraPerOOM)
+		// Standard: 1 OOM = 2.0x, 2 OOM = 2.5x, 3 OOM = 3.0x, 4+ OOM = 3.5x
+		extraPerOOM := math.Max(0, (oom-1)*0.5)
+		pressureFactor = 2.0 + math.Min(1.5, extraPerOOM)
 	} else {
 		// No OOM: consider allocation failures
 		if failCnt > 0 {
-			// Allocation failures: small boost from 1.0 to 1.1
-			pressureFactor = 1.1
+			// Allocation failures: moderate boost from 1.0 to 1.25
+			pressureFactor = 1.25
 		}
 
 		// Memory pressure
 		if pressure > 0 {
 			if pressure < 0.1 {
-				// Low pressure (0-10%): very gentle scaling from 1.0 to 1.01
-				pressureBoost := pressure * 0.1
+				// Low pressure (0-10%): gentle scaling from 1.0 to 1.05
+				pressureBoost := pressure * 0.5
 				pressureFactor = math.Max(pressureFactor, 1.0+pressureBoost)
 			} else {
-				// Higher pressure (>= 10%): moderate scaling from 1.01 to 1.21
-				pressureBoost := 1.01 + math.Min(0.2, (pressure-0.1)*2.0)
+				// Higher pressure (>= 10%): moderate scaling from 1.05, scales linearly to 100% (3.075x at 100%)
+				pressureBoost := 1.05 + (pressure-0.1)*2.25
 				pressureFactor = math.Max(pressureFactor, pressureBoost)
 			}
 		}
@@ -695,7 +700,7 @@ func calculateDynamicSafetyMargin(
 	}
 
 	// Adjust safety margin based on anomalies
-	if anomalyCount > 10 {
+	if anomalyCount > 8 {
 		safetyMargin *= 1.1
 	}
 
