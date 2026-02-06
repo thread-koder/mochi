@@ -18,21 +18,34 @@ func BuildPodMemoryQuery(namespace, pod, container string) string {
 }
 
 // Builds a PromQL query for pod CPU throttling (CFS)
-func BuildPodCPUThrottlingQuery(namespace, pod, container string, rangeDuration string) string {
+func BuildPodCPUThrottlingQuery(namespace, pod, container string, rangeDuration string, timeRange string, step string) string {
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
-	throttledQuery := BuildContainerMetricQuery("container_cpu_cfs_throttled_periods_total", namespace, pod, container, rangeDuration)
-	totalQuery := BuildContainerMetricQuery("container_cpu_cfs_periods_total", namespace, pod, container, rangeDuration)
-	return fmt.Sprintf("clamp_min(rate(%s) / clamp_min(rate(%s), 0.0001), 0)", throttledQuery, totalQuery)
+	if step == "" {
+		step = "5m"
+	}
+
+	throttledMetric := BuildContainerMetricQuery("container_cpu_cfs_throttled_periods_total", namespace, pod, container, "")
+	totalMetric := BuildContainerMetricQuery("container_cpu_cfs_periods_total", namespace, pod, container, "")
+	throttledRate := fmt.Sprintf("rate(%s[%s])", throttledMetric, rangeDuration)
+	totalRate := fmt.Sprintf("rate(%s[%s])", totalMetric, rangeDuration)
+	ratioQuery := fmt.Sprintf("clamp_min(%s / clamp_min(%s, 0.0001), 0)", throttledRate, totalRate)
+	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", ratioQuery, timeRange, step)
 }
 
 // Builds a PromQL query for pod CPU pressure (stalled)
-func BuildPodCPUPressureQuery(namespace, pod, container string, rangeDuration string) string {
+func BuildPodCPUPressureQuery(namespace, pod, container string, rangeDuration string, timeRange string, step string) string {
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
-	return fmt.Sprintf("rate(%s)", BuildContainerMetricQuery("container_pressure_cpu_stalled_seconds_total", namespace, pod, container, rangeDuration))
+	if step == "" {
+		step = "5m"
+	}
+
+	baseMetric := BuildContainerMetricQuery("container_pressure_cpu_stalled_seconds_total", namespace, pod, container, "")
+	rateQuery := fmt.Sprintf("rate(%s[%s])", baseMetric, rangeDuration)
+	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step)
 }
 
 // Builds a PromQL query for pod memory fail count
@@ -46,11 +59,17 @@ func BuildPodMemoryOOMQuery(namespace, pod, container string, rangeDuration stri
 }
 
 // Builds a PromQL query for pod memory pressure (stalled)
-func BuildPodMemoryPressureQuery(namespace, pod, container string, rangeDuration string) string {
+func BuildPodMemoryPressureQuery(namespace, pod, container string, rangeDuration string, timeRange string, step string) string {
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
-	return fmt.Sprintf("rate(%s)", BuildContainerMetricQuery("container_pressure_memory_stalled_seconds_total", namespace, pod, container, rangeDuration))
+	if step == "" {
+		step = "5m"
+	}
+
+	baseMetric := BuildContainerMetricQuery("container_pressure_memory_stalled_seconds_total", namespace, pod, container, "")
+	rateQuery := fmt.Sprintf("rate(%s[%s])", baseMetric, rangeDuration)
+	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step)
 }
 
 // Builds a PromQL query for container restarts

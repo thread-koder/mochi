@@ -31,27 +31,24 @@ func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
 		StabilityScore: 1.0, // Start at optimal then penalize
 	}
 
-	// 1. Calculate raw metrics
+	// 1. Extract values
 	if len(metrics.CPUThrottling) > 0 {
-		result.CPUThrottling = CalculateMean(ExtractValues(metrics.CPUThrottling))
+		result.CPUThrottling = metrics.CPUThrottling[0].Value
 	}
 	if len(metrics.CPUPressure) > 0 {
-		result.CPUPressure = CalculateMean(ExtractValues(metrics.CPUPressure))
+		result.CPUPressure = metrics.CPUPressure[0].Value
 	}
 	if len(metrics.MemoryFailCnt) > 0 {
-		values := ExtractValues(metrics.MemoryFailCnt)
-		result.MemoryFailCnt = values[len(values)-1]
+		result.MemoryFailCnt = metrics.MemoryFailCnt[0].Value
 	}
 	if len(metrics.MemoryOOM) > 0 {
-		values := ExtractValues(metrics.MemoryOOM)
-		result.MemoryOOM = values[len(values)-1]
+		result.MemoryOOM = metrics.MemoryOOM[0].Value
 	}
 	if len(metrics.MemoryPressure) > 0 {
-		result.MemoryPressure = CalculateMean(ExtractValues(metrics.MemoryPressure))
+		result.MemoryPressure = metrics.MemoryPressure[0].Value
 	}
 	if len(metrics.Restarts) > 0 {
-		values := ExtractValues(metrics.Restarts)
-		result.Restarts = values[len(values)-1]
+		result.Restarts = metrics.Restarts[0].Value
 	}
 
 	// 2. Calculate Stability Score (0-1)
