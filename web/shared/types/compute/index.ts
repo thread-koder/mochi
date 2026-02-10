@@ -79,6 +79,8 @@ interface UtilizationResult {
 interface CPUProvisioning {
   request_utilization: number
   limit_utilization: number
+  current_request?: number | null
+  current_limit?: number | null
   is_over_provisioned: boolean
   is_under_provisioned: boolean
   efficiency: number
@@ -88,6 +90,8 @@ interface CPUProvisioning {
 interface MemoryProvisioning {
   request_utilization: number
   limit_utilization: number
+  current_request?: number | null
+  current_limit?: number | null
   is_over_provisioned: boolean
   is_under_provisioned: boolean
   efficiency: number

@@ -240,11 +240,25 @@
                             />
                           </div>
                         </div>
+                        <!-- Current Request -->
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs text-on-surface-secondary">Current Request</span>
+                          <span class="text-xs font-medium text-on-surface">
+                            {{ formatCPU(container.provisioning.cpu.current_request ?? undefined) }}
+                          </span>
+                        </div>
                         <!-- Request Utilization -->
                         <div class="flex items-center justify-between">
                           <span class="text-xs text-on-surface-secondary">Request Utilization</span>
                           <span class="text-xs font-medium text-on-surface">
                             {{ formatPercentage(container.provisioning.cpu.request_utilization) }}
+                          </span>
+                        </div>
+                        <!-- Current Limit -->
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs text-on-surface-secondary">Current Limit</span>
+                          <span class="text-xs font-medium text-on-surface">
+                            {{ formatCPU(container.provisioning.cpu.current_limit ?? undefined) }}
                           </span>
                         </div>
                         <!-- Limit Utilization -->
@@ -291,11 +305,25 @@
                             />
                           </div>
                         </div>
+                        <!-- Current Request -->
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs text-on-surface-secondary">Current Request</span>
+                          <span class="text-xs font-medium text-on-surface">
+                            {{ formatBytes(container.provisioning.memory.current_request ?? undefined) }}
+                          </span>
+                        </div>
                         <!-- Request Utilization -->
                         <div class="flex items-center justify-between">
                           <span class="text-xs text-on-surface-secondary">Request Utilization</span>
                           <span class="text-xs font-medium text-on-surface">
                             {{ formatPercentage(container.provisioning.memory.request_utilization) }}
+                          </span>
+                        </div>
+                        <!-- Current Limit -->
+                        <div class="flex items-center justify-between">
+                          <span class="text-xs text-on-surface-secondary">Current Limit</span>
+                          <span class="text-xs font-medium text-on-surface">
+                            {{ formatBytes(container.provisioning.memory.current_limit ?? undefined) }}
                           </span>
                         </div>
                         <!-- Limit Utilization -->
