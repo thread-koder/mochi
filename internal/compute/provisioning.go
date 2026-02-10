@@ -15,22 +15,26 @@ type ResourceSpecs struct {
 
 // Represents CPU provisioning analysis results
 type CPUProvisioning struct {
-	RequestUtilization float64 `json:"request_utilization"` // usage / request (0-1+)
-	LimitUtilization   float64 `json:"limit_utilization"`   // usage / limit (0-1+)
-	IsOverProvisioned  bool    `json:"is_over_provisioned"`
-	IsUnderProvisioned bool    `json:"is_under_provisioned"`
-	Efficiency         float64 `json:"efficiency"` // 0-1 score (higher is better)
-	Confidence         float64 `json:"confidence"` // 0-1 score based on data quality
+	RequestUtilization float64  `json:"request_utilization"` // usage / request (0-1+)
+	LimitUtilization   float64  `json:"limit_utilization"`   // usage / limit (0-1+)
+	CurrentRequest     *float64 `json:"current_request,omitempty"`
+	CurrentLimit       *float64 `json:"current_limit,omitempty"`
+	IsOverProvisioned  bool     `json:"is_over_provisioned"`
+	IsUnderProvisioned bool     `json:"is_under_provisioned"`
+	Efficiency         float64  `json:"efficiency"` // 0-1 score (higher is better)
+	Confidence         float64  `json:"confidence"` // 0-1 score based on data quality
 }
 
 // Represents memory provisioning analysis results
 type MemoryProvisioning struct {
-	RequestUtilization float64 `json:"request_utilization"` // usage / request (0-1+)
-	LimitUtilization   float64 `json:"limit_utilization"`   // usage / limit (0-1+)
-	IsOverProvisioned  bool    `json:"is_over_provisioned"`
-	IsUnderProvisioned bool    `json:"is_under_provisioned"`
-	Efficiency         float64 `json:"efficiency"` // 0-1 score (higher is better)
-	Confidence         float64 `json:"confidence"` // 0-1 score based on data quality
+	RequestUtilization float64  `json:"request_utilization"` // usage / request (0-1+)
+	LimitUtilization   float64  `json:"limit_utilization"`   // usage / limit (0-1+)
+	CurrentRequest     *float64 `json:"current_request,omitempty"`
+	CurrentLimit       *float64 `json:"current_limit,omitempty"`
+	IsOverProvisioned  bool     `json:"is_over_provisioned"`
+	IsUnderProvisioned bool     `json:"is_under_provisioned"`
+	Efficiency         float64  `json:"efficiency"` // 0-1 score (higher is better)
+	Confidence         float64  `json:"confidence"` // 0-1 score based on data quality
 }
 
 // Represents overall provisioning analysis results
@@ -80,6 +84,9 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization) (CP
 
 	hasRequest := specs.CPURequest != nil && *specs.CPURequest > 0
 	hasLimit := specs.CPULimit != nil && *specs.CPULimit > 0
+
+	result.CurrentRequest = specs.CPURequest
+	result.CurrentLimit = specs.CPULimit
 
 	// Handle missing resources
 	if !hasRequest {
@@ -175,6 +182,9 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 
 	hasRequest := specs.MemoryRequest != nil && *specs.MemoryRequest > 0
 	hasLimit := specs.MemoryLimit != nil && *specs.MemoryLimit > 0
+
+	result.CurrentRequest = specs.MemoryRequest
+	result.CurrentLimit = specs.MemoryLimit
 
 	// Handle missing resources
 	if !hasRequest {
