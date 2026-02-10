@@ -37,15 +37,18 @@ func Init(level string, format string) {
 		Logger = zerolog.New(output).
 			With().
 			Timestamp().
-			Caller().
 			Logger()
 	} else {
 		// JSON output formatter
 		Logger = zerolog.New(os.Stderr).
 			With().
 			Timestamp().
-			Caller().
 			Logger()
+	}
+
+	// Add caller if debug level
+	if level == "debug" {
+		Logger = Logger.With().Caller().Logger()
 	}
 
 	// Set as global logger
