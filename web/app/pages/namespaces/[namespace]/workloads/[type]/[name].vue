@@ -32,7 +32,7 @@
           <h1 class="text-4xl font-bold font-heading mb-2">
             {{ data?.name }}
           </h1>
-          <div class="flex items-center space-x-3 flex-wrap gap-2">
+          <div class="flex items-center space-x-2 flex-wrap">
             <span class="px-3 py-1 rounded-full text-xs bg-primary/20 text-primary-light border border-primary/30">
               {{ data?.type }}
             </span>
