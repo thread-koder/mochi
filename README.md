@@ -3,7 +3,7 @@
 > ⚠️ **Early Development**: Mochi is currently in active development. First release (v0.1.0) expected soon. Not production-ready yet.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://go.dev/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.34+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 
 **Next-generation Kubernetes resource optimization platform** that combines monitoring, optimization, cost analysis, and autoscaling into a single, unified tool. Mochi goes beyond simple requests and limits, offering multi-dimensional optimization across compute, network, storage, and security.
