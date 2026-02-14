@@ -210,19 +210,19 @@ func GetRecommendations(c *gin.Context) {
 	// Prepare filter pointers
 	var namespacePtr, statusPtr, modePtr, workloadTypePtr, workloadNamePtr *string
 	if namespace != "" {
-		namespacePtr = &namespace
+		namespacePtr = new(namespace)
 	}
 	if status != "" {
-		statusPtr = &status
+		statusPtr = new(status)
 	}
 	if mode != "" {
-		modePtr = &mode
+		modePtr = new(mode)
 	}
 	if workloadType != "" {
-		workloadTypePtr = &workloadType
+		workloadTypePtr = new(workloadType)
 	}
 	if workloadName != "" {
-		workloadNamePtr = &workloadName
+		workloadNamePtr = new(workloadName)
 	}
 
 	// Get recommendations

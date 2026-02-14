@@ -824,8 +824,7 @@ func ParseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
 		if err != nil {
 			return ResourceSpecs{}, fmt.Errorf("failed to parse CPU request: %w", err)
 		}
-		cpuCores := qty.AsFloat64Slow()
-		specs.CPURequest = &cpuCores
+		specs.CPURequest = new(qty.AsFloat64Slow())
 	}
 
 	// Parse CPU limit
@@ -834,8 +833,7 @@ func ParseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
 		if err != nil {
 			return ResourceSpecs{}, fmt.Errorf("failed to parse CPU limit: %w", err)
 		}
-		cpuCores := qty.AsFloat64Slow()
-		specs.CPULimit = &cpuCores
+		specs.CPULimit = new(qty.AsFloat64Slow())
 	}
 
 	// Parse memory request
@@ -844,8 +842,7 @@ func ParseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
 		if err != nil {
 			return ResourceSpecs{}, fmt.Errorf("failed to parse memory request: %w", err)
 		}
-		memoryBytes := float64(qty.Value())
-		specs.MemoryRequest = &memoryBytes
+		specs.MemoryRequest = new(float64(qty.Value()))
 	}
 
 	// Parse memory limit
@@ -854,8 +851,7 @@ func ParseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
 		if err != nil {
 			return ResourceSpecs{}, fmt.Errorf("failed to parse memory limit: %w", err)
 		}
-		memoryBytes := float64(qty.Value())
-		specs.MemoryLimit = &memoryBytes
+		specs.MemoryLimit = new(float64(qty.Value()))
 	}
 
 	return specs, nil

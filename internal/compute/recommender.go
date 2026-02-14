@@ -173,20 +173,16 @@ func GenerateContainerRecommendation(
 	// Format recommendations to Kubernetes resource quantity strings
 	var cpuRequestRec, cpuLimitRec, memoryRequestRec, memoryLimitRec *string
 	if cpuRequestRecValue != nil {
-		formatted := formatCPUQuantity(*cpuRequestRecValue)
-		cpuRequestRec = &formatted
+		cpuRequestRec = new(formatCPUQuantity(*cpuRequestRecValue))
 	}
 	if cpuLimitRecValue != nil {
-		formatted := formatCPUQuantity(*cpuLimitRecValue)
-		cpuLimitRec = &formatted
+		cpuLimitRec = new(formatCPUQuantity(*cpuLimitRecValue))
 	}
 	if memoryRequestRecValue != nil {
-		formatted := formatMemoryQuantity(int64(*memoryRequestRecValue))
-		memoryRequestRec = &formatted
+		memoryRequestRec = new(formatMemoryQuantity(int64(*memoryRequestRecValue)))
 	}
 	if memoryLimitRecValue != nil {
-		formatted := formatMemoryQuantity(int64(*memoryLimitRecValue))
-		memoryLimitRec = &formatted
+		memoryLimitRec = new(formatMemoryQuantity(int64(*memoryLimitRecValue)))
 	}
 
 	// Build recommendation response
@@ -390,15 +386,12 @@ func calculateChangePercent(current, recommended *float64) *float64 {
 
 	if current == nil || *current == 0 {
 		// New resource or zero current, return 100.0%
-		val := 100.0
-		return &val
+		return new(100.0)
 	}
 
 	// Calculate percentage
 	changePercent := ((*recommended - *current) / *current) * 100.0
 
 	// Round to 1 decimal place
-	rounded := math.Round(changePercent*10) / 10
-
-	return &rounded
+	return new(math.Round(changePercent*10) / 10)
 }

@@ -105,11 +105,9 @@ func SyncNodes(ctx context.Context) error {
 		for _, addr := range node.Status.Addresses {
 			switch addr.Type {
 			case corev1.NodeInternalIP:
-				ip := addr.Address
-				internalIP = &ip
+				internalIP = new(addr.Address)
 			case corev1.NodeExternalIP:
-				ip := addr.Address
-				externalIP = &ip
+				externalIP = new(addr.Address)
 			}
 		}
 
@@ -303,10 +301,8 @@ func SyncReplicaSets(ctx context.Context, namespace string) error {
 		// Extract owner information (Deployment)
 		var ownerKind, ownerName *string
 		for _, owner := range rs.OwnerReferences {
-			kind := owner.Kind
-			name := owner.Name
-			ownerKind = &kind
-			ownerName = &name
+			ownerKind = new(owner.Kind)
+			ownerName = new(owner.Name)
 			break // Take first owner (Deployment)
 		}
 
@@ -476,7 +472,7 @@ func SyncServices(ctx context.Context, namespace string) error {
 		clusterIP := svc.Spec.ClusterIP
 		var clusterIPPtr *string
 		if clusterIP != "" {
-			clusterIPPtr = &clusterIP
+			clusterIPPtr = new(clusterIP)
 		}
 
 		dbService := &database.Service{
@@ -597,18 +593,15 @@ func SyncPods(ctx context.Context, namespace string) error {
 		// Extract owner information
 		var ownerKind, ownerName *string
 		for _, owner := range pod.OwnerReferences {
-			kind := owner.Kind
-			name := owner.Name
-			ownerKind = &kind
-			ownerName = &name
+			ownerKind = new(owner.Kind)
+			ownerName = new(owner.Name)
 			break // Take first owner
 		}
 
 		restartPolicy := string(pod.Spec.RestartPolicy)
 		var node *string
 		if pod.Spec.NodeName != "" {
-			n := pod.Spec.NodeName
-			node = &n
+			node = new(pod.Spec.NodeName)
 		}
 
 		dbPod := &database.Pod{
@@ -671,29 +664,24 @@ func SyncContainers(ctx context.Context, namespace string) error {
 			// Extract resource requests and limits
 			if container.Resources.Requests != nil {
 				if cpu := container.Resources.Requests[corev1.ResourceCPU]; !cpu.IsZero() {
-					cpuStr := cpu.String()
-					cpuRequest = &cpuStr
+					cpuRequest = new(cpu.String())
 				}
 				if mem := container.Resources.Requests[corev1.ResourceMemory]; !mem.IsZero() {
-					memStr := mem.String()
-					memoryRequest = &memStr
+					memoryRequest = new(mem.String())
 				}
 			}
 			if container.Resources.Limits != nil {
 				if cpu := container.Resources.Limits[corev1.ResourceCPU]; !cpu.IsZero() {
-					cpuStr := cpu.String()
-					cpuLimit = &cpuStr
+					cpuLimit = new(cpu.String())
 				}
 				if mem := container.Resources.Limits[corev1.ResourceMemory]; !mem.IsZero() {
-					memStr := mem.String()
-					memoryLimit = &memStr
+					memoryLimit = new(mem.String())
 				}
 			}
 
 			// Extract image pull policy
 			if container.ImagePullPolicy != "" {
-				policy := string(container.ImagePullPolicy)
-				imagePullPolicy = &policy
+				imagePullPolicy = new(string(container.ImagePullPolicy))
 			}
 
 			// Extract container ports
