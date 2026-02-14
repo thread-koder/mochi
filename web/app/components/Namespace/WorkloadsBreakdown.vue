@@ -8,57 +8,25 @@
         Workloads by Usage
       </h2>
       <div class="flex items-center gap-2">
-        <select
+        <UiSearchableSelect
           v-model="sortMetric"
-          class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-1
-            text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50"
-        >
-          <option value="current">
-            Current
-          </option>
-          <option value="p95">
-            P95
-          </option>
-          <option value="mean">
-            Mean
-          </option>
-          <option value="max">
-            Max
-          </option>
-        </select>
-        <select
+          :options="metricOptions"
+          :searchable="false"
+          placeholder="Metric"
+        />
+        <UiSearchableSelect
           v-model="sortResource"
-          class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-1
-            text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50"
-        >
-          <option value="cpu">
-            CPU
-          </option>
-          <option value="memory">
-            Memory
-          </option>
-        </select>
-        <select
+          :options="resourceOptions"
+          :searchable="false"
+          placeholder="Resource"
+        />
+        <UiSearchableSelect
           v-model="filterType"
-          class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-1
-            text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50"
-        >
-          <option value="all">
-            All Types
-          </option>
-          <option value="deployment">
-            Deployment
-          </option>
-          <option value="statefulset">
-            StatefulSet
-          </option>
-          <option value="daemonset">
-            DaemonSet
-          </option>
-          <option value="pod">
-            Pod
-          </option>
-        </select>
+          :options="workloadTypeOptions"
+          :searchable="false"
+          placeholder="All Types"
+          null-option="All Types"
+        />
       </div>
     </div>
     <div class="overflow-x-auto">
@@ -96,7 +64,7 @@
             >
               <div class="text-on-surface-secondary text-center font-medium">
                 <span>No workloads found</span>
-                <span v-if="filterType !== 'all'">
+                <span v-if="filterType">
                   <span> for type: </span>
                   <span class="text-primary-light capitalize">{{ filterType }}</span>
                 </span>
@@ -216,9 +184,28 @@ const props = defineProps<{
   namespace: string
 }>()
 
-const sortMetric = ref<'current' | 'p95' | 'mean' | 'max'>('p95')
-const sortResource = ref<'cpu' | 'memory'>('cpu')
-const filterType = ref<'all' | 'deployment' | 'statefulset' | 'daemonset' | 'pod'>('all')
+const sortMetric = ref<string | null>('p95')
+const sortResource = ref<string | null>('cpu')
+const filterType = ref<string | null>(null)
+
+const metricOptions: Array<{ value: string, label: string }> = [
+  { value: 'current', label: 'Current' },
+  { value: 'p95', label: 'P95' },
+  { value: 'mean', label: 'Mean' },
+  { value: 'max', label: 'Max' },
+]
+
+const resourceOptions: Array<{ value: string, label: string }> = [
+  { value: 'cpu', label: 'CPU' },
+  { value: 'memory', label: 'Memory' },
+]
+
+const workloadTypeOptions: Array<{ value: string, label: string }> = [
+  { value: 'deployment', label: 'Deployment' },
+  { value: 'statefulset', label: 'StatefulSet' },
+  { value: 'daemonset', label: 'DaemonSet' },
+  { value: 'pod', label: 'Pod' },
+]
 
 const filteredWorkloads = computed(() => {
   if (!props.workloads) return []
@@ -226,9 +213,9 @@ const filteredWorkloads = computed(() => {
   let filtered = [...props.workloads]
 
   // Filter by type
-  if (filterType.value !== 'all') {
+  if (filterType.value) {
     filtered = filtered.filter(
-      w => w.workload_type.toLowerCase() === filterType.value.toLowerCase(),
+      w => w.workload_type.toLowerCase() === filterType.value!.toLowerCase(),
     )
   }
 
@@ -236,7 +223,7 @@ const filteredWorkloads = computed(() => {
   filtered.sort((a, b) => {
     let aValue: number | undefined
     let bValue: number | undefined
-    const resource = sortResource.value
+    const resource = (sortResource.value ?? 'cpu') as 'cpu' | 'memory'
 
     if (sortMetric.value === 'current') {
       aValue = a.utilization[resource].current

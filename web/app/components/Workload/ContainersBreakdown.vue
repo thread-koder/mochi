@@ -8,36 +8,18 @@
         Containers by Usage
       </h2>
       <div class="flex items-center gap-2">
-        <select
+        <UiSearchableSelect
           v-model="sortMetric"
-          class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-1 text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50"
-          @change="sortContainers"
-        >
-          <option value="current">
-            Current
-          </option>
-          <option value="p95">
-            P95
-          </option>
-          <option value="mean">
-            Mean
-          </option>
-          <option value="max">
-            Max
-          </option>
-        </select>
-        <select
+          :options="metricOptions"
+          :searchable="false"
+          placeholder="Metric"
+        />
+        <UiSearchableSelect
           v-model="sortResource"
-          class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-1 text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50"
-          @change="sortContainers"
-        >
-          <option value="cpu">
-            CPU
-          </option>
-          <option value="memory">
-            Memory
-          </option>
-        </select>
+          :options="resourceOptions"
+          :searchable="false"
+          placeholder="Resource"
+        />
       </div>
     </div>
     <div class="overflow-x-auto">
@@ -452,8 +434,20 @@ const props = defineProps<{
   pods?: Compute.WorkloadAnalysis['pods']
 }>()
 
-const sortMetric = ref<'current' | 'p95' | 'mean' | 'max'>('p95')
-const sortResource = ref<'cpu' | 'memory'>('cpu')
+const sortMetric = ref<string | null>('p95')
+const sortResource = ref<string | null>('cpu')
+
+const metricOptions: Array<{ value: string, label: string }> = [
+  { value: 'current', label: 'Current' },
+  { value: 'p95', label: 'P95' },
+  { value: 'mean', label: 'Mean' },
+  { value: 'max', label: 'Max' },
+]
+
+const resourceOptions: Array<{ value: string, label: string }> = [
+  { value: 'cpu', label: 'CPU' },
+  { value: 'memory', label: 'Memory' },
+]
 const filteredContainers = ref<Array<Compute.WorkloadContainerAnalysis & { pod_name: string }>>([])
 
 const containers = computed(() => {
@@ -517,7 +511,7 @@ const sortContainers = () => {
   filteredContainers.value = [...containers.value].sort((a, b) => {
     let aValue: number | undefined
     let bValue: number | undefined
-    const resource = sortResource.value
+    const resource = (sortResource.value ?? 'cpu') as 'cpu' | 'memory'
 
     if (sortMetric.value === 'current') {
       aValue = a.utilization[resource].current
@@ -540,7 +534,7 @@ const sortContainers = () => {
   })
 }
 
-watch(containers, () => {
+watch([containers, sortMetric, sortResource], () => {
   sortContainers()
 }, { immediate: true })
 </script>
