@@ -155,8 +155,6 @@ const executeAnalysis = async () => {
 }
 
 watch(timeRange, async (newTimeRange, oldTimeRange) => {
-  if (newTimeRange === 'custom') return
-
   if (!newTimeRange) {
     timeRange.value = '24h'
     return

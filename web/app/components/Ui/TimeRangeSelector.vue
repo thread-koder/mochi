@@ -1,78 +1,116 @@
 <template>
   <div class="flex items-center gap-2">
-    <select
-      v-model="timeRange"
-      class="bg-surface-elevated border border-primary/20 rounded-lg px-4 py-2
-       text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50"
+    <UiSearchableSelect
+      v-model="selectedValue"
+      :options="timeRangeOptions"
+      :searchable="false"
+      placeholder="Select time range"
+      @select="onOptionSelect"
+    />
+    <Transition
+      enter-active-class="transition ease-out duration-200"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-150"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
     >
-      <option value="1h">
-        Last Hour
-      </option>
-      <option value="6h">
-        Last 6 Hours
-      </option>
-      <option value="12h">
-        Last 12 Hours
-      </option>
-      <option value="24h">
-        Last 24 Hours
-      </option>
-      <option value="3d">
-        Last 3 Days
-      </option>
-      <option value="7d">
-        Last 7 Days
-      </option>
-      <option value="30d">
-        Last 30 Days
-      </option>
-      <option :value="customTimeRange ? timeRange : 'custom'">
-        {{ customTimeRange && customValue ? `Custom (${customValue})` : 'Custom' }}
-      </option>
-    </select>
-    <div
-      v-if="customTimeRange"
-      class="flex items-center gap-2"
-    >
-      <input
-        v-model="customValue"
-        type="text"
-        placeholder="e.g., 2h, 48h, 5d"
-        class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-2
-         text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50 w-32"
-        @keyup.enter="applyCustom"
+      <div
+        v-if="isEditingCustom"
+        class="flex items-center gap-2"
       >
-      <button
-        class="px-3 py-2 bg-primary/20 hover:bg-primary/30 text-sm text-primary-light
-         rounded-lg transition-all cursor-pointer"
-        @click="applyCustom"
-      >
-        Apply
-      </button>
-    </div>
+        <input
+          ref="customInputRef"
+          v-model="customInputValue"
+          type="text"
+          placeholder="e.g., 2h, 48h, 5d"
+          class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-2
+           text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50 w-32"
+          @keyup.enter="applyCustom"
+        >
+        <button
+          class="px-3 py-2 bg-primary/20 hover:bg-primary/30 text-sm text-primary-light
+           rounded-lg transition-all cursor-pointer"
+          @click="applyCustom"
+        >
+          Apply
+        </button>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
 const timeRange = defineModel<string | null>({ required: true })
-const customValue = ref('')
 
-const predefinedOptions = ['1h', '6h', '12h', '24h', '3d', '7d', '30d']
+const CUSTOM_SENTINEL = '__custom__'
+const predefinedOptions = ['1h', '6h', '12h', '24h', '3d', '7d', '14d', '30d']
 
-const customTimeRange = computed(() => {
-  return timeRange.value !== null && !predefinedOptions.includes(timeRange.value)
+const isEditingCustom = ref(false)
+const customInputValue = ref('')
+const customInputRef = ref<HTMLInputElement | null>(null)
+const storedCustomValue = ref<string | null>(null)
+
+const timeRangeOptions = computed(() => {
+  const options: Array<{ value: string, label: string }> = [
+    { value: '1h', label: 'Last Hour' },
+    { value: '6h', label: 'Last 6 Hours' },
+    { value: '12h', label: 'Last 12 Hours' },
+    { value: '24h', label: 'Last 24 Hours' },
+    { value: '3d', label: 'Last 3 Days' },
+    { value: '7d', label: 'Last 7 Days' },
+    { value: '14d', label: 'Last 14 Days' },
+    { value: '30d', label: 'Last 30 Days' },
+  ]
+
+  if (storedCustomValue.value) {
+    options.push({ value: CUSTOM_SENTINEL, label: `Custom (${storedCustomValue.value})` })
+  }
+  else {
+    options.push({ value: CUSTOM_SENTINEL, label: 'Custom' })
+  }
+
+  return options
 })
 
-const applyCustom = () => {
-  const value = customValue.value.trim()
-  if (value) {
-    timeRange.value = value
+const selectedValue = computed({
+  get: () => {
+    if (timeRange.value && predefinedOptions.includes(timeRange.value)) {
+      return timeRange.value
+    }
+    return CUSTOM_SENTINEL
+  },
+  set: (value: string | null) => {
+    if (value !== CUSTOM_SENTINEL) {
+      isEditingCustom.value = false
+      storedCustomValue.value = null
+      timeRange.value = value
+    }
+  },
+})
+
+const onOptionSelect = (value: string | null) => {
+  if (value === CUSTOM_SENTINEL) {
+    isEditingCustom.value = true
+    customInputValue.value = timeRange.value || storedCustomValue.value || ''
+    nextTick(() => {
+      customInputRef.value?.focus()
+    })
   }
 }
 
-watch(timeRange, (newTimeRange) => {
-  if (newTimeRange && predefinedOptions.includes(newTimeRange)) {
-    customValue.value = ''
+const applyCustom = () => {
+  const value = customInputValue.value.trim()
+  if (value) {
+    timeRange.value = value
+    storedCustomValue.value = predefinedOptions.includes(value) ? null : value
+    isEditingCustom.value = false
   }
-})
+}
+
+watch(timeRange, (newValue) => {
+  if (newValue && !predefinedOptions.includes(newValue)) {
+    storedCustomValue.value = newValue
+  }
+}, { immediate: true })
 </script>
