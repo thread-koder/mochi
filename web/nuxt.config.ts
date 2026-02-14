@@ -47,7 +47,7 @@ export default defineNuxtConfig({
     },
   },
 
-  css: ['./app/assets/css/main.css'],
+  css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
     apiParty: {
@@ -60,7 +60,9 @@ export default defineNuxtConfig({
   },
   compatibilityDate: '2025-07-15',
   vite: {
-    plugins: [tailwindcss()],
+    // Nuxt and @tailwindcss/vite use different Vite plugin types, cast for now
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    plugins: [tailwindcss()] as any,
   },
 
   eslint: {
