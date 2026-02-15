@@ -35,7 +35,7 @@ type RecommendationConfig struct {
 	CostOptimizedRequestMargin float64
 	// Base margin for cost-optimized mode limits (default: 1.2 = 20% headroom)
 	CostOptimizedLimitMargin float64
-	// Multiplier for guaranteed mode margins (default: 1.1)
+	// Multiplier for guaranteed mode margins (default: 1.15)
 	GuaranteedMarginMultiplier float64
 	// Minimum CPU request in cores (default: 0.01 = 10m)
 	MinCPURequest float64
@@ -53,7 +53,7 @@ type RecommendationConfig struct {
 	CostOptimizedMaxReductionRatio float64
 	BurstableMaxReductionRatio     float64
 	GuaranteedMaxReductionRatio    float64
-	// Extra margin when no current request/limit (first-time): request (default 1.25), limit (default 1.25)
+	// Extra margin when no current request/limit (first-time): request (default 1.3), limit (default 1.25)
 	FirstTimeRequestMarginMultiplier float64
 	FirstTimeLimitMarginMultiplier   float64
 }
@@ -66,7 +66,7 @@ func DefaultRecommendationConfig() RecommendationConfig {
 		LimitMargin:                      1.3,              // 30% headroom
 		CostOptimizedRequestMargin:       1.15,             // 15% headroom for cost-optimized requests
 		CostOptimizedLimitMargin:         1.2,              // 20% headroom for cost-optimized limits
-		GuaranteedMarginMultiplier:       1.1,              // 1.1x multiplier for guaranteed mode margins
+		GuaranteedMarginMultiplier:       1.15,             // 1.15x multiplier for guaranteed mode margins
 		MinCPURequest:                    0.01,             // 10m minimum
 		MinMemoryRequest:                 64 * 1024 * 1024, // 64Mi minimum
 		MinConfidenceThreshold:           0.5,              // 50% minimum confidence
@@ -76,7 +76,7 @@ func DefaultRecommendationConfig() RecommendationConfig {
 		CostOptimizedMaxReductionRatio:   0.5,              // at most 50% reduction per step (floor 50% of current)
 		BurstableMaxReductionRatio:       0.4,              // at most 40% reduction per step (floor 60% of current)
 		GuaranteedMaxReductionRatio:      0.3,              // at most 30% reduction per step (floor 70% of current)
-		FirstTimeRequestMarginMultiplier: 1.25,             // extra 25% margin when no current request (first-time)
+		FirstTimeRequestMarginMultiplier: 1.3,              // extra 30% margin when no current request (first-time)
 		FirstTimeLimitMarginMultiplier:   1.25,             // extra 25% margin when no current limit (first-time)
 	}
 }
@@ -377,14 +377,19 @@ func CalculateCPULimitRecommendation(
 	var limitFromRequest float64
 	if recommendedRequest != nil && *recommendedRequest > 0 {
 		var multiplier float64
-		switch config.Mode {
-		case ModeCostOptimized:
-			multiplier = config.CostOptimizedLimitMultiplier
-		case ModeGuaranteed:
-			multiplier = config.LimitMultiplier
-		default:
-			// Burstable mode
-			multiplier = config.LimitMultiplier
+		// When request is at minimum do not add multiplier to the limit
+		if *recommendedRequest <= config.MinCPURequest {
+			multiplier = 1.0
+		} else {
+			switch config.Mode {
+			case ModeCostOptimized:
+				multiplier = config.CostOptimizedLimitMultiplier
+			case ModeGuaranteed:
+				multiplier = config.LimitMultiplier
+			default:
+				// Burstable mode
+				multiplier = config.LimitMultiplier
+			}
 		}
 		limitFromRequest = *recommendedRequest * multiplier
 	} else {
@@ -680,14 +685,19 @@ func CalculateMemoryLimitRecommendation(
 	var limitFromRequest float64
 	if recommendedRequest != nil && *recommendedRequest > 0 {
 		var multiplier float64
-		switch config.Mode {
-		case ModeCostOptimized:
-			multiplier = config.CostOptimizedLimitMultiplier
-		case ModeGuaranteed:
-			multiplier = config.LimitMultiplier
-		default:
-			// Burstable mode
-			multiplier = config.LimitMultiplier
+		// When request is at minimum do not add multiplier to the limit
+		if *recommendedRequest <= float64(config.MinMemoryRequest) {
+			multiplier = 1.0
+		} else {
+			switch config.Mode {
+			case ModeCostOptimized:
+				multiplier = config.CostOptimizedLimitMultiplier
+			case ModeGuaranteed:
+				multiplier = config.LimitMultiplier
+			default:
+				// Burstable mode
+				multiplier = config.LimitMultiplier
+			}
 		}
 		limitFromRequest = *recommendedRequest * multiplier
 	} else {
@@ -964,16 +974,14 @@ func finalizeResourceRecommendations(
 			return nil, nil
 		}
 
-		var maxValue float64
-		if recommendedRequest != nil && recommendedLimit != nil {
-			maxValue = max(*recommendedRequest, *recommendedLimit)
-		} else if recommendedRequest != nil {
-			maxValue = *recommendedRequest
+		var guaranteedValue float64
+		if recommendedRequest != nil {
+			guaranteedValue = *recommendedRequest
 		} else {
-			maxValue = *recommendedLimit
+			guaranteedValue = *recommendedLimit
 		}
 
-		return &maxValue, &maxValue
+		return &guaranteedValue, &guaranteedValue
 	}
 
 	// If no limit recommendation but we have a request
