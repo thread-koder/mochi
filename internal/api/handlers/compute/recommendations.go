@@ -179,7 +179,7 @@ func GetRecommendations(c *gin.Context) {
 		"DaemonSet":   true,
 		"Pod":         true, // For standalone pods
 	}
-	if !validTypes[workloadType] {
+	if workloadType != "" && !validTypes[workloadType] {
 		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
 		c.Error(err)
 		c.JSON(http.StatusBadRequest, gin.H{
