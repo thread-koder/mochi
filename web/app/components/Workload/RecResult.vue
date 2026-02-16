@@ -167,7 +167,7 @@
               <td class="py-4 px-4 text-center">
                 <span
                   class="px-2 py-1 rounded text-sm font-medium"
-                  :class="confidenceBadgeClass(rec.confidence_score)"
+                  :class="scoreBadgeClass(rec.confidence_score)"
                 >
                   {{ formatPercentage(rec.confidence_score) }}
                 </span>
@@ -330,11 +330,4 @@ watch(isOpen, () => {
   applied.value = false
   error.value = null
 })
-
-const confidenceBadgeClass = (score?: number): string => {
-  if (score === undefined || score === null) return 'bg-on-surface-muted/20 text-on-surface-muted'
-  if (score >= 0.8) return 'bg-success-light/20 text-success-light'
-  if (score >= 0.6) return 'bg-warning-light/20 text-warning-light'
-  return 'bg-error-light/20 text-error-light'
-}
 </script>

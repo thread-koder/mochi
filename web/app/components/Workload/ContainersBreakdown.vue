@@ -162,7 +162,7 @@
                 <div class="flex flex-col items-center gap-1">
                   <span
                     class="text-xs px-2 py-0.5 rounded-full font-medium"
-                    :class="stabilityBadgeClass(container.stability?.stability_score)"
+                    :class="scoreBadgeClass(container.stability?.stability_score)"
                   >
                     {{ formatPercentage(container.stability?.stability_score ?? 0) }}
                   </span>
@@ -487,13 +487,6 @@ const provisioningStatusClass = (provisioning: Compute.ProvisioningType): string
   if (provisioning.is_over_provisioned) return 'bg-warning-light/20 text-warning-light'
   if (provisioning.is_under_provisioned) return 'bg-error-light/20 text-error-light'
   return 'bg-success-light/20 text-success-light'
-}
-
-const stabilityBadgeClass = (score?: number): string => {
-  if (score === undefined || score === null) return 'bg-on-surface-muted/20 text-on-surface-muted'
-  if (score >= 0.8) return 'bg-success-light/20 text-success-light'
-  if (score >= 0.6) return 'bg-warning-light/20 text-warning-light'
-  return 'bg-error-light/20 text-error-light'
 }
 
 const metricColor = (value: number, threshold: number): string => {
