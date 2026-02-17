@@ -4,12 +4,11 @@
       Recent Activity
     </h2>
     <div class="space-y-3">
-      <div
+      <UiEmptyState
         v-if="!activities || activities.length === 0"
-        class="text-on-surface-secondary text-center py-8"
-      >
-        No recent activity
-      </div>
+        icon="lucide:activity"
+        title="No recent activity"
+      />
       <template v-else>
         <div
           v-for="activity in activities"
