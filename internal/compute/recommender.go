@@ -92,6 +92,7 @@ func GenerateContainerRecommendation(
 		containerAnalysis.Stability,
 		config,
 		cpuRequestRecValue,
+		specs.CPURequest,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate CPU limit recommendation: %w", err)
@@ -117,6 +118,7 @@ func GenerateContainerRecommendation(
 		containerAnalysis.Stability,
 		config,
 		memoryRequestRecValue,
+		specs.MemoryRequest,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate memory limit recommendation: %w", err)

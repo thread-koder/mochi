@@ -258,7 +258,7 @@ func CalculateCPURequestRecommendation(
 
 	// Max reduction per step: don't recommend less than (1 - maxReductionRatio) of current request
 	if currentRequest != nil && *currentRequest > 0 && recommendedCores < *currentRequest {
-		floor := *currentRequest * (1 - getMaxReductionRatio(config))
+		floor := *currentRequest * (1 - maxReductionRatio(config))
 		if recommendedCores < floor {
 			recommendedCores = floor
 		}
@@ -300,6 +300,7 @@ func CalculateCPULimitRecommendation(
 	stability StabilityResult,
 	config RecommendationConfig,
 	recommendedRequest *float64,
+	currentRequest *float64,
 ) (*float64, error) {
 	// Adjust confidence threshold based on efficiency
 	effectiveThreshold := config.MinConfidenceThreshold
@@ -373,12 +374,18 @@ func CalculateCPULimitRecommendation(
 	// Calculate limit from peak usage
 	limitFromPeak := peakUsage * safetyMargin * pressureFactor
 
-	// Calculate limit from recommended request
+	// Use recommended request when set, otherwise current request
+	effectiveRequest := recommendedRequest
+	if effectiveRequest == nil && currentRequest != nil && *currentRequest > 0 {
+		effectiveRequest = currentRequest
+	}
+
+	// Calculate limit from request
 	var limitFromRequest float64
-	if recommendedRequest != nil && *recommendedRequest > 0 {
+	if effectiveRequest != nil && *effectiveRequest > 0 {
 		var multiplier float64
 		// When request is at minimum do not add multiplier to the limit
-		if *recommendedRequest <= config.MinCPURequest {
+		if *effectiveRequest <= config.MinCPURequest {
 			multiplier = 1.0
 		} else {
 			switch config.Mode {
@@ -391,9 +398,7 @@ func CalculateCPULimitRecommendation(
 				multiplier = config.LimitMultiplier
 			}
 		}
-		limitFromRequest = *recommendedRequest * multiplier
-	} else {
-		limitFromRequest = 0
+		limitFromRequest = *effectiveRequest * multiplier
 	}
 
 	// Maintain ratio and cover peak demand
@@ -404,14 +409,14 @@ func CalculateCPULimitRecommendation(
 		recommendedCores = config.MinCPURequest
 	}
 
-	// Ensure limit is at least equal to recommended request
-	if recommendedRequest != nil && recommendedCores < *recommendedRequest {
-		recommendedCores = *recommendedRequest
+	// Ensure limit is at least equal to request
+	if effectiveRequest != nil && recommendedCores < *effectiveRequest {
+		recommendedCores = *effectiveRequest
 	}
 
 	// Max reduction per step: don't recommend limit less than (1 - maxReductionRatio) of current limit
 	if currentLimit != nil && *currentLimit > 0 && recommendedCores < *currentLimit {
-		floor := *currentLimit * (1 - getMaxReductionRatio(config))
+		floor := *currentLimit * (1 - maxReductionRatio(config))
 		if recommendedCores < floor {
 			recommendedCores = floor
 		}
@@ -564,7 +569,7 @@ func CalculateMemoryRequestRecommendation(
 
 	// Max reduction per step: don't recommend less than (1 - maxReductionRatio) of current request
 	if currentRequest != nil && *currentRequest > 0 && recommendedBytes < *currentRequest {
-		floor := *currentRequest * (1 - getMaxReductionRatio(config))
+		floor := *currentRequest * (1 - maxReductionRatio(config))
 		if recommendedBytes < floor {
 			recommendedBytes = floor
 		}
@@ -606,6 +611,7 @@ func CalculateMemoryLimitRecommendation(
 	stability StabilityResult,
 	config RecommendationConfig,
 	recommendedRequest *float64,
+	currentRequest *float64,
 ) (*float64, error) {
 	// Adjust confidence threshold based on efficiency
 	effectiveThreshold := config.MinConfidenceThreshold
@@ -681,12 +687,18 @@ func CalculateMemoryLimitRecommendation(
 	// Calculate limit from peak usage
 	limitFromPeak := peakUsage * safetyMargin * pressureFactor
 
-	// Calculate limit from recommended request
+	// Use recommended request when set, otherwise current request
+	effectiveRequest := recommendedRequest
+	if effectiveRequest == nil && currentRequest != nil && *currentRequest > 0 {
+		effectiveRequest = currentRequest
+	}
+
+	// Calculate limit from request
 	var limitFromRequest float64
-	if recommendedRequest != nil && *recommendedRequest > 0 {
+	if effectiveRequest != nil && *effectiveRequest > 0 {
 		var multiplier float64
 		// When request is at minimum do not add multiplier to the limit
-		if *recommendedRequest <= float64(config.MinMemoryRequest) {
+		if *effectiveRequest <= float64(config.MinMemoryRequest) {
 			multiplier = 1.0
 		} else {
 			switch config.Mode {
@@ -699,9 +711,7 @@ func CalculateMemoryLimitRecommendation(
 				multiplier = config.LimitMultiplier
 			}
 		}
-		limitFromRequest = *recommendedRequest * multiplier
-	} else {
-		limitFromRequest = 0
+		limitFromRequest = *effectiveRequest * multiplier
 	}
 
 	// Maintain ratio and cover peak demand
@@ -712,14 +722,14 @@ func CalculateMemoryLimitRecommendation(
 		recommendedBytes = float64(config.MinMemoryRequest)
 	}
 
-	// Ensure limit is at least equal to recommended request
-	if recommendedRequest != nil && recommendedBytes < *recommendedRequest {
-		recommendedBytes = *recommendedRequest
+	// Ensure limit is at least equal to request
+	if effectiveRequest != nil && recommendedBytes < *effectiveRequest {
+		recommendedBytes = *effectiveRequest
 	}
 
 	// Max reduction per step: don't recommend limit less than (1 - maxReductionRatio) of current limit
 	if currentLimit != nil && *currentLimit > 0 && recommendedBytes < *currentLimit {
-		floor := *currentLimit * (1 - getMaxReductionRatio(config))
+		floor := *currentLimit * (1 - maxReductionRatio(config))
 		if recommendedBytes < floor {
 			recommendedBytes = floor
 		}
@@ -754,7 +764,7 @@ func CalculateMemoryLimitRecommendation(
 }
 
 // Returns the max reduction ratio for the current mode.
-func getMaxReductionRatio(config RecommendationConfig) float64 {
+func maxReductionRatio(config RecommendationConfig) float64 {
 	switch config.Mode {
 	case ModeCostOptimized:
 		return config.CostOptimizedMaxReductionRatio
