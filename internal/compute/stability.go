@@ -14,6 +14,9 @@ const (
 	maxPenaltyRestarts       = 0.35 // 35% max penalty
 )
 
+// Noise threshold (0.1%): values below this are treated as zero to avoid metrics noise
+const stabilityNoiseThreshold = 0.001
+
 // Represents stability analysis results for a container
 type StabilityResult struct {
 	CPUThrottling  float64 `json:"cpu_throttling"`  // CPU throttling percentage (0-1, where 1.0 = 100% throttling)
@@ -51,7 +54,12 @@ func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
 		result.Restarts = metrics.Restarts[0].Value
 	}
 
-	// 2. Calculate Stability Score (0-1)
+	// 2. Filter noise from metrics
+	result.CPUThrottling = filterNoise(result.CPUThrottling)
+	result.CPUPressure = filterNoise(result.CPUPressure)
+	result.MemoryPressure = filterNoise(result.MemoryPressure)
+
+	// 3. Calculate Stability Score (0-1)
 	var totalPenalty float64
 
 	// OOMs: critical
@@ -119,4 +127,12 @@ func AggregateStability(stabilities []StabilityResult) StabilityResult {
 	aggregated.StabilityScore = minScore
 
 	return aggregated
+}
+
+// Returns 0 if value is below the noise threshold, otherwise returns value.
+func filterNoise(value float64) float64 {
+	if value < stabilityNoiseThreshold {
+		return 0
+	}
+	return value
 }
