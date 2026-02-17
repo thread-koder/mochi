@@ -70,7 +70,7 @@
             class="text-lg text-on-surface-secondary shrink-0"
           />
           <input
-            v-model="filters.workloadName"
+            v-model="workloadNameInput"
             type="text"
             placeholder="Search workload name..."
             class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-2
@@ -286,6 +286,25 @@ const filters = defineModel<FilterState>({
     workloadName: null,
   }),
 })
+
+const workloadNameInput = ref<string>('')
+
+// Debounced function to update workload name filter
+const updateWorkloadNameFilter = useDebounceFn((value: string) => {
+  filters.value.workloadName = value || null
+}, 500)
+
+// Watch workload name input and trigger debounced update
+watch(workloadNameInput, (value) => {
+  updateWorkloadNameFilter(value)
+})
+
+// Sync workload name filter to input
+watch(() => filters.value.workloadName, (value) => {
+  if (value !== workloadNameInput.value) {
+    workloadNameInput.value = value || ''
+  }
+}, { immediate: true })
 
 const namespaceOptions = computed(() => {
   return props.namespaces?.map((ns: Namespace.Namespace) => ns.name) || []
