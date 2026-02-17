@@ -7,6 +7,7 @@
       v-if="!pods || pods.length === 0"
       icon="lucide:layers"
       title="No pods found"
+      description="This workload doesn't have any pods running."
     />
     <div
       v-else

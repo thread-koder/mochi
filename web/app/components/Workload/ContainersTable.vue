@@ -7,6 +7,7 @@
       v-if="!containers || containers.length === 0"
       icon="lucide:box"
       title="No containers found"
+      description="This workload doesn't have any containers."
     />
     <div
       v-else

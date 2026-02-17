@@ -8,6 +8,7 @@
         v-if="!activities || activities.length === 0"
         icon="lucide:activity"
         title="No recent activity"
+        description="Activity will appear here as recommendations are generated or applied."
       />
       <template v-else>
         <div

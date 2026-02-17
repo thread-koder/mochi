@@ -7,6 +7,7 @@
       v-if="!pods || pods.length === 0"
       icon="lucide:layers"
       title="No pods found"
+      :description="`No ${badgeLabel.toLowerCase()} found in this namespace.`"
     />
     <div
       v-else

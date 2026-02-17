@@ -7,6 +7,7 @@
       v-if="!workloads || workloads.length === 0"
       icon="lucide:server"
       title="No workloads found"
+      description="This namespace doesn't have any workloads yet."
     />
     <div
       v-else
