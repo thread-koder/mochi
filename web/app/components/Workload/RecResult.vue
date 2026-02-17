@@ -6,22 +6,13 @@
     :close-on-backdrop-click="false"
   >
     <div class="space-y-6">
-      <!-- Empty state: no recommendations -->
-      <div
+      <!-- Empty state -->
+      <UiEmptyState
         v-if="!hasRecommendations"
-        class="py-12 px-6 rounded-lg bg-primary/5 border border-primary/10 text-center"
-      >
-        <Icon
-          name="lucide:inbox"
-          class="mx-auto text-4xl text-on-surface-muted mb-4"
-        />
-        <p class="text-sm font-medium text-on-surface mb-1">
-          Workload is stable, no recommendations available.
-        </p>
-        <p class="text-xs text-on-surface-muted">
-          Try a different time range or recommendation mode.
-        </p>
-      </div>
+        icon="lucide:inbox"
+        title="Workload is stable, no recommendations available."
+        description="Try a different time range or recommendation mode."
+      />
 
       <!-- Recommendations Table -->
       <div
@@ -186,28 +177,15 @@
         leave-from-class="opacity-100 translate-y-0"
         leave-to-class="opacity-0 translate-y-2"
       >
-        <div
+        <UiAlert
           v-if="applied"
-          class="p-4 rounded-lg bg-success/10 border border-success/20"
-        >
-          <div class="flex items-start gap-3">
-            <Icon
-              name="lucide:check-circle-2"
-              class="text-success-light text-xl shrink-0 mt-0.5"
-            />
-            <div class="flex-1">
-              <p class="text-sm font-medium text-success-light mb-1">
-                Recommendation applied successfully
-              </p>
-              <p class="text-xs text-success-light/80">
-                The resource recommendations have been applied to the workload.
-              </p>
-            </div>
-          </div>
-        </div>
+          variant="success"
+          title="Recommendation applied successfully"
+          description="The resource recommendations have been applied to the workload."
+        />
       </Transition>
 
-      <!-- Error Message -->
+      <!-- Error State -->
       <Transition
         enter-active-class="transition ease-out duration-200"
         enter-from-class="opacity-0 translate-y-2"
@@ -216,25 +194,12 @@
         leave-from-class="opacity-100 translate-y-0"
         leave-to-class="opacity-0 translate-y-2"
       >
-        <div
+        <UiAlert
           v-if="error && !applied"
-          class="p-4 rounded-lg bg-error/10 border border-error/20"
-        >
-          <div class="flex items-start gap-3">
-            <Icon
-              name="lucide:alert-circle"
-              class="text-error-light text-xl shrink-0 mt-0.5"
-            />
-            <div class="flex-1">
-              <p class="text-sm font-medium text-error-light mb-1">
-                Error applying recommendation
-              </p>
-              <p class="text-xs text-error-light/80">
-                {{ parseError(error, 'Failed to apply recommendation').message }}
-              </p>
-            </div>
-          </div>
-        </div>
+          variant="error"
+          title="Error applying recommendation"
+          :description="parseError(error, 'Failed to apply recommendation').message"
+        />
       </Transition>
 
       <!-- Action Buttons -->

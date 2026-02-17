@@ -63,7 +63,7 @@
         <UiTimeRangeSelector v-model="timeRange" />
       </div>
 
-      <!-- Error Message -->
+      <!-- Error State -->
       <Transition
         enter-active-class="transition ease-out duration-200"
         enter-from-class="opacity-0 translate-y-2"
@@ -72,25 +72,12 @@
         leave-from-class="opacity-100 translate-y-0"
         leave-to-class="opacity-0 translate-y-2"
       >
-        <div
+        <UiAlert
           v-if="error"
-          class="p-4 rounded-lg bg-error/10 border border-error/20"
-        >
-          <div class="flex items-start gap-3">
-            <Icon
-              name="lucide:alert-circle"
-              class="text-error-light text-xl shrink-0 mt-0.5"
-            />
-            <div class="flex-1">
-              <p class="text-sm font-medium text-error-light mb-1">
-                Error generating recommendation
-              </p>
-              <p class="text-xs text-error-light/80">
-                {{ parseError(error, 'Failed to generate recommendation').message }}
-              </p>
-            </div>
-          </div>
-        </div>
+          variant="error"
+          title="Error generating recommendation"
+          :description="parseError(error, 'Failed to generate recommendation').message"
+        />
       </Transition>
 
       <!-- Action Buttons -->

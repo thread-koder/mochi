@@ -3,12 +3,11 @@
     <h2 class="text-2xl font-bold font-heading mb-4">
       Workloads
     </h2>
-    <div
+    <UiEmptyState
       v-if="!workloads || workloads.length === 0"
-      class="text-base font-medium text-on-surface-secondary text-center py-12"
-    >
-      No workloads found
-    </div>
+      icon="lucide:server"
+      title="No workloads found"
+    />
     <div
       v-else
       class="space-y-2"

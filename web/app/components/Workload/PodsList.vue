@@ -3,12 +3,11 @@
     <h2 class="text-2xl font-bold font-heading mb-4">
       Pods
     </h2>
-    <div
+    <UiEmptyState
       v-if="!pods || pods.length === 0"
-      class="text-base font-medium text-on-surface-secondary text-center py-12"
-    >
-      No pods found
-    </div>
+      icon="lucide:layers"
+      title="No pods found"
+    />
     <div
       v-else
       class="space-y-2"

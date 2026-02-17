@@ -3,12 +3,11 @@
     <h2 class="text-2xl font-bold font-heading mb-4">
       Containers
     </h2>
-    <div
+    <UiEmptyState
       v-if="!containers || containers.length === 0"
-      class="text-base font-medium text-on-surface-secondary text-center py-12"
-    >
-      No containers found
-    </div>
+      icon="lucide:box"
+      title="No containers found"
+    />
     <div
       v-else
       class="overflow-x-auto"

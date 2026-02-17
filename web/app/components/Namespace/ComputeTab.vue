@@ -22,17 +22,12 @@
     </div>
 
     <!-- Error State -->
-    <div
+    <UiAlert
       v-else-if="analysisError"
-      class="glass rounded-xl p-6 mb-6"
-    >
-      <div class="text-error-light">
-        <p class="font-semibold mb-2">
-          Error
-        </p>
-        <p>{{ parseError(analysisError, 'Failed to load analysis').message }}</p>
-      </div>
-    </div>
+      variant="error"
+      title="Failed to load analysis"
+      :description="parseError(analysisError, 'Failed to load analysis').message"
+    />
 
     <!-- Analysis Results -->
     <div
