@@ -154,8 +154,8 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 	}
 
 	if workloadName != nil {
-		query += fmt.Sprintf(" AND workload_name = $%d", argIndex)
-		args = append(args, *workloadName)
+		query += fmt.Sprintf(" AND workload_name ILIKE $%d", argIndex)
+		args = append(args, "%"+*workloadName+"%")
 		argIndex++
 	}
 
@@ -238,7 +238,7 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id int64, status str
 	return nil
 }
 
-// Marks all pending recommendations for a workload as superseded (except the one being applied)
+// Marks all recommendations for a workload as superseded (except the one being applied)
 func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadName, namespace string, excludeID int64) error {
 	log := logger.WithComponent("database")
 	log.Debug().
@@ -254,7 +254,6 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 		WHERE workload_type = $1
 		  AND workload_name = $2
 		  AND namespace = $3
-		  AND status = 'pending'
 		  AND id != $4
 	`
 
