@@ -48,7 +48,7 @@ const healthIndicators = computed(() => {
     return {
       name: check.name,
       status,
-      iconName: status ? 'lucide:check-circle-2' : 'lucide:x-circle',
+      iconName: status ? 'lucide:circle-check' : 'lucide:circle-x',
       statusText: status ? 'Connected' : 'Disconnected',
       containerClass: status
         ? 'bg-success/10 border border-success/20'

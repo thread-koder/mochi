@@ -21,7 +21,7 @@
         <!-- Status Filter -->
         <div class="flex items-center gap-2">
           <Icon
-            name="lucide:check-circle-2"
+            name="lucide:circle-check"
             class="text-lg text-on-surface-secondary shrink-0"
           />
           <UiSearchableSelect
@@ -138,7 +138,7 @@
                  bg-primary/20 text-primary-light border border-primary/30"
               >
                 <Icon
-                  name="lucide:check-circle-2"
+                  name="lucide:circle-check"
                   class="text-xs shrink-0"
                 />
                 <span>{{ statusLabel(filters.status) }}</span>
@@ -250,7 +250,7 @@
             @click="clearFilters"
           >
             <Icon
-              name="lucide:x-circle"
+              name="lucide:circle-x"
               class="text-sm shrink-0"
             />
             <span>Clear All</span>

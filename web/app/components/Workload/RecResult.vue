@@ -226,12 +226,12 @@
         >
           <Icon
             v-if="applying"
-            name="lucide:loader-2"
+            name="lucide:loader-circle"
             class="text-base animate-spin"
           />
           <Icon
             v-else
-            name="lucide:check-circle-2"
+            name="lucide:circle-check"
             class="text-base"
           />
           <span>{{ applying ? 'Applying...' : 'Apply Recommendation' }}</span>

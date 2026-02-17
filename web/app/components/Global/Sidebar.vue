@@ -24,7 +24,7 @@
          bg-primary/20 border-l-2 border-primary-light text-primary-light"
       >
         <Icon
-          name="lucide:home"
+          name="lucide:house"
         />
         <span class="font-medium">Home</span>
       </NuxtLink>

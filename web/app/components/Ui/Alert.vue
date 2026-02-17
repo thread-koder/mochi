@@ -56,13 +56,11 @@ const iconName = computed(() => {
   if (props.icon) return props.icon
   switch (props.variant) {
     case 'success':
-      return 'lucide:check-circle-2'
+      return 'lucide:circle-check'
     case 'error':
-      return 'lucide:alert-circle'
+      return 'lucide:circle-alert'
     case 'warning':
-      return 'lucide:alert-triangle'
-    case 'info':
-      return 'lucide:info'
+      return 'lucide:triangle-alert'
     default:
       return 'lucide:info'
   }

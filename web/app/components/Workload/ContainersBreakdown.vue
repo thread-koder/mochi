@@ -171,7 +171,7 @@
                     class="flex items-center gap-1 text-xs text-error-light"
                   >
                     <Icon
-                      name="lucide:alert-triangle"
+                      name="lucide:triangle-alert"
                       class="text-xs"
                     />
                     <span>Issues</span>

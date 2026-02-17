@@ -47,7 +47,7 @@
               class="shrink-0"
             >
               <Icon
-                name="lucide:check-circle-2"
+                name="lucide:circle-check"
                 class="text-primary-light text-xl"
               />
             </div>
@@ -99,7 +99,7 @@
         >
           <Icon
             v-if="generating"
-            name="lucide:loader-2"
+            name="lucide:loader-circle"
             class="text-base animate-spin"
           />
           <Icon
@@ -147,7 +147,7 @@ const modes = [
   {
     value: 'guaranteed',
     label: 'Guaranteed',
-    icon: 'lucide:check-circle-2',
+    icon: 'lucide:circle-check',
     description: 'Best performance, no throttling risk',
   },
 ] as const

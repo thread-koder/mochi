@@ -41,11 +41,11 @@ defineProps<{
 const activityIcon = (type: string) => {
   switch (type) {
     case 'recommendation_applied':
-      return 'lucide:check-circle-2'
+      return 'lucide:circle-check'
     case 'recommendation_generated':
       return 'lucide:lightbulb'
     default:
-      return 'lucide:alert-circle'
+      return 'lucide:circle-alert'
   }
 }
 
