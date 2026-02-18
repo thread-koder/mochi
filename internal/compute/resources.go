@@ -27,16 +27,22 @@ const (
 type RecommendationConfig struct {
 	// Recommendation mode: cost_optimized (maximize cost savings), burstable (balance), or guaranteed (best performance)
 	Mode RecommendationMode
-	// Safety margin multiplier for requests (default: 1.2 = 20% headroom)
-	RequestMargin float64
-	// Safety margin multiplier for limits based on peak (default: 1.3 = 30% headroom)
-	LimitMargin float64
-	// Base margin for cost-optimized mode requests (default: 1.15 = 15% headroom)
-	CostOptimizedRequestMargin float64
-	// Base margin for cost-optimized mode limits (default: 1.2 = 20% headroom)
-	CostOptimizedLimitMargin float64
-	// Multiplier for guaranteed mode margins (default: 1.15)
-	GuaranteedMarginMultiplier float64
+	// Safety margin multiplier for CPU requests (default: 1.25 = 25% headroom)
+	CPURequestMargin float64
+	// Safety margin multiplier for CPU limits (default: 1.35 = 35% headroom)
+	CPULimitMargin float64
+	// Safety margin multiplier for memory requests (default: 1.2 = 20% headroom)
+	MemoryRequestMargin float64
+	// Safety margin multiplier for memory limits (default: 1.3 = 30% headroom)
+	MemoryLimitMargin float64
+	// Safety margin for cost-optimized mode CPU requests (default: 1.15 = 15% headroom)
+	CostOptimizedCPURequestMargin float64
+	// Safety margin for cost-optimized mode CPU limits (default: 1.2 = 20% headroom)
+	CostOptimizedCPULimitMargin float64
+	// Safety margin for cost-optimized mode memory requests (default: 1.15 = 15% headroom)
+	CostOptimizedMemoryRequestMargin float64
+	// Safety margin for cost-optimized mode memory limits (default: 1.2 = 20% headroom)
+	CostOptimizedMemoryLimitMargin float64
 	// Minimum CPU request in cores (default: 0.01 = 10m)
 	MinCPURequest float64
 	// Minimum memory request in bytes (default: 64Mi)
@@ -53,31 +59,29 @@ type RecommendationConfig struct {
 	CostOptimizedMaxReductionRatio float64
 	BurstableMaxReductionRatio     float64
 	GuaranteedMaxReductionRatio    float64
-	// Extra margin when no current request/limit (first-time): request (default 1.3), limit (default 1.25)
-	FirstTimeRequestMarginMultiplier float64
-	FirstTimeLimitMarginMultiplier   float64
 }
 
 // Returns default recommendation configuration
 func DefaultRecommendationConfig() RecommendationConfig {
 	return RecommendationConfig{
 		Mode:                             ModeBurstable,    // Default: optimize for efficiency
-		RequestMargin:                    1.2,              // 20% headroom
-		LimitMargin:                      1.3,              // 30% headroom
-		CostOptimizedRequestMargin:       1.15,             // 15% headroom for cost-optimized requests
-		CostOptimizedLimitMargin:         1.2,              // 20% headroom for cost-optimized limits
-		GuaranteedMarginMultiplier:       1.15,             // 1.15x multiplier for guaranteed mode margins
+		CPURequestMargin:                 1.25,             // 25% headroom for CPU requests
+		CPULimitMargin:                   1.35,             // 35% headroom for CPU limits
+		MemoryRequestMargin:              1.2,              // 20% headroom for memory requests
+		MemoryLimitMargin:                1.3,              // 30% headroom for memory limits
+		CostOptimizedCPURequestMargin:    1.15,             // 15% headroom for cost-optimized CPU requests
+		CostOptimizedCPULimitMargin:      1.2,              // 20% headroom for cost-optimized CPU limits
+		CostOptimizedMemoryRequestMargin: 1.15,             // 15% headroom for cost-optimized memory requests
+		CostOptimizedMemoryLimitMargin:   1.2,              // 20% headroom for cost-optimized memory limits
 		MinCPURequest:                    0.01,             // 10m minimum
 		MinMemoryRequest:                 64 * 1024 * 1024, // 64Mi minimum
 		MinConfidenceThreshold:           0.5,              // 50% minimum confidence
-		BurstThreshold:                   1.8,              // Max > 1.8x percentile = burst workload
+		BurstThreshold:                   1.6,              // Max > 1.6x percentile = burst workload
 		LimitMultiplier:                  1.5,              // 1.5x limit
 		CostOptimizedLimitMultiplier:     1.2,              // 1.2x limit for cost-optimized mode
 		CostOptimizedMaxReductionRatio:   0.5,              // at most 50% reduction per step (floor 50% of current)
 		BurstableMaxReductionRatio:       0.4,              // at most 40% reduction per step (floor 60% of current)
 		GuaranteedMaxReductionRatio:      0.3,              // at most 30% reduction per step (floor 70% of current)
-		FirstTimeRequestMarginMultiplier: 1.3,              // extra 30% margin when no current request (first-time)
-		FirstTimeLimitMarginMultiplier:   1.25,             // extra 25% margin when no current limit (first-time)
 	}
 }
 
@@ -86,20 +90,29 @@ func (config RecommendationConfig) Validate() error {
 	if config.Mode != ModeCostOptimized && config.Mode != ModeBurstable && config.Mode != ModeGuaranteed {
 		return fmt.Errorf("Mode must be one of %s, %s, or %s, got: %v", ModeCostOptimized, ModeBurstable, ModeGuaranteed, config.Mode)
 	}
-	if config.RequestMargin <= 0 {
-		return fmt.Errorf("RequestMargin must be positive, got: %v", config.RequestMargin)
+	if config.CPURequestMargin <= 0 {
+		return fmt.Errorf("CPURequestMargin must be positive, got: %v", config.CPURequestMargin)
 	}
-	if config.LimitMargin <= 0 {
-		return fmt.Errorf("LimitMargin must be positive, got: %v", config.LimitMargin)
+	if config.CPULimitMargin <= 0 {
+		return fmt.Errorf("CPULimitMargin must be positive, got: %v", config.CPULimitMargin)
 	}
-	if config.CostOptimizedRequestMargin <= 0 {
-		return fmt.Errorf("CostOptimizedRequestMargin must be positive, got: %v", config.CostOptimizedRequestMargin)
+	if config.MemoryRequestMargin <= 0 {
+		return fmt.Errorf("MemoryRequestMargin must be positive, got: %v", config.MemoryRequestMargin)
 	}
-	if config.CostOptimizedLimitMargin <= 0 {
-		return fmt.Errorf("CostOptimizedLimitMargin must be positive, got: %v", config.CostOptimizedLimitMargin)
+	if config.MemoryLimitMargin <= 0 {
+		return fmt.Errorf("MemoryLimitMargin must be positive, got: %v", config.MemoryLimitMargin)
 	}
-	if config.GuaranteedMarginMultiplier <= 0 {
-		return fmt.Errorf("GuaranteedMarginMultiplier must be positive, got: %v", config.GuaranteedMarginMultiplier)
+	if config.CostOptimizedCPURequestMargin <= 0 {
+		return fmt.Errorf("CostOptimizedCPURequestMargin must be positive, got: %v", config.CostOptimizedCPURequestMargin)
+	}
+	if config.CostOptimizedCPULimitMargin <= 0 {
+		return fmt.Errorf("CostOptimizedCPULimitMargin must be positive, got: %v", config.CostOptimizedCPULimitMargin)
+	}
+	if config.CostOptimizedMemoryRequestMargin <= 0 {
+		return fmt.Errorf("CostOptimizedMemoryRequestMargin must be positive, got: %v", config.CostOptimizedMemoryRequestMargin)
+	}
+	if config.CostOptimizedMemoryLimitMargin <= 0 {
+		return fmt.Errorf("CostOptimizedMemoryLimitMargin must be positive, got: %v", config.CostOptimizedMemoryLimitMargin)
 	}
 	if config.MinCPURequest < 0 {
 		return fmt.Errorf("MinCPURequest must be non-negative, got: %v", config.MinCPURequest)
@@ -127,12 +140,6 @@ func (config RecommendationConfig) Validate() error {
 	}
 	if config.GuaranteedMaxReductionRatio < 0 || config.GuaranteedMaxReductionRatio > 1 {
 		return fmt.Errorf("GuaranteedMaxReductionRatio must be between 0 and 1, got: %v", config.GuaranteedMaxReductionRatio)
-	}
-	if config.FirstTimeRequestMarginMultiplier <= 0 {
-		return fmt.Errorf("FirstTimeRequestMarginMultiplier must be positive, got: %v", config.FirstTimeRequestMarginMultiplier)
-	}
-	if config.FirstTimeLimitMarginMultiplier <= 0 {
-		return fmt.Errorf("FirstTimeLimitMarginMultiplier must be positive, got: %v", config.FirstTimeLimitMarginMultiplier)
 	}
 	return nil
 }
@@ -173,6 +180,11 @@ func CalculateCPURequestRecommendation(
 		percentileP95, percentileP99, peakUsage, config.BurstThreshold,
 	)
 
+	// For first-time recommendations, use peak instead of percentile
+	if firstTime(currentRequest) {
+		adjustedPercentile = peakUsage
+	}
+
 	// Calculate pressure factors
 	cpuThrottlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
 	cpuPressureFactor := calculateCPUPressureFactor(stability.CPUPressure)
@@ -183,10 +195,7 @@ func CalculateCPURequestRecommendation(
 	switch config.Mode {
 	case ModeCostOptimized:
 		// Cost-optimized mode: use adjusted percentile
-		baseMargin := config.CostOptimizedRequestMargin
-		if firstTime(currentRequest) {
-			baseMargin *= config.FirstTimeRequestMarginMultiplier
-		}
+		baseMargin := config.CostOptimizedCPURequestMargin
 		safetyMargin := calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -197,10 +206,7 @@ func CalculateCPURequestRecommendation(
 		recommendedCores = adjustedPercentile * safetyMargin * pressureFactor
 	case ModeGuaranteed:
 		// Guaranteed mode: use peak usage
-		baseMargin := config.RequestMargin * config.GuaranteedMarginMultiplier
-		if firstTime(currentRequest) {
-			baseMargin *= config.FirstTimeRequestMarginMultiplier
-		}
+		baseMargin := config.CPURequestMargin
 		safetyMargin := calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -211,10 +217,7 @@ func CalculateCPURequestRecommendation(
 		recommendedCores = peakUsage * safetyMargin * pressureFactor
 	default:
 		// Burstable mode: use adjusted percentile
-		baseMargin := config.RequestMargin // Standard base
-		if firstTime(currentRequest) {
-			baseMargin *= config.FirstTimeRequestMarginMultiplier
-		}
+		baseMargin := config.CPURequestMargin
 		safetyMargin := calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -332,10 +335,7 @@ func CalculateCPULimitRecommendation(
 	switch config.Mode {
 	case ModeCostOptimized:
 		// Cost-optimized mode: minimal base margin
-		baseMargin := config.CostOptimizedLimitMargin
-		if firstTime(currentLimit) {
-			baseMargin *= config.FirstTimeLimitMarginMultiplier
-		}
+		baseMargin := config.CostOptimizedCPULimitMargin
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -344,11 +344,8 @@ func CalculateCPULimitRecommendation(
 			false, // Limits don't need burst detection
 		)
 	case ModeGuaranteed:
-		// Guaranteed mode: higher base margin
-		baseMargin := config.LimitMargin * config.GuaranteedMarginMultiplier
-		if firstTime(currentLimit) {
-			baseMargin *= config.FirstTimeLimitMarginMultiplier
-		}
+		// Guaranteed mode: standard base margin
+		baseMargin := config.CPULimitMargin
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -357,11 +354,8 @@ func CalculateCPULimitRecommendation(
 			false, // Limits don't need burst detection
 		)
 	default:
-		// Burstable mode: base margin
-		baseMargin := config.LimitMargin
-		if firstTime(currentLimit) {
-			baseMargin *= config.FirstTimeLimitMarginMultiplier
-		}
+		// Burstable mode: standard base margin
+		baseMargin := config.CPULimitMargin
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -412,14 +406,6 @@ func CalculateCPULimitRecommendation(
 	// Ensure limit is at least equal to request
 	if effectiveRequest != nil && recommendedCores < *effectiveRequest {
 		recommendedCores = *effectiveRequest
-	}
-
-	// Max reduction per step: don't recommend limit less than (1 - maxReductionRatio) of current limit
-	if currentLimit != nil && *currentLimit > 0 && recommendedCores < *currentLimit {
-		floor := *currentLimit * (1 - maxReductionRatio(config))
-		if recommendedCores < floor {
-			recommendedCores = floor
-		}
 	}
 
 	// Round to reasonable precision
@@ -490,6 +476,11 @@ func CalculateMemoryRequestRecommendation(
 		adjustedPercentile = math.Max(adjustedPercentile, peakUsage)
 	}
 
+	// For first-time recommendations, use peak instead of percentile
+	if firstTime(currentRequest) {
+		adjustedPercentile = peakUsage
+	}
+
 	// Calculate memory pressure factor
 	pressureFactor := calculateMemoryPressureFactor(
 		stability.MemoryOOM,
@@ -502,10 +493,7 @@ func CalculateMemoryRequestRecommendation(
 	switch config.Mode {
 	case ModeCostOptimized:
 		// Cost-optimized mode: use adjusted percentile
-		baseMargin := config.CostOptimizedRequestMargin
-		if firstTime(currentRequest) {
-			baseMargin *= config.FirstTimeRequestMarginMultiplier
-		}
+		baseMargin := config.CostOptimizedMemoryRequestMargin
 		safetyMargin := calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -516,10 +504,7 @@ func CalculateMemoryRequestRecommendation(
 		recommendedBytes = adjustedPercentile * safetyMargin * pressureFactor
 	case ModeGuaranteed:
 		// Guaranteed mode: use peak usage
-		baseMargin := config.RequestMargin * config.GuaranteedMarginMultiplier
-		if firstTime(currentRequest) {
-			baseMargin *= config.FirstTimeRequestMarginMultiplier
-		}
+		baseMargin := config.MemoryRequestMargin
 		safetyMargin := calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -530,10 +515,7 @@ func CalculateMemoryRequestRecommendation(
 		recommendedBytes = peakUsage * safetyMargin * pressureFactor
 	default:
 		// Burstable mode: use adjusted percentile
-		baseMargin := config.RequestMargin // Standard base
-		if firstTime(currentRequest) {
-			baseMargin *= config.FirstTimeRequestMarginMultiplier
-		}
+		baseMargin := config.MemoryRequestMargin
 		safetyMargin := calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -645,10 +627,7 @@ func CalculateMemoryLimitRecommendation(
 	switch config.Mode {
 	case ModeCostOptimized:
 		// Cost-optimized mode: minimal base margin
-		baseMargin := config.CostOptimizedLimitMargin
-		if firstTime(currentLimit) {
-			baseMargin *= config.FirstTimeLimitMarginMultiplier
-		}
+		baseMargin := config.CostOptimizedMemoryLimitMargin
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -657,11 +636,8 @@ func CalculateMemoryLimitRecommendation(
 			false, // Limits don't need burst detection
 		)
 	case ModeGuaranteed:
-		// Guaranteed mode: higher base margin
-		baseMargin := config.LimitMargin * config.GuaranteedMarginMultiplier
-		if firstTime(currentLimit) {
-			baseMargin *= config.FirstTimeLimitMarginMultiplier
-		}
+		// Guaranteed mode: standard base margin
+		baseMargin := config.MemoryLimitMargin
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -671,10 +647,7 @@ func CalculateMemoryLimitRecommendation(
 		)
 	default:
 		// Burstable mode: standard base margin
-		baseMargin := config.LimitMargin
-		if firstTime(currentLimit) {
-			baseMargin *= config.FirstTimeLimitMarginMultiplier
-		}
+		baseMargin := config.MemoryLimitMargin
 		safetyMargin = calculateDynamicSafetyMargin(
 			baseMargin,
 			utilization.Trend,
@@ -725,14 +698,6 @@ func CalculateMemoryLimitRecommendation(
 	// Ensure limit is at least equal to request
 	if effectiveRequest != nil && recommendedBytes < *effectiveRequest {
 		recommendedBytes = *effectiveRequest
-	}
-
-	// Max reduction per step: don't recommend limit less than (1 - maxReductionRatio) of current limit
-	if currentLimit != nil && *currentLimit > 0 && recommendedBytes < *currentLimit {
-		floor := *currentLimit * (1 - maxReductionRatio(config))
-		if recommendedBytes < floor {
-			recommendedBytes = floor
-		}
 	}
 
 	// Round to nearest byte
@@ -855,7 +820,7 @@ func detectAndAdjustBurstyWorkload(
 	if percentileP95 > 0 && peakUsage > percentileP95*burstThreshold {
 		isBursty = true
 		// Use a higher percentile or weighted approach
-		if percentileP99 > percentileP95*1.5 {
+		if percentileP99 > percentileP95*1.4 {
 			adjustedPercentile = percentileP99
 			if peakUsage > adjustedPercentile*burstThreshold {
 				adjustedPercentile = calculateWeightedPercentile(adjustedPercentile, peakUsage, baselineP95)
@@ -863,8 +828,8 @@ func detectAndAdjustBurstyWorkload(
 		} else {
 			weightedPercentile := calculateWeightedPercentile(percentileP95, peakUsage, baselineP95)
 
-			// Validate: if weighted result is still too extreme (> 5x P95), use P99 instead
-			if weightedPercentile > percentileP95*5.0 {
+			// Validate: if weighted result is still too extreme (> 4.5x P95), use P99 instead
+			if weightedPercentile > percentileP95*4.5 {
 				// Use P99 if available, otherwise use the weighted result
 				if percentileP99 > 0 {
 					adjustedPercentile = percentileP99
@@ -939,8 +904,8 @@ func calculateMaxWeightForGap(gapRatio float64) float64 {
 		// Large gap (5-10x): use 50% of Max
 		return 0.5
 	} else {
-		// Moderate gap (2-5x): use 45% of Max
-		return 0.45
+		// Moderate gap (2-5x): use 40% of Max
+		return 0.4
 	}
 }
 
@@ -980,15 +945,17 @@ func finalizeResourceRecommendations(
 ) (*float64, *float64) {
 	// For Guaranteed mode, both request and limit MUST be equal
 	if mode == ModeGuaranteed {
-		if recommendedRequest == nil && recommendedLimit == nil {
-			return nil, nil
-		}
-
 		var guaranteedValue float64
 		if recommendedRequest != nil {
 			guaranteedValue = *recommendedRequest
-		} else {
+		} else if currentRequest != nil && *currentRequest > 0 {
+			guaranteedValue = *currentRequest
+		} else if recommendedLimit != nil {
 			guaranteedValue = *recommendedLimit
+		} else if currentLimit != nil && *currentLimit > 0 {
+			guaranteedValue = *currentLimit
+		} else {
+			return nil, nil
 		}
 
 		return &guaranteedValue, &guaranteedValue
