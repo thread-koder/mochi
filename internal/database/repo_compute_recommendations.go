@@ -119,62 +119,78 @@ func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadN
 }
 
 // Gets all compute recommendations with optional filters
-func GetComputeRecommendations(ctx context.Context, namespace *string, status *string, mode *string, workloadType *string, workloadName *string, limit, offset int) ([]*ComputeRecommendation, error) {
-	query := `
-		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
-		       recommendations, status, analysis_time_range, created_at, updated_at, generated_at
-		FROM compute_recommendations
-		WHERE 1=1
-	`
+func GetComputeRecommendations(ctx context.Context, namespace *string, status *string, mode *string, workloadType *string, workloadName *string, limit, offset int) ([]*ComputeRecommendation, int64, error) {
+	// Build WHERE clause for both count and select queries
+	whereClause := "WHERE 1=1"
 	args := []any{}
 	argIndex := 1
 
 	if namespace != nil {
-		query += fmt.Sprintf(" AND namespace = $%d", argIndex)
+		whereClause += fmt.Sprintf(" AND namespace = $%d", argIndex)
 		args = append(args, *namespace)
 		argIndex++
 	}
 
 	if status != nil {
-		query += fmt.Sprintf(" AND status = $%d", argIndex)
+		whereClause += fmt.Sprintf(" AND status = $%d", argIndex)
 		args = append(args, *status)
 		argIndex++
 	}
 
 	if mode != nil {
-		query += fmt.Sprintf(" AND recommendation_mode = $%d", argIndex)
+		whereClause += fmt.Sprintf(" AND recommendation_mode = $%d", argIndex)
 		args = append(args, *mode)
 		argIndex++
 	}
 
 	if workloadType != nil {
-		query += fmt.Sprintf(" AND workload_type = $%d", argIndex)
+		whereClause += fmt.Sprintf(" AND workload_type = $%d", argIndex)
 		args = append(args, *workloadType)
 		argIndex++
 	}
 
 	if workloadName != nil {
-		query += fmt.Sprintf(" AND workload_name ILIKE $%d", argIndex)
+		whereClause += fmt.Sprintf(" AND workload_name ILIKE $%d", argIndex)
 		args = append(args, "%"+*workloadName+"%")
 		argIndex++
 	}
 
-	query += " ORDER BY created_at DESC"
+	// Get total count (without LIMIT/OFFSET)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM compute_recommendations %s", whereClause)
+	var total int64
+	err := Pool.QueryRow(ctx, countQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count compute recommendations: %w", err)
+	}
+
+	// Get paginated results
+	selectQuery := fmt.Sprintf(`
+		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
+		       recommendations, status, analysis_time_range, created_at, updated_at, generated_at
+		FROM compute_recommendations
+		%s
+		ORDER BY created_at DESC
+	`, whereClause)
+
+	selectArgs := make([]any, len(args))
+	copy(selectArgs, args)
+	selectArgIndex := argIndex
 
 	if limit > 0 {
-		query += fmt.Sprintf(" LIMIT $%d", argIndex)
-		args = append(args, limit)
-		argIndex++
+		selectQuery += fmt.Sprintf(" LIMIT $%d", selectArgIndex)
+		selectArgs = append(selectArgs, limit)
+		selectArgIndex++
 	}
 
 	if offset > 0 {
-		query += fmt.Sprintf(" OFFSET $%d", argIndex)
-		args = append(args, offset)
+		selectQuery += fmt.Sprintf(" OFFSET $%d", selectArgIndex)
+		selectArgs = append(selectArgs, offset)
+		selectArgIndex++
 	}
 
-	rows, err := Pool.Query(ctx, query, args...)
+	rows, err := Pool.Query(ctx, selectQuery, selectArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query compute recommendations: %w", err)
+		return nil, 0, fmt.Errorf("failed to query compute recommendations: %w", err)
 	}
 	defer rows.Close()
 
@@ -189,7 +205,7 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 			&analysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt, &rec.GeneratedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan compute recommendation: %w", err)
+			return nil, 0, fmt.Errorf("failed to scan compute recommendation: %w", err)
 		}
 
 		if analysisTimeRange != nil {
@@ -201,10 +217,10 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating compute recommendations: %w", err)
+		return nil, 0, fmt.Errorf("error iterating compute recommendations: %w", err)
 	}
 
-	return recommendations, nil
+	return recommendations, total, nil
 }
 
 // Updates the status of a compute recommendation

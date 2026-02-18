@@ -226,7 +226,7 @@ func GetRecommendations(c *gin.Context) {
 	}
 
 	// Get recommendations
-	recommendations, err := database.GetComputeRecommendations(
+	recommendations, total, err := database.GetComputeRecommendations(
 		ctx,
 		namespacePtr,
 		statusPtr,
@@ -245,7 +245,10 @@ func GetRecommendations(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, recommendations)
+	c.JSON(http.StatusOK, gin.H{
+		"recommendations": recommendations,
+		"total":           total,
+	})
 }
 
 // Gets a compute recommendation by ID

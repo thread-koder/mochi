@@ -67,7 +67,7 @@ type Activity struct {
 
 // Gets activities
 func GetActivities(ctx context.Context, limit int) ([]Activity, error) {
-	computeRecommendations, err := database.GetComputeRecommendations(
+	computeRecommendations, _, err := database.GetComputeRecommendations(
 		ctx,
 		nil, nil, nil, nil, nil,
 		limit,
