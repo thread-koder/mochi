@@ -66,3 +66,13 @@ export const formatChangePercent = (percent: number | null | undefined): string 
   const sign = percent >= 0 ? '+' : ''
   return `${sign}${percent.toFixed(1)}%`
 }
+
+/**
+ * Formats a snake_case or lowercase value to Title Case
+ * @param value - The string to format.
+ * @returns A human-readable label string.
+ */
+export const formatTitleCase = (value: string): string => {
+  if (!value) return ''
+  return value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}

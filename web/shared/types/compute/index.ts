@@ -178,6 +178,26 @@ interface Recommendation {
   analysis_time_range: string
 }
 
+// Compute recommendation database record
+interface RecommendationRecord {
+  id: number
+  workload_type: string
+  workload_name: string
+  namespace: string
+  recommendation_mode: string
+  recommendations: ContainerRecommendation[]
+  status: string
+  analysis_time_range?: string
+  created_at: string
+  updated_at?: string
+  generated_at?: string
+}
+
+interface RecommendationsResponse {
+  recommendations: RecommendationRecord[]
+  total: number
+}
+
 export type {
   UtilizationResult,
   NamespaceAnalysis,
@@ -186,4 +206,7 @@ export type {
   ProvisioningType,
   StabilityResult,
   Recommendation,
+  RecommendationRecord,
+  ContainerRecommendation,
+  RecommendationsResponse,
 }
