@@ -89,19 +89,12 @@ const variantClasses = computed(() => {
         text: 'text-warning-light',
         description: 'text-warning-light/80',
       }
-    case 'info':
-      return {
-        container: 'bg-primary/10 border border-primary/20',
-        icon: 'text-primary-light',
-        text: 'text-primary-light',
-        description: 'text-primary-light/80',
-      }
     default:
       return {
-        container: 'bg-primary/10 border border-primary/20',
-        icon: 'text-primary-light',
-        text: 'text-primary-light',
-        description: 'text-primary-light/80',
+        container: 'bg-info/10 border border-info/20',
+        icon: 'text-info-light',
+        text: 'text-info-light',
+        description: 'text-info-light/80',
       }
   }
 })
