@@ -152,8 +152,8 @@ func CalculateCPURequestRecommendation(
 	stability StabilityResult,
 	config RecommendationConfig,
 ) (*float64, error) {
-	// If we don't have enough confidence, don't recommend
-	if provisioning.Confidence < config.MinConfidenceThreshold {
+	// If not first-time recommendation and we don't have enough confidence, don't recommend
+	if !firstTime(currentRequest) && provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil, nil
 	}
 
@@ -299,8 +299,8 @@ func CalculateCPULimitRecommendation(
 	recommendedRequest *float64,
 	currentRequest *float64,
 ) (*float64, error) {
-	// If we don't have enough confidence, don't recommend
-	if provisioning.Confidence < config.MinConfidenceThreshold {
+	// If not first-time recommendation and we don't have enough confidence, don't recommend
+	if !firstTime(currentLimit) && provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil, nil
 	}
 
@@ -433,8 +433,8 @@ func CalculateMemoryRequestRecommendation(
 	stability StabilityResult,
 	config RecommendationConfig,
 ) (*float64, error) {
-	// If we don't have enough confidence, don't recommend
-	if provisioning.Confidence < config.MinConfidenceThreshold {
+	// If not first-time recommendation and we don't have enough confidence, don't recommend
+	if !firstTime(currentRequest) && provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil, nil
 	}
 
@@ -578,8 +578,8 @@ func CalculateMemoryLimitRecommendation(
 	recommendedRequest *float64,
 	currentRequest *float64,
 ) (*float64, error) {
-	// If we don't have enough confidence, don't recommend
-	if provisioning.Confidence < config.MinConfidenceThreshold {
+	// If not first-time recommendation and we don't have enough confidence, don't recommend
+	if !firstTime(currentLimit) && provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil, nil
 	}
 
