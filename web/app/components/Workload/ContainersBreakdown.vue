@@ -161,7 +161,7 @@
               <td class="py-3 px-4 text-center">
                 <div class="flex flex-col items-center gap-1">
                   <span
-                    class="text-xs px-2 py-0.5 rounded-full font-medium"
+                    class="text-xs px-2 py-1 rounded-full font-medium border"
                     :class="scoreBadgeClass(container.stability?.stability_score)"
                   >
                     {{ formatPercentage(container.stability?.stability_score ?? 0) }}
@@ -254,7 +254,7 @@
                         <div class="flex items-center justify-between pt-1">
                           <span class="text-xs text-on-surface-secondary">Status</span>
                           <span
-                            class="text-xs px-2 py-0.5 rounded-full font-medium"
+                            class="text-xs px-2 py-1 rounded-full font-medium border"
                             :class="provisioningStatusClass(container.provisioning.cpu)"
                           >
                             {{ provisioningStatus(container.provisioning.cpu) }}
@@ -319,7 +319,7 @@
                         <div class="flex items-center justify-between pt-1">
                           <span class="text-xs text-on-surface-secondary">Status</span>
                           <span
-                            class="text-xs px-2 py-0.5 rounded-full font-medium"
+                            class="text-xs px-2 py-1 rounded-full font-medium border"
                             :class="provisioningStatusClass(container.provisioning.memory)"
                           >
                             {{ provisioningStatus(container.provisioning.memory) }}
@@ -484,9 +484,9 @@ const provisioningStatus = (provisioning: Compute.ProvisioningType): string => {
 }
 
 const provisioningStatusClass = (provisioning: Compute.ProvisioningType): string => {
-  if (provisioning.is_over_provisioned) return 'bg-warning-light/20 text-warning-light'
-  if (provisioning.is_under_provisioned) return 'bg-error-light/20 text-error-light'
-  return 'bg-success-light/20 text-success-light'
+  if (provisioning.is_over_provisioned) return 'bg-warning-light/20 text-warning-light border-warning-light/30'
+  if (provisioning.is_under_provisioned) return 'bg-error-light/20 text-error-light border-error-light/30'
+  return 'bg-success-light/20 text-success-light border-success-light/30'
 }
 
 const metricColor = (value: number, threshold: number): string => {

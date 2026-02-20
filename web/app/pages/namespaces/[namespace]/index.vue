@@ -34,7 +34,7 @@
           </h1>
           <div class="flex items-center space-x-2">
             <span
-              class="px-3 py-1 rounded-full text-xs border"
+              class="px-3 py-1 rounded-full text-xs font-medium border"
               :class="phaseBadgeClass"
             >
               {{ data?.phase }}

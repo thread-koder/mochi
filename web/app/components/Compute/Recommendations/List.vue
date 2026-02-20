@@ -145,27 +145,27 @@
               <span class="text-primary-light font-medium text-sm">{{ record.workload_name }}</span>
             </td>
             <td class="py-3 px-4">
-              <span class="px-2 py-1 rounded text-xs bg-primary/20 text-primary-light">
+              <span class="px-2 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
                 {{ record.workload_type }}
               </span>
             </td>
             <td class="py-3 px-4">
               <span
                 :class="statusBadgeClass(record.status)"
-                class="px-2 py-1 rounded text-xs font-medium"
+                class="px-2 py-1 rounded-full text-xs font-medium border"
               >
                 {{ formatTitleCase(record.status) }}
               </span>
             </td>
             <td class="py-3 px-4">
-              <span class="px-2 py-1 rounded text-xs bg-secondary/20 text-secondary-light">
+              <span class="px-2 py-1 rounded-full text-xs font-medium bg-secondary/20 text-secondary-light border border-secondary/30">
                 {{ formatTitleCase(record.recommendation_mode) }}
               </span>
             </td>
             <td class="py-3 px-4">
               <span
                 :class="scoreBadgeClass(averageConfidence(record))"
-                class="px-2 py-1 rounded text-xs font-medium"
+                class="px-2 py-1 rounded-full text-xs font-medium border"
               >
                 {{ formatPercentage(averageConfidence(record)) }}
               </span>

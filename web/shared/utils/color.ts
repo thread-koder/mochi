@@ -53,12 +53,12 @@ export const scoreBadgeClass = (
   const midThreshold = options?.midThreshold ?? 0.6
 
   if (value === undefined || value === null) {
-    return 'bg-on-surface-muted/20 text-on-surface-muted'
+    return 'bg-on-surface-muted/20 text-on-surface-muted border-on-surface-muted/30'
   }
 
-  if (value >= highThreshold) return 'bg-success-light/20 text-success-light'
-  if (value >= midThreshold) return 'bg-warning-light/20 text-warning-light'
-  return 'bg-error-light/20 text-error-light'
+  if (value >= highThreshold) return 'bg-success-light/20 text-success-light border-success-light/30'
+  if (value >= midThreshold) return 'bg-warning-light/20 text-warning-light border-warning-light/30'
+  return 'bg-error-light/20 text-error-light border-error-light/30'
 }
 
 /**

@@ -34,8 +34,8 @@
       :pods="nsData.standalone_pods"
       :namespace="nsData.name"
       title="Standalone Pods"
-      badge-label="Pod"
-      badge-class="bg-secondary/20 text-secondary-light"
+      badge-label="Standalone"
+      badge-class="bg-secondary/20 text-secondary-light border-secondary-light/30"
     />
 
     <!-- System Pods -->
@@ -45,7 +45,7 @@
       :namespace="nsData.name"
       title="System Pods"
       badge-label="System"
-      badge-class="bg-warning/20 text-warning-light"
+      badge-class="bg-warning/20 text-warning-light border-warning-light/30"
     />
   </div>
 </template>

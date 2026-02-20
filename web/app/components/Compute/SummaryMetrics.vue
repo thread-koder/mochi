@@ -88,13 +88,13 @@
           <span class="text-sm text-on-surface-secondary">Anomalies:</span>
           <span
             v-if="(utilization?.cpu?.anomalies?.anomaly_count ?? 0) > 0"
-            class="text-sm bg-error/20 text-error-light px-2 py-1 rounded"
+            class="text-sm font-medium bg-error/20 text-error-light border border-error-light/30 px-2 py-1 rounded-full"
           >
             {{ utilization?.cpu?.anomalies?.anomaly_count ?? 0 }} detected
           </span>
           <span
             v-else
-            class="text-sm text-on-surface-secondary py-1 rounded"
+            class="text-sm text-on-surface-secondary py-1 rounded-full"
           >
             No anomalies
           </span>
@@ -185,13 +185,13 @@
           <span class="text-sm text-on-surface-secondary">Anomalies:</span>
           <span
             v-if="(utilization?.memory?.anomalies?.anomaly_count ?? 0) > 0"
-            class="text-sm bg-error/20 text-error-light px-2 py-1 rounded"
+            class="text-sm font-medium bg-error/20 text-error-light border border-error-light/30 px-2 py-1 rounded-full"
           >
             {{ utilization?.memory?.anomalies?.anomaly_count ?? 0 }} detected
           </span>
           <span
             v-else
-            class="text-sm text-on-surface-secondary py-1 rounded"
+            class="text-sm text-on-surface-secondary py-1 rounded-full"
           >
             No anomalies
           </span>

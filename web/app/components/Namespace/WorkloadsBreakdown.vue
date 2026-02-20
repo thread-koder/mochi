@@ -87,7 +87,7 @@
               </NuxtLink>
             </td>
             <td class="py-3 px-4">
-              <span class="px-2 py-1 rounded text-xs bg-primary/20 text-primary-light">
+              <span class="px-2 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
                 {{ workload.workload_type }}
               </span>
             </td>

@@ -47,7 +47,7 @@
             <NuxtLink
               v-if="data"
               :to="`/namespaces/${data.namespace}/workloads/${data.workload_type}/${data.workload_name}`"
-              class="px-3 py-1 rounded-full text-xs bg-primary/20 text-primary-light border border-primary/30 hover:bg-primary/30 transition-colors"
+              class="px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30 hover:bg-primary/30 transition-colors"
             >
               {{ data.workload_name }}
             </NuxtLink>
@@ -61,7 +61,7 @@
             <!-- Created -->
             <span
               v-if="data?.created_at"
-              class="px-3 py-1 rounded-full text-xs bg-primary/20 text-primary-light border border-primary/30"
+              class="px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30"
             >
               Created {{ timeAgo(data.created_at) }}
             </span>

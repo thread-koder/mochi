@@ -21,7 +21,7 @@
          transition-all text-on-surface-secondary hover:text-on-surface"
       >
         <span
-          class="px-2 py-1 rounded text-xs"
+          class="px-2 py-1 rounded-full text-xs font-medium border"
           :class="badgeClass"
         >
           {{ badgeLabel }}

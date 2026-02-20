@@ -30,7 +30,7 @@
           </div>
           <div class="flex items-center justify-between min-h-9">
             <span class="text-sm text-on-surface-secondary shrink-0">Type:</span>
-            <span class="px-2 py-1 rounded text-sm bg-primary/20 text-primary-light shrink-0">{{ recommendation.workload_type }}</span>
+            <span class="px-2 py-1 rounded-full text-sm font-medium bg-primary/20 text-primary-light border border-primary/30 shrink-0">{{ recommendation.workload_type }}</span>
           </div>
         </div>
       </div>
@@ -45,21 +45,21 @@
             <span class="text-sm text-on-surface-secondary shrink-0">Mode:</span>
             <span class="text-sm text-on-surface font-medium">{{ formatTitleCase(recommendation.recommendation_mode) }}</span>
           </div>
-          <div class="flex items-center justify-between min-h-9">
-            <span class="text-sm text-on-surface-secondary shrink-0">Status:</span>
-            <span
-              :class="statusBadgeClass(recommendation.status)"
-              class="px-2 py-1 rounded text-sm shrink-0"
-            >
-              {{ formatTitleCase(recommendation.status) }}
-            </span>
-          </div>
           <div
             v-if="recommendation.analysis_time_range"
             class="flex items-center justify-between min-h-9"
           >
             <span class="text-sm text-on-surface-secondary shrink-0">Analysis Period:</span>
             <span class="text-sm text-on-surface font-medium">{{ formatDuration(recommendation.analysis_time_range) }}</span>
+          </div>
+          <div class="flex items-center justify-between min-h-9">
+            <span class="text-sm text-on-surface-secondary shrink-0">Status:</span>
+            <span
+              :class="statusBadgeClass(recommendation.status)"
+              class="px-2 py-1 rounded-full text-sm font-medium border shrink-0"
+            >
+              {{ formatTitleCase(recommendation.status) }}
+            </span>
           </div>
         </div>
       </div>

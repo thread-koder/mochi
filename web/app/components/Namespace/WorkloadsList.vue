@@ -19,7 +19,7 @@
         :to="`/namespaces/${namespace}/workloads/${workload.type}/${workload.name}`"
         class="flex items-center space-x-4 glass hover:bg-primary/10 rounded-lg p-4 transition-all text-on-surface-secondary hover:text-on-surface"
       >
-        <span class="px-2 py-1 rounded text-xs bg-primary/20 text-primary-light">
+        <span class="px-2 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
           {{ workload.type }}
         </span>
         <div class="flex-1">

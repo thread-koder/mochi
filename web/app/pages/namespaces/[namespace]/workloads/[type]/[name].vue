@@ -33,16 +33,16 @@
             {{ data?.name }}
           </h1>
           <div class="flex items-center space-x-2 flex-wrap">
-            <span class="px-3 py-1 rounded-full text-xs bg-primary/20 text-primary-light border border-primary/30">
+            <span class="px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
               {{ data?.type }}
             </span>
             <span
               v-if="data?.type !== 'Pod'"
-              class="px-3 py-1 rounded-full text-xs bg-primary/20 text-primary-light border border-primary/30"
+              class="px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30"
             >
               {{ data?.ready }}/{{ data?.replicas }} Replicas
             </span>
-            <span class="px-3 py-1 rounded-full text-xs bg-primary/20 text-primary-light border border-primary/30">
+            <span class="px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
               Created {{ timeAgo(data?.created_at ?? '') }}
             </span>
           </div>
