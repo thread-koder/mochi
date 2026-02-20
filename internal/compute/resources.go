@@ -47,7 +47,7 @@ type RecommendationConfig struct {
 	MinCPURequest float64
 	// Minimum memory request in bytes (default: 64Mi)
 	MinMemoryRequest int64
-	// Minimum confidence threshold to generate recommendations (default: 0.5)
+	// Minimum confidence threshold to generate recommendations (default: 0.8)
 	MinConfidenceThreshold float64
 	// Burst detection threshold: if Max > percentile * BurstThreshold, treat as burst workload
 	BurstThreshold float64
@@ -75,7 +75,7 @@ func DefaultRecommendationConfig() RecommendationConfig {
 		CostOptimizedMemoryLimitMargin:   1.2,              // 20% headroom for cost-optimized memory limits
 		MinCPURequest:                    0.01,             // 10m minimum
 		MinMemoryRequest:                 64 * 1024 * 1024, // 64Mi minimum
-		MinConfidenceThreshold:           0.5,              // 50% minimum confidence
+		MinConfidenceThreshold:           0.8,              // 80% minimum confidence
 		BurstThreshold:                   1.6,              // Max > 1.6x percentile = burst workload
 		LimitMultiplier:                  1.5,              // 1.5x limit
 		CostOptimizedLimitMultiplier:     1.2,              // 1.2x limit for cost-optimized mode
@@ -152,15 +152,8 @@ func CalculateCPURequestRecommendation(
 	stability StabilityResult,
 	config RecommendationConfig,
 ) (*float64, error) {
-	// Adjust confidence threshold based on efficiency
-	effectiveThreshold := config.MinConfidenceThreshold
-	if provisioning.Efficiency < 0.3 {
-		// Low efficiency = be more aggressive (lower threshold)
-		effectiveThreshold = effectiveThreshold * 0.8
-	}
-
 	// If we don't have enough confidence, don't recommend
-	if provisioning.Confidence < effectiveThreshold {
+	if provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil, nil
 	}
 
@@ -305,14 +298,8 @@ func CalculateCPULimitRecommendation(
 	recommendedRequest *float64,
 	currentRequest *float64,
 ) (*float64, error) {
-	// Adjust confidence threshold based on efficiency
-	effectiveThreshold := config.MinConfidenceThreshold
-	if provisioning.Efficiency < 0.3 {
-		effectiveThreshold = effectiveThreshold * 0.8
-	}
-
 	// If we don't have enough confidence, don't recommend
-	if provisioning.Confidence < effectiveThreshold {
+	if provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil, nil
 	}
 
@@ -444,14 +431,8 @@ func CalculateMemoryRequestRecommendation(
 	stability StabilityResult,
 	config RecommendationConfig,
 ) (*float64, error) {
-	// Adjust confidence threshold based on efficiency
-	effectiveThreshold := config.MinConfidenceThreshold
-	if provisioning.Efficiency < 0.3 {
-		effectiveThreshold = effectiveThreshold * 0.8
-	}
-
 	// If we don't have enough confidence, don't recommend
-	if provisioning.Confidence < effectiveThreshold {
+	if provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil, nil
 	}
 
@@ -595,14 +576,8 @@ func CalculateMemoryLimitRecommendation(
 	recommendedRequest *float64,
 	currentRequest *float64,
 ) (*float64, error) {
-	// Adjust confidence threshold based on efficiency
-	effectiveThreshold := config.MinConfidenceThreshold
-	if provisioning.Efficiency < 0.3 {
-		effectiveThreshold = effectiveThreshold * 0.8
-	}
-
 	// If we don't have enough confidence, don't recommend
-	if provisioning.Confidence < effectiveThreshold {
+	if provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil, nil
 	}
 
