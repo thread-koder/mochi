@@ -1,7 +1,7 @@
 <template>
   <div class="p-8">
     <!-- Header -->
-    <div class="mb-8">
+    <div class="mb-4">
       <!-- Breadcrumb -->
       <div class="flex items-center space-x-2 text-sm mb-4">
         <NuxtLink
