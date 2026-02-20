@@ -21,17 +21,17 @@
       >
         <table class="w-full">
           <thead>
-            <tr class="border-b border-primary/20">
-              <th class="text-left py-3 px-4 text-sm font-semibold text-on-surface-secondary">
+            <tr class="border-b border-primary/20 text-sm text-on-surface-secondary">
+              <th class="text-left py-3 px-4">
                 Container
               </th>
-              <th class="text-left py-3 px-4 text-sm font-semibold text-on-surface-secondary">
+              <th class="text-left py-3 px-4">
                 CPU
               </th>
-              <th class="text-left py-3 px-4 text-sm font-semibold text-on-surface-secondary">
+              <th class="text-left py-3 px-4">
                 Memory
               </th>
-              <th class="text-center py-3 px-4 text-sm font-semibold text-on-surface-secondary">
+              <th class="text-center py-3 px-4">
                 Confidence
               </th>
             </tr>

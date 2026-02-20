@@ -105,7 +105,7 @@
             >
               <span
                 v-if="filters.namespace"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium
+                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium
                  bg-primary/20 text-primary-light border border-primary/30"
               >
                 <Icon
@@ -134,7 +134,7 @@
             >
               <span
                 v-if="filters.status"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium
+                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium
                  bg-primary/20 text-primary-light border border-primary/30"
               >
                 <Icon
@@ -163,7 +163,7 @@
             >
               <span
                 v-if="filters.mode"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium
+                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium
                  bg-primary/20 text-primary-light border border-primary/30"
               >
                 <Icon
@@ -192,7 +192,7 @@
             >
               <span
                 v-if="filters.workloadType"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium
+                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium
                  bg-primary/20 text-primary-light border border-primary/30"
               >
                 <Icon
@@ -221,7 +221,7 @@
             >
               <span
                 v-if="filters.workloadName"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium
+                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium
                  bg-primary/20 text-primary-light border border-primary/30"
               >
                 <Icon
@@ -244,7 +244,7 @@
 
           <!-- Clear All Button -->
           <button
-            class="px-3 py-1.5 rounded-lg text-xs font-medium text-on-surface-secondary
+            class="px-4 py-2 rounded-lg text-xs font-medium text-on-surface-secondary
              hover:bg-primary/10 hover:text-on-surface transition-all cursor-pointer
              flex items-center gap-1.5"
             @click="clearFilters"
