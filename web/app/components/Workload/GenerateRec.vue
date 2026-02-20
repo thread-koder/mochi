@@ -174,6 +174,9 @@ const generateRecommendation = async () => {
   try {
     const recommendation = await $api<Compute.Recommendation>(
       `/api/v1/compute/recommendations/generate/${props.workloadType}/${props.workloadName}?namespace=${props.namespace}&timeRange=${timeRange.value}&mode=${selectedMode.value}`,
+      {
+        method: 'POST',
+      },
     )
 
     emit('generated', recommendation)
