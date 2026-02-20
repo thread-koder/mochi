@@ -181,7 +181,8 @@ func CalculateCPURequestRecommendation(
 	// Calculate pressure factors
 	cpuThrottlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
 	cpuPressureFactor := calculateCPUPressureFactor(stability.CPUPressure)
-	pressureFactor := cpuThrottlingFactor * cpuPressureFactor
+	// Use the higher of the two pressure factors
+	pressureFactor := math.Max(cpuThrottlingFactor, cpuPressureFactor)
 
 	// Calculate recommended request based on mode
 	var recommendedCores float64
@@ -315,7 +316,8 @@ func CalculateCPULimitRecommendation(
 	// Calculate pressure factors
 	cpuThrottlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
 	cpuPressureFactor := calculateCPUPressureFactor(stability.CPUPressure)
-	pressureFactor := cpuThrottlingFactor * cpuPressureFactor
+	// Use the higher of the two pressure factors
+	pressureFactor := math.Max(cpuThrottlingFactor, cpuPressureFactor)
 
 	// Calculate safety margin based on mode
 	var safetyMargin float64
@@ -733,8 +735,10 @@ func calculateCPUThrottlingPressureFactor(throttling float64) float64 {
 		// Minor throttling (1% to 10%): moderate scaling from 1.01 to 1.6
 		return 1.01 + (throttling-0.01)/0.09*0.59
 	}
-	// Severe throttling (>= 10%): aggressive scaling from 1.6, scales linearly to 100% (6.1x at 100%)
-	return 1.6 + (throttling-0.1)*5.0
+	// Severe throttling (>= 10%): aggressive scaling from 1.6, scales linearly
+	// Capped at 3.0 (reached at ~38% throttling) to avoid extreme values
+	val := 1.6 + (throttling-0.1)*5.0
+	return math.Min(val, 3.0)
 }
 
 // Calculates CPU pressure factor using gradual scaling
@@ -746,39 +750,47 @@ func calculateCPUPressureFactor(pressure float64) float64 {
 		// Low pressure (0-20%): gentle scaling from 1.0 to 1.05
 		return 1.0 + pressure*0.25
 	}
-	// Higher pressure (>= 20%): moderate scaling from 1.05, scales linearly to 100% (3.05x at 100%)
-	return 1.05 + (pressure-0.2)*2.5
+	// Higher pressure (>= 20%): moderate scaling from 1.05, scales linearly
+	// Capped at 2.0 (reached at ~58% pressure) to avoid extreme values
+	val := 1.05 + (pressure-0.2)*2.5
+	return math.Min(val, 2.0)
 }
 
 // Calculates memory pressure factor using gradual scaling
 func calculateMemoryPressureFactor(oom float64, failCnt float64, pressure float64) float64 {
 	pressureFactor := 1.0
 
-	// OOM events scale based on count
+	// If allocation failures exist, add a small boost
+	if failCnt > 0 {
+		pressureFactor = 1.25
+	}
+
+	// Calculate OOM Factor
+	oomFactor := 1.0
 	if oom > 0 {
 		// Standard: 1 OOM = 2.0x, 2 OOM = 2.5x, 3 OOM = 3.0x, 4+ OOM = 3.5x
 		extraPerOOM := math.Max(0, (oom-1)*0.5)
-		pressureFactor = 2.0 + math.Min(1.5, extraPerOOM)
-	} else {
-		// No OOM: consider allocation failures
-		if failCnt > 0 {
-			// Allocation failures: moderate boost from 1.0 to 1.25
-			pressureFactor = 1.25
-		}
+		oomFactor = 2.0 + math.Min(1.5, extraPerOOM)
+	}
 
-		// Memory pressure
-		if pressure > 0 {
-			if pressure < 0.1 {
-				// Low pressure (0-10%): gentle scaling from 1.0 to 1.05
-				pressureBoost := pressure * 0.5
-				pressureFactor = math.Max(pressureFactor, 1.0+pressureBoost)
-			} else {
-				// Higher pressure (>= 10%): moderate scaling from 1.05, scales linearly to 100% (3.075x at 100%)
-				pressureBoost := 1.05 + (pressure-0.1)*2.25
-				pressureFactor = math.Max(pressureFactor, pressureBoost)
-			}
+	// Calculate Pressure Factor
+	psiFactor := 1.0
+	if pressure > 0 {
+		if pressure < 0.1 {
+			// Low pressure (0-10%): gentle scaling from 1.0 to 1.05
+			psiFactor = 1.0 + (pressure * 0.5)
+		} else {
+			// Higher pressure (>= 10%): moderate scaling from 1.05, scales linearly
+			// Capped at 3.0 (reached at ~83% pressure) to avoid extreme values
+			val := 1.05 + (pressure-0.1)*2.25
+			psiFactor = math.Min(val, 3.0)
 		}
 	}
+
+	// Use the maximum of the three signals
+	// This ensures we prioritize the most critical distress signal
+	pressureFactor = math.Max(pressureFactor, oomFactor)
+	pressureFactor = math.Max(pressureFactor, psiFactor)
 
 	return pressureFactor
 }
