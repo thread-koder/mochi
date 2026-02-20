@@ -107,12 +107,12 @@ func (w *ResourceSyncWorker) sync() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	log.Info().Msg("Starting resources sync process...")
+	log.Info().Msg("Starting sync process...")
 	// Sync all resources
 	if err := kubernetes.SyncResources(ctx); err != nil {
 		log.Warn().Err(err).Msg("Failed to sync resources")
 	}
-	log.Info().Msg("Resources sync process completed")
+	log.Info().Msg("Sync process completed")
 
 	// Run cleanup
 	w.cleanup(ctx)
