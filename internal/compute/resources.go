@@ -3,6 +3,8 @@ package compute
 import (
 	"fmt"
 	"math"
+
+	"github.com/thread_koder/mochi/internal/config"
 )
 
 // Represents recommended resource values
@@ -64,24 +66,24 @@ type RecommendationConfig struct {
 // Returns default recommendation configuration
 func DefaultRecommendationConfig() RecommendationConfig {
 	return RecommendationConfig{
-		Mode:                             ModeBurstable,    // Default: optimize for efficiency
-		CPURequestMargin:                 1.25,             // 25% headroom for CPU requests
-		CPULimitMargin:                   1.35,             // 35% headroom for CPU limits
-		MemoryRequestMargin:              1.2,              // 20% headroom for memory requests
-		MemoryLimitMargin:                1.3,              // 30% headroom for memory limits
-		CostOptimizedCPURequestMargin:    1.15,             // 15% headroom for cost-optimized CPU requests
-		CostOptimizedCPULimitMargin:      1.2,              // 20% headroom for cost-optimized CPU limits
-		CostOptimizedMemoryRequestMargin: 1.15,             // 15% headroom for cost-optimized memory requests
-		CostOptimizedMemoryLimitMargin:   1.2,              // 20% headroom for cost-optimized memory limits
-		MinCPURequest:                    0.01,             // 10m minimum
-		MinMemoryRequest:                 64 * 1024 * 1024, // 64Mi minimum
-		MinConfidenceThreshold:           0.8,              // 80% minimum confidence
-		BurstThreshold:                   1.6,              // Max > 1.6x percentile = burst workload
-		LimitMultiplier:                  1.5,              // 1.5x limit
-		CostOptimizedLimitMultiplier:     1.2,              // 1.2x limit for cost-optimized mode
-		CostOptimizedMaxReductionRatio:   0.5,              // at most 50% reduction per step (floor 50% of current)
-		BurstableMaxReductionRatio:       0.4,              // at most 40% reduction per step (floor 60% of current)
-		GuaranteedMaxReductionRatio:      0.3,              // at most 30% reduction per step (floor 70% of current)
+		Mode:                             ModeBurstable,                                   // Default: optimize for efficiency
+		CPURequestMargin:                 1.25,                                            // 25% headroom for CPU requests
+		CPULimitMargin:                   1.35,                                            // 35% headroom for CPU limits
+		MemoryRequestMargin:              1.2,                                             // 20% headroom for memory requests
+		MemoryLimitMargin:                1.3,                                             // 30% headroom for memory limits
+		CostOptimizedCPURequestMargin:    1.15,                                            // 15% headroom for cost-optimized CPU requests
+		CostOptimizedCPULimitMargin:      1.2,                                             // 20% headroom for cost-optimized CPU limits
+		CostOptimizedMemoryRequestMargin: 1.15,                                            // 15% headroom for cost-optimized memory requests
+		CostOptimizedMemoryLimitMargin:   1.2,                                             // 20% headroom for cost-optimized memory limits
+		MinCPURequest:                    0.01,                                            // 10m minimum
+		MinMemoryRequest:                 64 * 1024 * 1024,                                // 64Mi minimum
+		MinConfidenceThreshold:           config.AppConfig.Compute.MinConfidenceThreshold, // Minimum confidence (default: 0.8)
+		BurstThreshold:                   1.6,                                             // Max > 1.6x percentile = burst workload
+		LimitMultiplier:                  1.5,                                             // 1.5x limit
+		CostOptimizedLimitMultiplier:     1.2,                                             // 1.2x limit for cost-optimized mode
+		CostOptimizedMaxReductionRatio:   0.5,                                             // at most 50% reduction per step (floor 50% of current)
+		BurstableMaxReductionRatio:       0.4,                                             // at most 40% reduction per step (floor 60% of current)
+		GuaranteedMaxReductionRatio:      0.3,                                             // at most 30% reduction per step (floor 70% of current)
 	}
 }
 

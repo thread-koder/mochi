@@ -18,6 +18,12 @@ type Config struct {
 	Prometheus PrometheusConfig `mapstructure:"prometheus"`
 	Redis      RedisConfig      `mapstructure:"redis"`
 	Workers    WorkerConfig     `mapstructure:"workers"`
+	Compute    ComputeConfig    `mapstructure:"compute"`
+}
+
+// Compute/recommendation tuning.
+type ComputeConfig struct {
+	MinConfidenceThreshold float64 `mapstructure:"min_confidence_threshold"` // Minimum confidence (0-1) to generate recommendations
 }
 
 // Holds logger configuration
@@ -84,6 +90,7 @@ type WorkerConfig struct {
 	ResourceSyncInterval int      `mapstructure:"resource_sync_interval"` // Resource sync interval in seconds
 	ExcludeNamespaces    []string `mapstructure:"exclude_namespaces"`     // List of namespaces to exclude from syncing
 	IncludeNamespaces    []string `mapstructure:"include_namespaces"`     // If non-empty, only sync these namespaces (exclude_namespaces ignored)
+	Retention            int      `mapstructure:"retention"`              // Keep data for this many days
 }
 
 var AppConfig *Config
@@ -183,6 +190,10 @@ func setDefaults() {
 	viper.SetDefault("workers.resource_sync_interval", 120) // 2 minutes
 	viper.SetDefault("workers.exclude_namespaces", []string{"default", "kube-system", "kube-public", "kube-node-lease"})
 	viper.SetDefault("workers.include_namespaces", []string{})
+	viper.SetDefault("workers.retention", 90) // Days
+
+	// Compute defaults
+	viper.SetDefault("compute.min_confidence_threshold", 0.8)
 }
 
 // Validates the entire configuration
@@ -207,6 +218,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Workers.Validate(); err != nil {
 		return fmt.Errorf("workers config: %w", err)
+	}
+	if err := c.Compute.Validate(); err != nil {
+		return fmt.Errorf("compute config: %w", err)
 	}
 	return nil
 }
@@ -348,11 +362,28 @@ func (c *WorkerConfig) Validate() error {
 	if c.ResourceSyncInterval <= 0 {
 		return fmt.Errorf("resource_sync_interval must be greater than 0, got: %d", c.ResourceSyncInterval)
 	}
+	if c.Retention <= 0 {
+		return fmt.Errorf("retention must be at least 1 day, got: %d", c.Retention)
+	}
+	if c.Retention > 3650 {
+		return fmt.Errorf("retention must be at most 3650 days (about 10 years), got: %d", c.Retention)
+	}
 	if c.ExcludeNamespaces == nil {
 		c.ExcludeNamespaces = []string{}
 	}
 	if c.IncludeNamespaces == nil {
 		c.IncludeNamespaces = []string{}
+	}
+	return nil
+}
+
+// Validates compute configuration
+func (c *ComputeConfig) Validate() error {
+	if c.MinConfidenceThreshold <= 0.2 {
+		return fmt.Errorf("min_confidence_threshold must be greater than 0.2 (values 0.2 or lower produce low-confidence recommendations); use a value between 0.5 and 0.95, got: %g", c.MinConfidenceThreshold)
+	}
+	if c.MinConfidenceThreshold >= 1.0 {
+		return fmt.Errorf("min_confidence_threshold must be less than 1.0 (1.0 would exclude all recommendations); use a value between 0.5 and 0.95, got: %g", c.MinConfidenceThreshold)
 	}
 	return nil
 }

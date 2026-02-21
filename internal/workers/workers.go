@@ -122,8 +122,11 @@ func (w *ResourceSyncWorker) sync() {
 func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	log := logger.WithComponent("workers")
 
+	// Set the the retention period and calculate the thresholds for cleanup
+	retentionDays := config.AppConfig.Workers.Retention
+	oldRecommendationsThreshold := time.Now().Add(-time.Duration(retentionDays) * 24 * time.Hour)
+
 	log.Info().Msg("Starting cleanup process...")
-	oldRecommendationsThreshold := time.Now().Add(-90 * 24 * time.Hour) // 90 days
 	if err := database.DeleteComputeRecommendationsOlderThan(ctx, oldRecommendationsThreshold); err != nil {
 		log.Warn().Err(err).Msg("Failed to delete old compute recommendations")
 	}

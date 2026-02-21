@@ -47,9 +47,14 @@ redis:
 
 workers:
   resource_sync_interval: 120 # Resource sync interval in seconds (2 minutes)
+  retention: 90 # Retention period in days, records older than this are eligible for cleanup
   exclude_namespaces: # List of namespaces to exclude from syncing
     - "default"
     - "kube-system"
     - "kube-public"
     - "kube-node-lease"
   include_namespaces: [] # If non-empty, only sync these namespaces (exclude_namespaces ignored)
+
+# Compute / recommendation tuning
+compute:
+  min_confidence_threshold: 0.8 # Minimum confidence (0-1) to generate recommendations
