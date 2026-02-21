@@ -23,23 +23,6 @@ type QueryOptions struct {
 	RangeDuration string
 }
 
-// Represents pod-level metric results
-type PodMetricResult struct {
-	Pod       string    `json:"pod"`
-	Namespace string    `json:"namespace"`
-	Container string    `json:"container"`
-	Node      string    `json:"node"`
-	Value     float64   `json:"value"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-// Represents namespace-level aggregated metric results
-type NamespaceMetricResult struct {
-	Namespace string    `json:"namespace"`
-	Value     float64   `json:"value"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
 // Executes a PromQL range query
 func QueryRange(ctx context.Context, query string, r v1.Range, opts QueryOptions) (model.Value, v1.Warnings, error) {
 	// Execute range query
