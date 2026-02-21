@@ -213,7 +213,8 @@ func GenerateContainerRecommendation(
 }
 
 // Generates recommendations for a workload
-// For workloads with multiple replicas, analyzes all instances and takes the recommendation with higher confidence per unique container name
+// For workloads with multiple replicas, analyzes all instances
+// and takes the recommendation with the maximum recommended values per unique container name
 func GenerateWorkloadRecommendations(
 	ctx context.Context,
 	workloadType string,
