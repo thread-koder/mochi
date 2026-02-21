@@ -14,7 +14,7 @@
       >
         <!-- Backdrop -->
         <div
-          class="absolute inset-0 bg-black/50"
+          class="absolute inset-0 dark:bg-black/50 bg-black/30"
           @click.self="closeOnBackdropClick && close()"
         />
 
@@ -31,7 +31,7 @@
             v-show="isOpen"
             v-bind="$attrs"
             :id="`${title}-modal`"
-            class="relative z-10 glass rounded-xl p-6 w-full overflow-y-auto"
+            class="relative z-10 bg-surface-elevated rounded-xl p-6 w-full overflow-y-auto"
             role="dialog"
             aria-modal="true"
             :aria-labelledby="title"
