@@ -58,7 +58,7 @@
           :key="ns.name"
           :to="`/namespaces/${ns.name}`"
           class="flex items-center justify-between px-4 py-2 rounded-lg transition-all
-           text-sm hover:bg-primary/10 hover:text-on-surface-secondary text-on-surface-muted"
+           text-sm hover:bg-primary/10 hover:text-on-surface text-on-surface-muted"
           active-class="bg-primary/20 hover:bg-primary/20 border-l-2 border-primary-light
            text-primary-light hover:text-primary-light font-medium"
           exact-active-class="bg-primary/20 hover:bg-primary/20 border-l-2 border-primary-light
@@ -81,11 +81,11 @@
         <NuxtLink
           to="/recommendations/compute"
           class="block px-4 py-2 rounded-lg transition-all
-           text-sm hover:bg-primary/10 hover:text-on-surface-secondary text-on-surface-muted"
+           text-sm hover:bg-primary/10 hover:text-on-surface text-on-surface-muted"
           active-class="bg-primary/20 border-l-2 border-primary-light
-           text-primary-light hover:bg-primary/20 font-medium"
+           text-primary-light hover:bg-primary/20 hover:text-primary-light font-medium"
           exact-active-class="bg-primary/20 border-l-2 border-primary-light
-           text-primary-light hover:bg-primary/20 font-medium"
+           text-primary-light hover:bg-primary/20 hover:text-primary-light font-medium"
         >
           Compute
         </NuxtLink>
