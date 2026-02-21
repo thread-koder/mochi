@@ -3,7 +3,6 @@ package compute
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/thread_koder/mochi/internal/database"
 	"github.com/thread_koder/mochi/internal/prometheus"
+	"github.com/thread_koder/mochi/internal/timeseries"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -610,14 +610,14 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 	}
 
 	return ResourceMetrics{
-		CPU:            MatrixToDataPoints(cpuMatrix),
-		Memory:         MatrixToDataPoints(memoryMatrix),
-		CPUThrottling:  []DataPoint{{Timestamp: time.Now(), Value: cpuThrottling}},
-		CPUPressure:    []DataPoint{{Timestamp: time.Now(), Value: cpuPressure}},
-		MemoryFailCnt:  []DataPoint{{Timestamp: time.Now(), Value: memFailCnt}},
-		MemoryOOM:      []DataPoint{{Timestamp: time.Now(), Value: memOOM}},
-		MemoryPressure: []DataPoint{{Timestamp: time.Now(), Value: memPressure}},
-		Restarts:       []DataPoint{{Timestamp: time.Now(), Value: restarts}},
+		CPU:            timeseries.MatrixToDataPoints(cpuMatrix),
+		Memory:         timeseries.MatrixToDataPoints(memoryMatrix),
+		CPUThrottling:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuThrottling}},
+		CPUPressure:    []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuPressure}},
+		MemoryFailCnt:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: memFailCnt}},
+		MemoryOOM:      []timeseries.DataPoint{{Timestamp: time.Now(), Value: memOOM}},
+		MemoryPressure: []timeseries.DataPoint{{Timestamp: time.Now(), Value: memPressure}},
+		Restarts:       []timeseries.DataPoint{{Timestamp: time.Now(), Value: restarts}},
 	}, nil
 }
 
@@ -669,12 +669,12 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	}
 
 	// Aggregate CPU metrics
-	cpuDataPoints := MatrixToDataPoints(cpuMatrix)
-	aggregatedCPU := aggregateDataPointsByTimestamp(cpuDataPoints)
+	cpuDataPoints := timeseries.MatrixToDataPoints(cpuMatrix)
+	aggregatedCPU := timeseries.AggregateDataPointsByTimestamp(cpuDataPoints)
 
 	// Aggregate memory metrics
-	memoryDataPoints := MatrixToDataPoints(memoryMatrix)
-	aggregatedMemory := aggregateDataPointsByTimestamp(memoryDataPoints)
+	memoryDataPoints := timeseries.MatrixToDataPoints(memoryMatrix)
+	aggregatedMemory := timeseries.AggregateDataPointsByTimestamp(memoryDataPoints)
 
 	return ResourceMetrics{
 		CPU:    aggregatedCPU,
@@ -746,8 +746,8 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 
 			// Merge results
 			mu.Lock()
-			metrics.CPU = mergeDataPointsByTime(metrics.CPU, MatrixToDataPoints(cpuMatrix))
-			metrics.Memory = mergeDataPointsByTime(metrics.Memory, MatrixToDataPoints(memoryMatrix))
+			metrics.CPU = timeseries.MergeDataPointsByTime(metrics.CPU, timeseries.MatrixToDataPoints(cpuMatrix))
+			metrics.Memory = timeseries.MergeDataPointsByTime(metrics.Memory, timeseries.MatrixToDataPoints(memoryMatrix))
 			mu.Unlock()
 
 			return nil
@@ -809,8 +809,8 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	}
 
 	return ResourceMetrics{
-		CPU:    MatrixToDataPoints(cpuMatrix),
-		Memory: MatrixToDataPoints(memoryMatrix),
+		CPU:    timeseries.MatrixToDataPoints(cpuMatrix),
+		Memory: timeseries.MatrixToDataPoints(memoryMatrix),
 	}, nil
 }
 
@@ -855,59 +855,4 @@ func ParseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
 	}
 
 	return specs, nil
-}
-
-// Merges two slices of data points by timestamp (sums values at the same timestamp)
-// Used when combining data points from multiple sources (e.g., multiple pods in a workload)
-func mergeDataPointsByTime(existing []DataPoint, new []DataPoint) []DataPoint {
-	if len(existing) == 0 {
-		// If existing is empty, still aggregate new in case it has duplicate timestamps
-		return aggregateDataPointsByTimestamp(new)
-	}
-
-	// Create a map of timestamp -> sum of values
-	timeMap := make(map[time.Time]float64)
-	for _, dp := range existing {
-		timeMap[dp.Timestamp] += dp.Value
-	}
-	for _, dp := range new {
-		timeMap[dp.Timestamp] += dp.Value
-	}
-
-	return timeMapToSortedDataPoints(timeMap)
-}
-
-// Aggregates a single slice of data points by timestamp (sums values at the same timestamp)
-// Used when a single data source contains multiple series (e.g., multiple containers in a pod)
-func aggregateDataPointsByTimestamp(dataPoints []DataPoint) []DataPoint {
-	if len(dataPoints) == 0 {
-		return dataPoints
-	}
-
-	// Create a map of timestamp -> sum of values
-	timeMap := make(map[time.Time]float64)
-	for _, dp := range dataPoints {
-		timeMap[dp.Timestamp] += dp.Value
-	}
-
-	return timeMapToSortedDataPoints(timeMap)
-}
-
-// Converts a timestamp->value map to a sorted slice of DataPoints
-func timeMapToSortedDataPoints(timeMap map[time.Time]float64) []DataPoint {
-	// Convert back to sorted slice
-	result := make([]DataPoint, 0, len(timeMap))
-	for ts, val := range timeMap {
-		result = append(result, DataPoint{
-			Timestamp: ts,
-			Value:     val,
-		})
-	}
-
-	// Sort by timestamp
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Timestamp.Before(result[j].Timestamp)
-	})
-
-	return result
 }

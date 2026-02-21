@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/thread_koder/mochi/internal/config"
+	"github.com/thread_koder/mochi/internal/timeseries"
 )
 
 // Represents recommended resource values
@@ -840,7 +841,7 @@ func detectAndAdjustBurstyWorkload(
 // Calculates dynamic safety margin adjustments based on utilization patterns
 func calculateDynamicSafetyMargin(
 	baseMargin float64,
-	trend TrendResult,
+	trend timeseries.TrendResult,
 	cv float64,
 	anomalyCount int,
 	isBursty bool,
@@ -848,10 +849,10 @@ func calculateDynamicSafetyMargin(
 	safetyMargin := baseMargin
 
 	// Adjust safety margin based on trend
-	if trend.Direction == DirectionIncreasing && trend.Strength > 0.5 {
+	if trend.Direction == timeseries.DirectionIncreasing && trend.Strength > 0.5 {
 		// Increasing trend with strong signal = add extra headroom
 		safetyMargin *= 1.1
-	} else if trend.Direction == DirectionDecreasing && trend.Strength > 0.5 {
+	} else if trend.Direction == timeseries.DirectionDecreasing && trend.Strength > 0.5 {
 		// Decreasing trend = can be slightly less conservative
 		safetyMargin *= 0.95
 	}
