@@ -1,9 +1,5 @@
 package compute
 
-import (
-	"math"
-)
-
 // Max penalty per factor
 const (
 	maxPenaltyCPUThrottling  = 0.25 // 25% max penalty
@@ -63,31 +59,31 @@ func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
 	var totalPenalty float64
 
 	// OOMs: critical
-	totalPenalty += math.Min(result.MemoryOOM*0.5, maxPenaltyOOM)
+	totalPenalty += min(result.MemoryOOM*0.5, maxPenaltyOOM)
 
 	// Memory allocation failures: pre-OOM signal
-	totalPenalty += math.Min(result.MemoryFailCnt*0.2, maxPenaltyMemoryFailCnt)
+	totalPenalty += min(result.MemoryFailCnt*0.2, maxPenaltyMemoryFailCnt)
 
 	// Restarts: critical
-	totalPenalty += math.Min(result.Restarts*0.3, maxPenaltyRestarts)
+	totalPenalty += min(result.Restarts*0.3, maxPenaltyRestarts)
 
 	// Throttling: penalize if > 5%
 	if result.CPUThrottling > 0.05 {
 		penalty := (result.CPUThrottling - 0.05) * 2.0
-		totalPenalty += math.Min(penalty, maxPenaltyCPUThrottling)
+		totalPenalty += min(penalty, maxPenaltyCPUThrottling)
 	}
 
 	// Pressure: penalize if > 10% stalled
 	if result.CPUPressure > 0.1 {
 		penalty := (result.CPUPressure - 0.1) * 0.5
-		totalPenalty += math.Min(penalty, maxPenaltyCPUPressure)
+		totalPenalty += min(penalty, maxPenaltyCPUPressure)
 	}
 	if result.MemoryPressure > 0.1 {
 		penalty := (result.MemoryPressure - 0.1) * 1.0
-		totalPenalty += math.Min(penalty, maxPenaltyMemoryPressure)
+		totalPenalty += min(penalty, maxPenaltyMemoryPressure)
 	}
 
-	result.StabilityScore = math.Max(0.0, math.Min(1.0, 1.0-totalPenalty))
+	result.StabilityScore = max(0.0, min(1.0, 1.0-totalPenalty))
 
 	return result, nil
 }

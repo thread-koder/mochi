@@ -2,7 +2,6 @@ package compute
 
 import (
 	"fmt"
-	"math"
 )
 
 // Represents resource specifications (requests and limits)
@@ -84,7 +83,7 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 	} else if utilization.Stats.StdDev > 0 {
 		// Calculate confidence based on coefficient of variation
 		cv := utilization.Stats.StdDev / utilization.Stats.Mean
-		result.Confidence = math.Min(1.0, 1.0/(1.0+cv))
+		result.Confidence = min(1.0, 1.0/(1.0+cv))
 	} else {
 		// Zero variance (all values are the same)
 		result.Confidence = 1.0
@@ -110,12 +109,12 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 	if stability.CPUThrottling > ThrottlingThreshold {
 		result.IsUnderProvisioned = true
 		penalty := (stability.CPUThrottling - ThrottlingThreshold) * 2.0
-		result.Efficiency = math.Min(result.Efficiency, math.Max(0.0, 1.0-penalty))
+		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 	if stability.CPUPressure > PressureThreshold {
 		result.IsUnderProvisioned = true
 		penalty := (stability.CPUPressure - PressureThreshold) * 0.5
-		result.Efficiency = math.Min(result.Efficiency, math.Max(0.0, 1.0-penalty))
+		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 
 	// Analyze request utilization
@@ -157,7 +156,7 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 				requestEfficiency = 1.0 - ((result.RequestUtilization - OptimalUtilizationMax) / (1.0 - OptimalUtilizationMax))
 			}
 		}
-		result.Efficiency = math.Min(result.Efficiency, requestEfficiency)
+		result.Efficiency = min(result.Efficiency, requestEfficiency)
 	}
 
 	// Analyze limit utilization
@@ -174,12 +173,12 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 			} else {
 				limitPenalty = (1.0 - result.LimitUtilization) / CPUHeadroom
 			}
-			result.Efficiency = math.Min(result.Efficiency, limitPenalty)
+			result.Efficiency = min(result.Efficiency, limitPenalty)
 		}
 	}
 
 	// Clamp efficiency to 0-1
-	result.Efficiency = math.Max(0.0, math.Min(1.0, result.Efficiency))
+	result.Efficiency = max(0.0, min(1.0, result.Efficiency))
 
 	return result, nil
 }
@@ -200,7 +199,7 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 	} else if utilization.Stats.StdDev > 0 {
 		// Calculate confidence based on coefficient of variation
 		cv := utilization.Stats.StdDev / utilization.Stats.Mean
-		result.Confidence = math.Min(1.0, 1.0/(1.0+cv))
+		result.Confidence = min(1.0, 1.0/(1.0+cv))
 	} else {
 		// Zero variance (all values are the same)
 		result.Confidence = 1.0
@@ -225,18 +224,18 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 	// Force under-provisioned when OOM, failcnt, or pressure are above threshold
 	if stability.MemoryOOM > 0 {
 		result.IsUnderProvisioned = true
-		penalty := math.Min(stability.MemoryOOM*0.5, 0.35)
-		result.Efficiency = math.Min(result.Efficiency, math.Max(0.0, 1.0-penalty))
+		penalty := min(stability.MemoryOOM*0.5, 0.35)
+		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 	if stability.MemoryFailCnt > 0 {
 		result.IsUnderProvisioned = true
-		penalty := math.Min(stability.MemoryFailCnt*0.2, 0.25)
-		result.Efficiency = math.Min(result.Efficiency, math.Max(0.0, 1.0-penalty))
+		penalty := min(stability.MemoryFailCnt*0.2, 0.25)
+		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 	if stability.MemoryPressure > PressureThreshold {
 		result.IsUnderProvisioned = true
 		penalty := (stability.MemoryPressure - PressureThreshold) * 1.0
-		result.Efficiency = math.Min(result.Efficiency, math.Max(0.0, 1.0-penalty))
+		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 
 	// Analyze request utilization
@@ -272,7 +271,7 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 				requestEfficiency = 1.0 - ((result.RequestUtilization - OptimalUtilizationMax) / (1.0 - OptimalUtilizationMax))
 			}
 		}
-		result.Efficiency = math.Min(result.Efficiency, requestEfficiency)
+		result.Efficiency = min(result.Efficiency, requestEfficiency)
 	}
 
 	// Analyze limit utilization
@@ -289,12 +288,12 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 			} else {
 				limitPenalty = (1.0 - result.LimitUtilization) / MemoryHeadroom
 			}
-			result.Efficiency = math.Min(result.Efficiency, limitPenalty)
+			result.Efficiency = min(result.Efficiency, limitPenalty)
 		}
 	}
 
 	// Clamp efficiency to 0-1
-	result.Efficiency = math.Max(0.0, math.Min(1.0, result.Efficiency))
+	result.Efficiency = max(0.0, min(1.0, result.Efficiency))
 
 	return result, nil
 }
@@ -326,18 +325,18 @@ func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, sta
 }
 
 // Returns dynamic minimum request utilization from usage pattern
-func effectiveMinFromBurstiness(mean, p95, max float64) float64 {
+func effectiveMinFromBurstiness(mean, p95, peak float64) float64 {
 	if mean <= 0 {
 		return BurstEffectiveMinCeil
 	}
-	// Burstiness score from P95/mean and max/mean (higher ratio = more bursty)
-	burstScore := (p95/mean + max/mean) / 2.0
+	// Burstiness score from P95/mean and peak/mean (higher ratio = more bursty)
+	burstScore := (p95/mean + peak/mean) / 2.0
 	// Clamp burst score to 1.0
-	burstScore = math.Max(burstScore, 1.0)
+	burstScore = max(burstScore, 1.0)
 	// Effective min decreases as burstiness increases (allow lower util for bursty workloads)
 	effectiveMin := BurstEffectiveMinCeil - (burstScore-1.0)*0.1
 	// Clamp effective min to the floor and ceil
-	effectiveMin = math.Max(effectiveMin, BurstEffectiveMinFloor)
-	effectiveMin = math.Min(effectiveMin, BurstEffectiveMinCeil)
+	effectiveMin = max(effectiveMin, BurstEffectiveMinFloor)
+	effectiveMin = min(effectiveMin, BurstEffectiveMinCeil)
 	return effectiveMin
 }

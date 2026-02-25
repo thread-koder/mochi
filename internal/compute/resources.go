@@ -191,7 +191,7 @@ func CalculateCPURequestRecommendation(
 	cpuThrottlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
 	cpuPressureFactor := calculateCPUPressureFactor(stability.CPUPressure)
 	// Use the higher of the two pressure factors
-	pressureFactor := math.Max(cpuThrottlingFactor, cpuPressureFactor)
+	pressureFactor := max(cpuThrottlingFactor, cpuPressureFactor)
 
 	// Calculate recommended request based on mode
 	var recommendedCores float64
@@ -235,15 +235,11 @@ func CalculateCPURequestRecommendation(
 	// Only use Mean if it's higher than the recommendation
 	if utilization.Stats.Mean > 0 && recommendedCores < utilization.Stats.Mean {
 		meanBased := utilization.Stats.Mean * 1.15
-		if meanBased > recommendedCores {
-			recommendedCores = meanBased
-		}
+		recommendedCores = max(recommendedCores, meanBased)
 	}
 
 	// Apply minimum
-	if recommendedCores < config.MinCPURequest {
-		recommendedCores = config.MinCPURequest
-	}
+	recommendedCores = max(recommendedCores, config.MinCPURequest)
 
 	// If throttling exists and we have current requests
 	// don't recommend less than current and account for throttling pressure factor
@@ -257,25 +253,19 @@ func CalculateCPURequestRecommendation(
 			throttlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
 			minRequestFromThrottling = *currentRequest * throttlingFactor
 		}
-		if recommendedCores < minRequestFromThrottling {
-			recommendedCores = minRequestFromThrottling
-		}
+		recommendedCores = max(recommendedCores, minRequestFromThrottling)
 	}
 
 	// Max reduction per step: don't recommend less than (1 - maxReductionRatio) of current request
 	if currentRequest != nil && *currentRequest > 0 && recommendedCores < *currentRequest {
 		floor := *currentRequest * (1 - maxReductionRatio(config))
-		if recommendedCores < floor {
-			recommendedCores = floor
-		}
+		recommendedCores = max(recommendedCores, floor)
 	}
 
 	// Max increase per step: don't recommend more than current * MaxIncreaseRatio
 	if currentRequest != nil && *currentRequest > 0 && recommendedCores > *currentRequest {
 		ceiling := *currentRequest * config.MaxIncreaseRatio
-		if recommendedCores > ceiling {
-			recommendedCores = ceiling
-		}
+		recommendedCores = min(recommendedCores, ceiling)
 	}
 
 	// Round to reasonable precision (3 decimal places for CPU)
@@ -334,7 +324,7 @@ func CalculateCPULimitRecommendation(
 	cpuThrottlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
 	cpuPressureFactor := calculateCPUPressureFactor(stability.CPUPressure)
 	// Use the higher of the two pressure factors
-	pressureFactor := math.Max(cpuThrottlingFactor, cpuPressureFactor)
+	pressureFactor := max(cpuThrottlingFactor, cpuPressureFactor)
 
 	// Calculate safety margin based on mode
 	var safetyMargin float64
@@ -402,12 +392,10 @@ func CalculateCPULimitRecommendation(
 	}
 
 	// Maintain ratio and cover peak demand
-	recommendedCores := math.Max(limitFromPeak, limitFromRequest)
+	recommendedCores := max(limitFromPeak, limitFromRequest)
 
 	// Apply minimum
-	if recommendedCores < config.MinCPURequest {
-		recommendedCores = config.MinCPURequest
-	}
+	recommendedCores = max(recommendedCores, config.MinCPURequest)
 
 	// Ensure limit is at least equal to request
 	if effectiveRequest != nil && recommendedCores < *effectiveRequest {
@@ -473,7 +461,7 @@ func CalculateMemoryRequestRecommendation(
 
 	// Apply memory pressure factor: if OOM detected, use peak instead of percentile
 	if stability.MemoryOOM > 0 {
-		adjustedPercentile = math.Max(adjustedPercentile, peakUsage)
+		adjustedPercentile = max(adjustedPercentile, peakUsage)
 	}
 
 	// For first-time recommendations, use peak instead of percentile
@@ -530,39 +518,29 @@ func CalculateMemoryRequestRecommendation(
 	// Only use Mean if it's higher than the recommendation
 	if utilization.Stats.Mean > 0 && recommendedBytes < utilization.Stats.Mean {
 		meanBased := utilization.Stats.Mean * 1.15
-		if meanBased > recommendedBytes {
-			recommendedBytes = meanBased
-		}
+		recommendedBytes = max(recommendedBytes, meanBased)
 	}
 
 	// Apply minimum
-	if recommendedBytes < float64(config.MinMemoryRequest) {
-		recommendedBytes = float64(config.MinMemoryRequest)
-	}
+	recommendedBytes = max(recommendedBytes, float64(config.MinMemoryRequest))
 
 	// If OOM exists and we have current memory request
 	// don't reduce below current request and account for pressure factor
 	if (stability.MemoryOOM > 0 || stability.MemoryFailCnt > 0) && currentRequest != nil && *currentRequest > 0 {
 		minRequestFromOOM := *currentRequest * pressureFactor
-		if recommendedBytes < minRequestFromOOM {
-			recommendedBytes = minRequestFromOOM
-		}
+		recommendedBytes = max(recommendedBytes, minRequestFromOOM)
 	}
 
 	// Max reduction per step: don't recommend less than (1 - maxReductionRatio) of current request
 	if currentRequest != nil && *currentRequest > 0 && recommendedBytes < *currentRequest {
 		floor := *currentRequest * (1 - maxReductionRatio(config))
-		if recommendedBytes < floor {
-			recommendedBytes = floor
-		}
+		recommendedBytes = max(recommendedBytes, floor)
 	}
 
 	// Max increase per step: don't recommend more than current * MaxIncreaseRatio
 	if currentRequest != nil && *currentRequest > 0 && recommendedBytes > *currentRequest {
 		ceiling := float64(*currentRequest) * config.MaxIncreaseRatio
-		if recommendedBytes > ceiling {
-			recommendedBytes = ceiling
-		}
+		recommendedBytes = min(recommendedBytes, ceiling)
 	}
 
 	// Round to nearest byte
@@ -690,12 +668,10 @@ func CalculateMemoryLimitRecommendation(
 	}
 
 	// Maintain ratio and cover peak demand
-	recommendedBytes := math.Max(limitFromPeak, limitFromRequest)
+	recommendedBytes := max(limitFromPeak, limitFromRequest)
 
 	// Apply minimum
-	if recommendedBytes < float64(config.MinMemoryRequest) {
-		recommendedBytes = float64(config.MinMemoryRequest)
-	}
+	recommendedBytes = max(recommendedBytes, float64(config.MinMemoryRequest))
 
 	// Ensure limit is at least equal to request
 	if effectiveRequest != nil && recommendedBytes < *effectiveRequest {
@@ -763,7 +739,7 @@ func calculateCPUThrottlingPressureFactor(throttling float64) float64 {
 	// Severe throttling (>= 5%): from 1.15
 	// Capped at 3.0 (reached at ~42% throttling) to avoid extreme values
 	val := 1.15 + (throttling-0.05)*5.0
-	return math.Min(val, 3.0)
+	return min(val, 3.0)
 }
 
 // Calculates CPU pressure factor using gradual scaling
@@ -778,7 +754,7 @@ func calculateCPUPressureFactor(pressure float64) float64 {
 	// Higher pressure (>= 10%): moderate scaling from 1.05
 	// Capped at 2.0 (reached at ~48% pressure) to avoid extreme values
 	val := 1.05 + (pressure-0.1)*2.5
-	return math.Min(val, 2.0)
+	return min(val, 2.0)
 }
 
 // Calculates memory pressure factor using gradual scaling
@@ -794,8 +770,8 @@ func calculateMemoryPressureFactor(oom float64, failCnt float64, pressure float6
 	oomFactor := 1.0
 	if oom > 0 {
 		// Standard: 1 OOM = 2.0x, 2 OOM = 2.5x, 3 OOM = 3.0x, 4+ OOM = 3.5x
-		extraPerOOM := math.Max(0, (oom-1)*0.5)
-		oomFactor = 2.0 + math.Min(1.5, extraPerOOM)
+		extraPerOOM := max(0, (oom-1)*0.5)
+		oomFactor = 2.0 + min(1.5, extraPerOOM)
 	}
 
 	// Calculate Pressure Factor
@@ -808,14 +784,14 @@ func calculateMemoryPressureFactor(oom float64, failCnt float64, pressure float6
 			// Higher pressure (>= 10%): moderate scaling from 1.05
 			// Capped at 2.0 (reached at ~48% pressure) to avoid extreme values
 			val := 1.05 + (pressure-0.1)*2.5
-			psiFactor = math.Min(val, 2.0)
+			psiFactor = min(val, 2.0)
 		}
 	}
 
 	// Use the maximum of the three signals
 	// This ensures we prioritize the most critical distress signal
-	pressureFactor = math.Max(pressureFactor, oomFactor)
-	pressureFactor = math.Max(pressureFactor, psiFactor)
+	pressureFactor = max(pressureFactor, oomFactor)
+	pressureFactor = max(pressureFactor, psiFactor)
 
 	return pressureFactor
 }
@@ -942,7 +918,7 @@ func calculateOverallConfidence(
 	overallConfidence := (cpuProvisioning.Confidence * cpuWeight) + (memoryProvisioning.Confidence * memoryWeight)
 
 	// Ensure it's between 0 and 1
-	overallConfidence = math.Max(0.0, math.Min(1.0, overallConfidence))
+	overallConfidence = max(0.0, min(1.0, overallConfidence))
 
 	return overallConfidence
 }
