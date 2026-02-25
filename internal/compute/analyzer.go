@@ -152,7 +152,7 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 	}
 
 	// Analyze provisioning
-	provisioning, err := AnalyzeProvisioning(specs, utilization)
+	provisioning, err := AnalyzeProvisioning(specs, utilization, stability)
 	if err != nil {
 		return ContainerAnalysis{}, fmt.Errorf("failed to analyze provisioning: %w", err)
 	}
