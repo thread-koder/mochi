@@ -62,6 +62,8 @@ type RecommendationConfig struct {
 	CostOptimizedMaxReductionRatio float64
 	BurstableMaxReductionRatio     float64
 	GuaranteedMaxReductionRatio    float64
+	// Max increase ratio per step (default 2.5)
+	MaxIncreaseRatio float64
 }
 
 // Returns default recommendation configuration
@@ -85,6 +87,7 @@ func DefaultRecommendationConfig() RecommendationConfig {
 		CostOptimizedMaxReductionRatio:   0.5,                                             // at most 50% reduction per step (floor 50% of current)
 		BurstableMaxReductionRatio:       0.4,                                             // at most 40% reduction per step (floor 60% of current)
 		GuaranteedMaxReductionRatio:      0.3,                                             // at most 30% reduction per step (floor 70% of current)
+		MaxIncreaseRatio:                 2.5,                                             // at most 2.5x current per step
 	}
 }
 
@@ -143,6 +146,9 @@ func (config RecommendationConfig) Validate() error {
 	}
 	if config.GuaranteedMaxReductionRatio < 0 || config.GuaranteedMaxReductionRatio > 1 {
 		return fmt.Errorf("GuaranteedMaxReductionRatio must be between 0 and 1, got: %v", config.GuaranteedMaxReductionRatio)
+	}
+	if config.MaxIncreaseRatio < 1.0 || config.MaxIncreaseRatio > 5.0 {
+		return fmt.Errorf("MaxIncreaseRatio must be between 1 and 5, got: %v", config.MaxIncreaseRatio)
 	}
 	return nil
 }
@@ -241,10 +247,10 @@ func CalculateCPURequestRecommendation(
 
 	// If throttling exists and we have current requests
 	// don't recommend less than current and account for throttling pressure factor
-	// Cost_optimized mode: only apply floor when throttling exceeds 10% (accepts low throttling risk)
+	// Cost_optimized mode: only apply floor when throttling exceeds 5% (accepts low throttling risk)
 	if stability.CPUThrottling > 0 && currentRequest != nil && *currentRequest > 0 {
 		var minRequestFromThrottling float64
-		if config.Mode == ModeCostOptimized && stability.CPUThrottling <= 0.10 {
+		if config.Mode == ModeCostOptimized && stability.CPUThrottling <= 0.05 {
 			// Don't reduce below current
 			minRequestFromThrottling = *currentRequest
 		} else {
@@ -261,6 +267,14 @@ func CalculateCPURequestRecommendation(
 		floor := *currentRequest * (1 - maxReductionRatio(config))
 		if recommendedCores < floor {
 			recommendedCores = floor
+		}
+	}
+
+	// Max increase per step: don't recommend more than current * MaxIncreaseRatio
+	if currentRequest != nil && *currentRequest > 0 && recommendedCores > *currentRequest {
+		ceiling := *currentRequest * config.MaxIncreaseRatio
+		if recommendedCores > ceiling {
+			recommendedCores = ceiling
 		}
 	}
 
@@ -528,7 +542,7 @@ func CalculateMemoryRequestRecommendation(
 
 	// If OOM exists and we have current memory request
 	// don't reduce below current request and account for pressure factor
-	if stability.MemoryOOM > 0 && currentRequest != nil && *currentRequest > 0 {
+	if (stability.MemoryOOM > 0 || stability.MemoryFailCnt > 0) && currentRequest != nil && *currentRequest > 0 {
 		minRequestFromOOM := *currentRequest * pressureFactor
 		if recommendedBytes < minRequestFromOOM {
 			recommendedBytes = minRequestFromOOM
@@ -540,6 +554,14 @@ func CalculateMemoryRequestRecommendation(
 		floor := *currentRequest * (1 - maxReductionRatio(config))
 		if recommendedBytes < floor {
 			recommendedBytes = floor
+		}
+	}
+
+	// Max increase per step: don't recommend more than current * MaxIncreaseRatio
+	if currentRequest != nil && *currentRequest > 0 && recommendedBytes > *currentRequest {
+		ceiling := float64(*currentRequest) * config.MaxIncreaseRatio
+		if recommendedBytes > ceiling {
+			recommendedBytes = ceiling
 		}
 	}
 
@@ -734,13 +756,13 @@ func calculateCPUThrottlingPressureFactor(throttling float64) float64 {
 		// Very small throttling (0-1%): very gentle scaling from 1.0 to 1.01
 		return 1.0 + throttling*1.0
 	}
-	if throttling < 0.1 {
-		// Minor throttling (1% to 10%): moderate scaling from 1.01 to 1.6
-		return 1.01 + (throttling-0.01)/0.09*0.59
+	if throttling < 0.05 {
+		// Minor throttling (1% to 5%): moderate scaling from 1.01 to 1.15
+		return 1.01 + (throttling-0.01)*3.5
 	}
-	// Severe throttling (>= 10%): aggressive scaling from 1.6, scales linearly
-	// Capped at 3.0 (reached at ~38% throttling) to avoid extreme values
-	val := 1.6 + (throttling-0.1)*5.0
+	// Severe throttling (>= 5%): from 1.15
+	// Capped at 3.0 (reached at ~42% throttling) to avoid extreme values
+	val := 1.15 + (throttling-0.05)*5.0
 	return math.Min(val, 3.0)
 }
 
@@ -749,13 +771,13 @@ func calculateCPUPressureFactor(pressure float64) float64 {
 	if pressure <= 0 {
 		return 1.0
 	}
-	if pressure < 0.2 {
-		// Low pressure (0-20%): gentle scaling from 1.0 to 1.05
-		return 1.0 + pressure*0.25
+	if pressure < 0.1 {
+		// Low pressure (0-10%): gentle scaling from 1.0 to 1.05
+		return 1.0 + pressure*0.5
 	}
-	// Higher pressure (>= 20%): moderate scaling from 1.05, scales linearly
-	// Capped at 2.0 (reached at ~58% pressure) to avoid extreme values
-	val := 1.05 + (pressure-0.2)*2.5
+	// Higher pressure (>= 10%): moderate scaling from 1.05
+	// Capped at 2.0 (reached at ~48% pressure) to avoid extreme values
+	val := 1.05 + (pressure-0.1)*2.5
 	return math.Min(val, 2.0)
 }
 
@@ -783,10 +805,10 @@ func calculateMemoryPressureFactor(oom float64, failCnt float64, pressure float6
 			// Low pressure (0-10%): gentle scaling from 1.0 to 1.05
 			psiFactor = 1.0 + (pressure * 0.5)
 		} else {
-			// Higher pressure (>= 10%): moderate scaling from 1.05, scales linearly
-			// Capped at 3.0 (reached at ~83% pressure) to avoid extreme values
-			val := 1.05 + (pressure-0.1)*2.25
-			psiFactor = math.Min(val, 3.0)
+			// Higher pressure (>= 10%): moderate scaling from 1.05
+			// Capped at 2.0 (reached at ~48% pressure) to avoid extreme values
+			val := 1.05 + (pressure-0.1)*2.5
+			psiFactor = math.Min(val, 2.0)
 		}
 	}
 
