@@ -70,15 +70,13 @@ func main() {
 	}
 	defer redis.Close()
 
-	// Create and start worker pool
+	// Create the worker pool
 	workerPool, err := workers.NewWorkerPool(&cfg.Workers)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create worker pool")
 	}
-	workerPool.Start()
-	defer workerPool.Stop()
 
-	// Create and start API server
+	// Create the API server
 	server, err := api.NewServer(&cfg.API)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create API server")
@@ -91,6 +89,10 @@ func main() {
 			log.Fatal().Err(err).Msg("Failed to start API server")
 		}
 	}()
+
+	// Start the worker pool
+	workerPool.Start()
+	defer workerPool.Stop()
 
 	// Wait for interrupt signal for graceful shutdown
 	quit := make(chan os.Signal, 1)

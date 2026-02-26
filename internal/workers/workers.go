@@ -81,7 +81,7 @@ func (w *ResourceSyncWorker) Run() {
 	log := logger.WithComponent("workers")
 	log.Info().
 		Dur("interval", w.interval).
-		Msg("Starting resource sync worker...")
+		Msg("Starting sync worker...")
 
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
@@ -92,7 +92,7 @@ func (w *ResourceSyncWorker) Run() {
 	for {
 		select {
 		case <-w.ctx.Done():
-			log.Info().Msg("Resource sync worker stopped")
+			log.Info().Msg("Sync worker stopped")
 			return
 		case <-ticker.C:
 			w.sync()
