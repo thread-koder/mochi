@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/url"
 	"os"
@@ -8,6 +10,14 @@ import (
 
 	"github.com/spf13/viper"
 )
+
+// Holds TLS settings for clients
+type TLSConfig struct {
+	InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"` // Skip server certificate verification
+	RootCAPath         string `mapstructure:"root_ca_path"`         // Path to CA cert for server verification (optional)
+	ClientCertPath     string `mapstructure:"client_cert_path"`     // Path to client cert for mutual TLS (optional)
+	ClientKeyPath      string `mapstructure:"client_key_path"`      // Path to client key for mutual TLS (optional)
+}
 
 // Holds all application configuration
 type Config struct {
@@ -19,11 +29,6 @@ type Config struct {
 	Redis      RedisConfig      `mapstructure:"redis"`
 	Workers    WorkerConfig     `mapstructure:"workers"`
 	Compute    ComputeConfig    `mapstructure:"compute"`
-}
-
-// Compute/recommendation tuning.
-type ComputeConfig struct {
-	MinConfidenceThreshold float64 `mapstructure:"min_confidence_threshold"` // Minimum confidence (0-1) to generate recommendations
 }
 
 // Holds logger configuration
@@ -43,16 +48,17 @@ type APIConfig struct {
 
 // Holds database configuration
 type DatabaseConfig struct {
-	Host            string `mapstructure:"host"`               // PostgreSQL host
-	Port            int    `mapstructure:"port"`               // PostgreSQL port
-	User            string `mapstructure:"user"`               // PostgreSQL user
-	Password        string `mapstructure:"password"`           // PostgreSQL password
-	Database        string `mapstructure:"database"`           // PostgreSQL database name
-	SSLMode         string `mapstructure:"ssl_mode"`           // SSL mode (disable, require, verify-ca, verify-full)
-	MaxConnections  int    `mapstructure:"max_connections"`    // Maximum number of connections in pool
-	MaxIdleConns    int    `mapstructure:"max_idle_conns"`     // Maximum number of idle connections
-	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
-	ConnMaxIdleTime int    `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
+	Host            string    `mapstructure:"host"`               // PostgreSQL host
+	Port            int       `mapstructure:"port"`               // PostgreSQL port
+	User            string    `mapstructure:"user"`               // PostgreSQL user
+	Password        string    `mapstructure:"password"`           // PostgreSQL password
+	Database        string    `mapstructure:"database"`           // PostgreSQL database name
+	SSLMode         string    `mapstructure:"ssl_mode"`           // SSL mode (disable, require, verify-ca, verify-full)
+	MaxConnections  int       `mapstructure:"max_connections"`    // Maximum number of connections in pool
+	MinIdleConns    int       `mapstructure:"min_idle_conns"`     // Minimum number of idle connections in pool
+	ConnMaxLifetime int       `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
+	ConnMaxIdleTime int       `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
+	TLS             TLSConfig `mapstructure:"tls"`                // TLS config (used when ssl_mode != disable)
 }
 
 // Holds Kubernetes configuration
@@ -91,6 +97,11 @@ type WorkerConfig struct {
 	ExcludeNamespaces    []string `mapstructure:"exclude_namespaces"`     // List of namespaces to exclude from syncing
 	IncludeNamespaces    []string `mapstructure:"include_namespaces"`     // If non-empty, only sync these namespaces (exclude_namespaces ignored)
 	Retention            int      `mapstructure:"retention"`              // Keep data for this many days
+}
+
+// Holds compute recommendation configuration
+type ComputeConfig struct {
+	MinConfidenceThreshold float64 `mapstructure:"min_confidence_threshold"` // Minimum confidence (0-1) to generate recommendations
 }
 
 var AppConfig *Config
@@ -158,9 +169,13 @@ func setDefaults() {
 	viper.SetDefault("database.database", "mochi")
 	viper.SetDefault("database.ssl_mode", "disable")
 	viper.SetDefault("database.max_connections", 25)
-	viper.SetDefault("database.max_idle_conns", 5)
+	viper.SetDefault("database.min_idle_conns", 5)
 	viper.SetDefault("database.conn_max_lifetime", 300)
 	viper.SetDefault("database.conn_max_idle_time", 60)
+	viper.SetDefault("database.tls.insecure_skip_verify", false)
+	viper.SetDefault("database.tls.root_ca_path", "")
+	viper.SetDefault("database.tls.client_cert_path", "")
+	viper.SetDefault("database.tls.client_key_path", "")
 
 	// Kubernetes defaults
 	viper.SetDefault("kubernetes.kubeconfig_path", "")
@@ -233,7 +248,7 @@ func (c *LogConfig) Validate() error {
 		"warn":  true,
 		"error": true,
 	}
-	if !validLevels[strings.ToLower(c.Level)] {
+	if !validLevels[c.Level] {
 		return fmt.Errorf("level must be one of: debug, info, warn, error, got: %s", c.Level)
 	}
 
@@ -241,7 +256,7 @@ func (c *LogConfig) Validate() error {
 		"json":    true,
 		"console": true,
 	}
-	if !validFormats[strings.ToLower(c.Format)] {
+	if !validFormats[c.Format] {
 		return fmt.Errorf("format must be one of: json, console, got: %s", c.Format)
 	}
 	return nil
@@ -264,7 +279,7 @@ func (c *APIConfig) Validate() error {
 		"release": true,
 		"test":    true,
 	}
-	if !validModes[strings.ToLower(c.Mode)] {
+	if !validModes[c.Mode] {
 		return fmt.Errorf("mode must be one of: debug, release, test, got: %s", c.Mode)
 	}
 	return nil
@@ -278,8 +293,8 @@ func (c *DatabaseConfig) Validate() error {
 	if c.MaxConnections <= 0 {
 		return fmt.Errorf("max_connections must be greater than 0, got: %d", c.MaxConnections)
 	}
-	if c.MaxIdleConns < 0 {
-		return fmt.Errorf("max_idle_conns must be non-negative, got: %d", c.MaxIdleConns)
+	if c.MinIdleConns < 0 {
+		return fmt.Errorf("min_idle_conns must be non-negative, got: %d", c.MinIdleConns)
 	}
 	if c.ConnMaxLifetime <= 0 {
 		return fmt.Errorf("conn_max_lifetime must be greater than 0, got: %d", c.ConnMaxLifetime)
@@ -294,7 +309,7 @@ func (c *DatabaseConfig) Validate() error {
 		"verify-ca":   true,
 		"verify-full": true,
 	}
-	if !validSSLModes[strings.ToLower(c.SSLMode)] {
+	if !validSSLModes[c.SSLMode] {
 		return fmt.Errorf("ssl_mode must be one of: disable, require, verify-ca, verify-full, got: %s", c.SSLMode)
 	}
 	return nil
@@ -386,4 +401,31 @@ func (c *ComputeConfig) Validate() error {
 		return fmt.Errorf("min_confidence_threshold must be less than 1.0 (1.0 would exclude all recommendations); use a value between 0.5 and 0.95, got: %g", c.MinConfidenceThreshold)
 	}
 	return nil
+}
+
+// builds a TLS configuration for TLS clients
+func BuildTLSConfig(cfg TLSConfig) (*tls.Config, error) {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: cfg.InsecureSkipVerify,
+	}
+
+	if cfg.RootCAPath != "" {
+		pem, err := os.ReadFile(cfg.RootCAPath)
+		if err != nil {
+			return nil, fmt.Errorf("read root CA: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("failed to parse root CA from %s", cfg.RootCAPath)
+		}
+		tlsConfig.RootCAs = pool
+	}
+	if cfg.ClientCertPath != "" && cfg.ClientKeyPath != "" {
+		cert, err := tls.LoadX509KeyPair(cfg.ClientCertPath, cfg.ClientKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("load client cert/key: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+	return tlsConfig, nil
 }

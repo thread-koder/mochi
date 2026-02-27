@@ -36,7 +36,16 @@ func Init(cfg *config.DatabaseConfig) error {
 	poolConfig.MaxConns = int32(cfg.MaxConnections)
 	poolConfig.MaxConnIdleTime = time.Duration(cfg.ConnMaxIdleTime) * time.Second
 	poolConfig.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetime) * time.Second
-	poolConfig.MinConns = int32(cfg.MaxIdleConns)
+	poolConfig.MinIdleConns = int32(cfg.MinIdleConns)
+
+	// Apply TLS when SSL is enabled
+	if cfg.SSLMode != "disable" {
+		tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
+		if err != nil {
+			return fmt.Errorf("build TLS config: %w", err)
+		}
+		poolConfig.ConnConfig.TLSConfig = tlsConfig
+	}
 
 	// Create connection pool
 	Pool, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
