@@ -1,14 +1,14 @@
 package database
 
 import (
-	"database/sql"
 	"embed"
 	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/thread_koder/mochi/internal/config"
 	"github.com/thread_koder/mochi/internal/logger"
 )
@@ -27,11 +27,23 @@ func Migrate(cfg *config.DatabaseConfig) error {
 
 	dsn := buildDSN(cfg)
 
-	// Create sql.DB connection for migrations
-	db, err := sql.Open("pgx", dsn)
+	// Parse connection string and create connection config
+	connConfig, err := pgx.ParseConfig(dsn)
 	if err != nil {
-		return fmt.Errorf("failed to open database connection for migrations: %w", err)
+		return fmt.Errorf("failed to parse database connection string for migrations: %w", err)
 	}
+
+	// Apply TLS when SSL is enabled
+	if cfg.SSLMode != "disable" {
+		tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
+		if err != nil {
+			return fmt.Errorf("build TLS config: %w", err)
+		}
+		connConfig.TLSConfig = tlsConfig
+	}
+
+	// Create postgres connection for migrations
+	db := stdlib.OpenDB(*connConfig)
 	defer db.Close()
 
 	// Create postgres driver instance
