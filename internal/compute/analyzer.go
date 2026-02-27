@@ -697,16 +697,17 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		Step:  opts.RangeStep,
 	}
 
-	// Accumulator for merging metrics
-	var (
-		metrics ResourceMetrics
-		mu      sync.Mutex
-	)
+	// Per-pod results: each goroutine writes to its index
+	type podMetrics struct {
+		CPU    []timeseries.DataPoint
+		Memory []timeseries.DataPoint
+	}
+	results := make([]podMetrics, len(pods))
 
 	// Query all pods in parallel
 	g, gctx := errgroup.WithContext(ctx)
 
-	for _, pod := range pods {
+	for i, pod := range pods {
 		queryOpts := prometheus.QueryOptions{
 			Namespace:     pod.Namespace,
 			Pod:           pod.Name,
@@ -744,12 +745,10 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return err
 			}
 
-			// Merge results
-			mu.Lock()
-			metrics.CPU = timeseries.MergeDataPointsByTime(metrics.CPU, timeseries.MatrixToDataPoints(cpuMatrix))
-			metrics.Memory = timeseries.MergeDataPointsByTime(metrics.Memory, timeseries.MatrixToDataPoints(memoryMatrix))
-			mu.Unlock()
-
+			results[i] = podMetrics{
+				CPU:    timeseries.MatrixToDataPoints(cpuMatrix),
+				Memory: timeseries.MatrixToDataPoints(memoryMatrix),
+			}
 			return nil
 		})
 	}
@@ -759,7 +758,17 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		return ResourceMetrics{}, err
 	}
 
-	return metrics, nil
+	// Merge all per-pod results
+	var cpu, memory []timeseries.DataPoint
+	for _, p := range results {
+		cpu = timeseries.MergeDataPointsByTime(cpu, p.CPU)
+		memory = timeseries.MergeDataPointsByTime(memory, p.Memory)
+	}
+
+	return ResourceMetrics{
+		CPU:    cpu,
+		Memory: memory,
+	}, nil
 }
 
 // Fetches namespace metrics
