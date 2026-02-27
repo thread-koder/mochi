@@ -79,16 +79,19 @@ type PrometheusConfig struct {
 
 // Holds Redis configuration
 type RedisConfig struct {
-	Host            string `mapstructure:"host"`               // Redis host
-	Port            int    `mapstructure:"port"`               // Redis port
-	Password        string `mapstructure:"password"`           // Redis password (empty = no auth)
-	Database        int    `mapstructure:"database"`           // Redis database number (0-15)
-	MaxRetries      int    `mapstructure:"max_retries"`        // Maximum number of retries
-	PoolSize        int    `mapstructure:"pool_size"`          // Connection pool size
-	MinIdleConns    int    `mapstructure:"min_idle_conns"`     // Minimum idle connections
-	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
-	ConnMaxIdleTime int    `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
-	CacheTTL        int    `mapstructure:"cache_ttl"`          // Default cache TTL in seconds
+	Host            string    `mapstructure:"host"`               // Redis host
+	Port            int       `mapstructure:"port"`               // Redis port
+	Username        string    `mapstructure:"username"`           // Redis username (ACL, empty = default)
+	Password        string    `mapstructure:"password"`           // Redis password (empty = no auth)
+	Database        int       `mapstructure:"database"`           // Redis database number (0-15)
+	MaxRetries      int       `mapstructure:"max_retries"`        // Maximum number of retries
+	PoolSize        int       `mapstructure:"pool_size"`          // Connection pool size
+	MinIdleConns    int       `mapstructure:"min_idle_conns"`     // Minimum idle connections
+	ConnMaxLifetime int       `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
+	ConnMaxIdleTime int       `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
+	CacheTTL        int       `mapstructure:"cache_ttl"`          // Default cache TTL in seconds
+	UseTLS          bool      `mapstructure:"use_tls"`            // Enable TLS for connections
+	TLS             TLSConfig `mapstructure:"tls"`                // TLS config (used when use_tls is true)
 }
 
 // Holds worker configuration
@@ -195,6 +198,7 @@ func setDefaults() {
 	// Redis defaults
 	viper.SetDefault("redis.host", "localhost")
 	viper.SetDefault("redis.port", 6379)
+	viper.SetDefault("redis.username", "")
 	viper.SetDefault("redis.password", "mochi")
 	viper.SetDefault("redis.database", 0)
 	viper.SetDefault("redis.max_retries", 3)
@@ -203,6 +207,11 @@ func setDefaults() {
 	viper.SetDefault("redis.conn_max_lifetime", 300)
 	viper.SetDefault("redis.conn_max_idle_time", 60)
 	viper.SetDefault("redis.cache_ttl", 300)
+	viper.SetDefault("redis.use_tls", false)
+	viper.SetDefault("redis.tls.insecure_skip_verify", false)
+	viper.SetDefault("redis.tls.root_ca_path", "")
+	viper.SetDefault("redis.tls.client_cert_path", "")
+	viper.SetDefault("redis.tls.client_key_path", "")
 
 	// Worker defaults
 	viper.SetDefault("workers.resource_sync_interval", 120) // 2 minutes

@@ -27,6 +27,7 @@ func Init(cfg *config.RedisConfig) error {
 	// Create Redis client options
 	opts := &redis.Options{
 		Addr:            fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Username:        cfg.Username,
 		Password:        cfg.Password,
 		DB:              cfg.Database,
 		MaxRetries:      cfg.MaxRetries,
@@ -34,6 +35,14 @@ func Init(cfg *config.RedisConfig) error {
 		MinIdleConns:    cfg.MinIdleConns,
 		ConnMaxLifetime: time.Duration(cfg.ConnMaxLifetime) * time.Second,
 		ConnMaxIdleTime: time.Duration(cfg.ConnMaxIdleTime) * time.Second,
+	}
+
+	if cfg.UseTLS {
+		tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
+		if err != nil {
+			return fmt.Errorf("build TLS config: %w", err)
+		}
+		opts.TLSConfig = tlsConfig
 	}
 
 	// Create Redis client

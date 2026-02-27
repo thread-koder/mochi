@@ -46,6 +46,7 @@ prometheus:
 redis:
   host: "localhost" # Redis host
   port: 6379 # Redis port
+  username: "" # Redis username (empty = default user)
   password: "" # Set via MOCHI_REDIS_PASSWORD env var
   database: 0 # Redis database number (0-15)
   max_retries: 3 # Maximum number of retries
@@ -54,6 +55,12 @@ redis:
   conn_max_lifetime: 300 # seconds
   conn_max_idle_time: 60 # seconds
   cache_ttl: 300 # Default cache TTL in seconds
+  use_tls: false # Enable TLS for Redis connection
+  tls:
+    insecure_skip_verify: false # Skip server certificate verification
+    root_ca_path: "" # Path to CA cert for server verification
+    client_cert_path: "" # Path to client cert for mutual TLS
+    client_key_path: "" # Path to client key for mutual TLS
 
 workers:
   resource_sync_interval: 120 # Resource sync interval in seconds (2 minutes)
