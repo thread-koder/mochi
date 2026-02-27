@@ -296,6 +296,9 @@ func (c *DatabaseConfig) Validate() error {
 	if c.MinIdleConns < 0 {
 		return fmt.Errorf("min_idle_conns must be non-negative, got: %d", c.MinIdleConns)
 	}
+	if c.MinIdleConns > c.MaxConnections {
+		return fmt.Errorf("min_idle_conns must be less than or equal to max_connections, got: %d", c.MinIdleConns)
+	}
 	if c.ConnMaxLifetime <= 0 {
 		return fmt.Errorf("conn_max_lifetime must be greater than 0, got: %d", c.ConnMaxLifetime)
 	}

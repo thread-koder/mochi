@@ -69,18 +69,15 @@ func Init(cfg *config.KubernetesConfig) error {
 		return fmt.Errorf("no kubeconfig path provided and not running in-cluster")
 	}
 
-	// Configure timeouts if specified
-	if cfg.RequestTimeout > 0 {
-		RestConfig.Timeout = time.Duration(cfg.RequestTimeout) * time.Second
-	}
+	// Configure timeouts
+	RestConfig.Timeout = time.Duration(cfg.RequestTimeout) * time.Second
 
 	// Set QPS and Burst for rate limiting
-	if cfg.QPS > 0 {
-		RestConfig.QPS = float32(cfg.QPS)
-	}
-	if cfg.Burst > 0 {
-		RestConfig.Burst = cfg.Burst
-	}
+	RestConfig.QPS = float32(cfg.QPS)
+	RestConfig.Burst = cfg.Burst
+
+	// Set Agent Name
+	RestConfig.UserAgent = "mochi"
 
 	// Create the clientset
 	Clientset, err = kubernetes.NewForConfig(RestConfig)
