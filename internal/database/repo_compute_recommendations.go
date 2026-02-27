@@ -332,8 +332,8 @@ func DeleteComputeRecommendationsOlderThan(ctx context.Context, since time.Time)
 	return nil
 }
 
-// Cleans up compute recommendations for workloads that no longer exist
-func CleanupComputeRecommendationsForDeletedWorkloads(ctx context.Context) error {
+// Deletes compute recommendations for workloads that no longer exist
+func DeleteComputeRecommendationsForDeletedWorkloads(ctx context.Context) error {
 	log := logger.WithComponent("database")
 
 	// Delete recommendations for workloads that don't exist in any workload table

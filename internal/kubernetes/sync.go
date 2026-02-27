@@ -18,7 +18,6 @@ import (
 // Syncs resources to PostgreSQL
 func SyncResources(ctx context.Context) error {
 	log := logger.WithComponent("kubernetes")
-	log.Info().Msg("Starting resources sync...")
 
 	if err := SyncNodes(ctx); err != nil {
 		log.Warn().Err(err).Msg("Failed to sync nodes")
@@ -71,7 +70,6 @@ func SyncResources(ctx context.Context) error {
 
 	}
 
-	log.Info().Msg("Resources sync completed")
 	return nil
 }
 

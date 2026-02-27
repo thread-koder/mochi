@@ -65,7 +65,7 @@ func Init(cfg *config.PrometheusConfig) error {
 
 	log.Info().
 		Str("url", cfg.URL).
-		Int("timeout", cfg.Timeout).
+		Str("timeout", fmt.Sprintf("%ds", cfg.Timeout)).
 		Msg("Connection established")
 
 	return nil
