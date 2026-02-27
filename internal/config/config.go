@@ -90,7 +90,7 @@ type RedisConfig struct {
 	ConnMaxLifetime int       `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
 	ConnMaxIdleTime int       `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
 	CacheTTL        int       `mapstructure:"cache_ttl"`          // Default cache TTL in seconds
-	UseTLS          bool      `mapstructure:"use_tls"`            // Enable TLS for connections
+	UseTLS          bool      `mapstructure:"use_tls"`            // Enable TLS for connection
 	TLS             TLSConfig `mapstructure:"tls"`                // TLS config (used when use_tls is true)
 }
 
