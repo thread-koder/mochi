@@ -2,7 +2,6 @@ package prometheus
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net/http"
 	"time"
@@ -29,20 +28,21 @@ func Init(cfg *config.PrometheusConfig) error {
 	log := logger.WithComponent("prometheus")
 	log.Info().Msg("Initializing client...")
 
-	// Create HTTP transport
+	// Create HTTP transport and apply TLS config
 	transport := &http.Transport{}
-
-	// Configure TLS
-	if cfg.InsecureSkipVerify {
-		transport.TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: true,
-		}
+	tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
+	if err != nil {
+		return fmt.Errorf("build TLS config: %w", err)
 	}
+	transport.TLSClientConfig = tlsConfig
 
 	// Create Prometheus API client configuration
 	clientConfig := api.Config{
-		Address:      cfg.URL,
-		RoundTripper: transport,
+		Address: cfg.URL,
+		Client: &http.Client{
+			Transport: transport,
+			Timeout:   time.Duration(cfg.Timeout) * time.Second,
+		},
 	}
 
 	// Create the API client

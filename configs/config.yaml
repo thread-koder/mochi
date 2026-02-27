@@ -22,7 +22,7 @@ database:
   conn_max_idle_time: 60 # seconds
   # Used when ssl_mode is not "disable"
   tls:
-    insecure_skip_verify: false
+    insecure_skip_verify: false # Skip server certificate verification
     root_ca_path: "" # Path to CA cert for server verification
     client_cert_path: "" # Path to client cert for mutual TLS
     client_key_path: "" # Path to client key for mutual TLS
@@ -37,7 +37,11 @@ kubernetes:
 prometheus:
   url: "http://localhost:9090" # Prometheus server URL
   timeout: 30 # Request timeout in seconds
-  insecure_skip_verify: false # Skip TLS certificate verification
+  tls:
+    insecure_skip_verify: false # Skip server certificate verification
+    root_ca_path: "" # Path to CA cert for server verification
+    client_cert_path: "" # Path to client cert for mutual TLS
+    client_key_path: "" # Path to client key for mutual TLS
 
 redis:
   host: "localhost" # Redis host

@@ -72,9 +72,9 @@ type KubernetesConfig struct {
 
 // Holds Prometheus configuration
 type PrometheusConfig struct {
-	URL                string `mapstructure:"url"`                  // Prometheus server URL
-	Timeout            int    `mapstructure:"timeout"`              // Request timeout in seconds
-	InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"` // Skip TLS certificate verification
+	URL     string    `mapstructure:"url"`     // Prometheus server URL
+	Timeout int       `mapstructure:"timeout"` // Request timeout in seconds
+	TLS     TLSConfig `mapstructure:"tls"`     // TLS config for HTTPS
 }
 
 // Holds Redis configuration
@@ -187,7 +187,10 @@ func setDefaults() {
 	// Prometheus defaults
 	viper.SetDefault("prometheus.url", "http://localhost:9090")
 	viper.SetDefault("prometheus.timeout", 30)
-	viper.SetDefault("prometheus.insecure_skip_verify", false)
+	viper.SetDefault("prometheus.tls.insecure_skip_verify", false)
+	viper.SetDefault("prometheus.tls.root_ca_path", "")
+	viper.SetDefault("prometheus.tls.client_cert_path", "")
+	viper.SetDefault("prometheus.tls.client_key_path", "")
 
 	// Redis defaults
 	viper.SetDefault("redis.host", "localhost")
