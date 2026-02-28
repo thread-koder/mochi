@@ -207,6 +207,7 @@ const initChart = () => {
             },
           },
           grid: { color: gridColor },
+          grace: '10%',
           title: {
             display: true,
             text: isCPU
