@@ -101,7 +101,7 @@ func GetDeploymentsByNamespace(ctx context.Context, namespace string) ([]*Deploy
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating deployments: %w", err)
+		return nil, fmt.Errorf("failed to iterate deployments: %w", err)
 	}
 
 	return deployments, nil

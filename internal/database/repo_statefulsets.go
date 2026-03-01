@@ -100,7 +100,7 @@ func GetStatefulSetsByNamespace(ctx context.Context, namespace string) ([]*State
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating statefulsets: %w", err)
+		return nil, fmt.Errorf("failed to iterate statefulsets: %w", err)
 	}
 
 	return statefulsets, nil

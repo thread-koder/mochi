@@ -104,7 +104,7 @@ func GetReplicaSetsByDeployment(ctx context.Context, deploymentName, namespace s
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating replicasets: %w", err)
+		return nil, fmt.Errorf("failed to iterate replicasets: %w", err)
 	}
 
 	return replicasets, nil

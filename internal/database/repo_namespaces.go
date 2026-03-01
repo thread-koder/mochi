@@ -88,7 +88,7 @@ func GetNamespaces(ctx context.Context) ([]*Namespace, error) {
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating namespaces: %w", err)
+		return nil, fmt.Errorf("failed to iterate namespaces: %w", err)
 	}
 
 	return namespaces, nil

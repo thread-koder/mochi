@@ -217,7 +217,7 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error iterating compute recommendations: %w", err)
+		return nil, 0, fmt.Errorf("failed to iterate compute recommendations: %w", err)
 	}
 
 	return recommendations, total, nil

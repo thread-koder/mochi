@@ -101,7 +101,7 @@ func GetDaemonSetsByNamespace(ctx context.Context, namespace string) ([]*DaemonS
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating daemonsets: %w", err)
+		return nil, fmt.Errorf("failed to iterate daemonsets: %w", err)
 	}
 
 	return daemonsets, nil

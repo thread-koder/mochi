@@ -140,7 +140,7 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating pods: %w", err)
+		return nil, fmt.Errorf("failed to iterate pods: %w", err)
 	}
 
 	return pods, nil
@@ -178,7 +178,7 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating pods: %w", err)
+		return nil, fmt.Errorf("failed to iterate pods: %w", err)
 	}
 
 	return pods, nil
@@ -216,7 +216,7 @@ func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating pods: %w", err)
+		return nil, fmt.Errorf("failed to iterate pods: %w", err)
 	}
 
 	return pods, nil

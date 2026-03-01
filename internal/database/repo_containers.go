@@ -110,7 +110,7 @@ func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, er
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating containers: %w", err)
+		return nil, fmt.Errorf("failed to iterate containers: %w", err)
 	}
 
 	return containers, nil
