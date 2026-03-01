@@ -111,32 +111,23 @@ var AppConfig *Config
 
 // Reads configuration from file and environment variables
 func Load() (*Config, error) {
-	viper.SetConfigName("config")
+	// Set defaults
+	setDefaults()
+
+	// Read and merge config files
 	viper.SetConfigType("yaml")
-
-	configPath := os.Getenv("MOCHI_CONFIG_PATH")
-
-	// Add config paths
-	if configPath != "" {
-		viper.AddConfigPath(configPath)
+	configFiles := parseConfigFilesEnv(os.Getenv("MOCHI_CONFIG_FILES"))
+	if len(configFiles) > 0 {
+		if err := readConfigFiles(configFiles); err != nil {
+			return nil, err
+		}
 	}
 
 	// Setup environment variables
 	viper.SetEnvPrefix("MOCHI")
-	// Replace dots with underscores for nested keys (e.g., log.level -> LOG_LEVEL)
+	// Replace dots with underscores for nested keys (e.g., log.level -> MOCHI_LOG_LEVEL)
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
-
-	// Set defaults
-	setDefaults()
-
-	// Read config file (optional - env vars can override)
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("unable to read config file: %w", err)
-		}
-		// Config file not found is OK, use defaults and env vars
-	}
 
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
@@ -221,6 +212,35 @@ func setDefaults() {
 
 	// Compute defaults
 	viper.SetDefault("compute.min_confidence_threshold", 0.8)
+}
+
+// Returns a slice of config files paths from a comma-separated string
+func parseConfigFilesEnv(pathsList string) []string {
+	if pathsList == "" {
+		return nil
+	}
+	var paths []string
+	for segment := range strings.SplitSeq(pathsList, ",") {
+		if path := strings.TrimSpace(segment); path != "" {
+			paths = append(paths, path)
+		}
+	}
+	return paths
+}
+
+// Reads each config files in order and merges it
+func readConfigFiles(configFiles []string) error {
+	viper.SetConfigFile(configFiles[0])
+	if err := viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("config file %q: %w", configFiles[0], err)
+	}
+	for _, file := range configFiles[1:] {
+		viper.SetConfigFile(file)
+		if err := viper.MergeInConfig(); err != nil {
+			return fmt.Errorf("config file %q: %w", file, err)
+		}
+	}
+	return nil
 }
 
 // Validates the entire configuration
