@@ -15,12 +15,10 @@ import (
 func AnalyzeNamespace(c *gin.Context) {
 	namespace := c.Param("namespace")
 	timeRangeStr := c.Query("timeRange")
-	includeTimeSeries := c.Query("includeTimeSeries") == "true"
-	includeWorkloads := c.Query("includeWorkloads") == "true"
 
 	// Parse analysis options
 	opts := compute.DefaultAnalysisOptions()
-	opts.IncludeTimeSeries = includeTimeSeries
+	opts.IncludeTimeSeries = true
 
 	if timeRangeStr != "" {
 		timeRange, err := parseTimeRange(timeRangeStr)
@@ -40,7 +38,7 @@ func AnalyzeNamespace(c *gin.Context) {
 	defer cancel()
 
 	// Perform analysis
-	analysis, err := compute.AnalyzeNamespace(ctx, namespace, opts, includeWorkloads)
+	analysis, err := compute.AnalyzeNamespace(ctx, namespace, opts)
 	if err != nil {
 		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -58,7 +56,6 @@ func AnalyzeWorkload(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
-	includeTimeSeries := c.Query("includeTimeSeries") == "true"
 	timeRangeStr := c.Query("timeRange")
 
 	// Validate workload type
@@ -91,7 +88,7 @@ func AnalyzeWorkload(c *gin.Context) {
 
 	// Parse analysis options
 	opts := compute.DefaultAnalysisOptions()
-	opts.IncludeTimeSeries = includeTimeSeries
+	opts.IncludeTimeSeries = true
 	if timeRangeStr != "" {
 		timeRange, err := parseTimeRange(timeRangeStr)
 		if err != nil {
@@ -169,7 +166,7 @@ func AnalyzeWorkload(c *gin.Context) {
 	}
 
 	// Perform analysis
-	analysis, err := compute.AnalyzeWorkload(ctx, workloadType, workloadName, namespace, pods, opts)
+	analysis, err := compute.AnalyzeWorkload(ctx, workloadType, workloadName, namespace, pods, opts, true)
 	if err != nil {
 		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{

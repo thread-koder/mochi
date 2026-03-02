@@ -139,7 +139,7 @@ const generatedRecommendation = ref<Compute.Recommendation | null>(null)
 const executeAnalysis = async () => {
   analysisPending.value = true
   try {
-    analysis.value = await $api<Compute.WorkloadAnalysis>(`/api/v1/compute/analyze/workloads/${props.workloadType}/${props.workloadName}?namespace=${props.namespace}&timeRange=${timeRange.value}&includeTimeSeries=true`)
+    analysis.value = await $api<Compute.WorkloadAnalysis>(`/api/v1/compute/analyze/workloads/${props.workloadType}/${props.workloadName}?namespace=${props.namespace}&timeRange=${timeRange.value}`)
   }
   catch (error) {
     analysisError.value = error as FetchError

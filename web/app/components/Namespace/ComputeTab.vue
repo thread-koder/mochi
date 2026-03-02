@@ -102,7 +102,7 @@ const analysis = ref<Compute.NamespaceAnalysis | null>(null)
 const executeAnalysis = async () => {
   analysisPending.value = true
   try {
-    analysis.value = await $api<Compute.NamespaceAnalysis>(`/api/v1/compute/analyze/namespaces/${props.namespace}?timeRange=${timeRange.value}&includeTimeSeries=true&includeWorkloads=true`)
+    analysis.value = await $api<Compute.NamespaceAnalysis>(`/api/v1/compute/analyze/namespaces/${props.namespace}?timeRange=${timeRange.value}`)
   }
   catch (error) {
     analysisError.value = error as FetchError
