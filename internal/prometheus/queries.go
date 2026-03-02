@@ -79,6 +79,9 @@ func executeScalarQuery(ctx context.Context, query string, ts time.Time) (float6
 		if len(v) == 0 {
 			return 0, warnings, nil
 		}
+		if len(v) > 1 {
+			return 0, warnings, fmt.Errorf("scalar query returned %d series, expected 0 or 1", len(v))
+		}
 		return float64(v[0].Value), warnings, nil
 	default:
 		return 0, warnings, fmt.Errorf("query result is not a scalar or vector, got %T", result)

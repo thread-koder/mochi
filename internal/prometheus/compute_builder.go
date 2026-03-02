@@ -46,8 +46,18 @@ func BuildPodCPUThrottlingQuery(namespace, pod, container string, rangeDuration 
 
 	throttledMetric := BuildContainerMetricQuery("container_cpu_cfs_throttled_periods_total", namespace, pod, container, "")
 	totalMetric := BuildContainerMetricQuery("container_cpu_cfs_periods_total", namespace, pod, container, "")
-	throttledRate := fmt.Sprintf("rate(%s[%s])", throttledMetric, rangeDuration)
-	totalRate := fmt.Sprintf("rate(%s[%s])", totalMetric, rangeDuration)
+
+	// Container-level: ratio for a single container
+	if container != "" {
+		throttledRate := fmt.Sprintf("rate(%s[%s])", throttledMetric, rangeDuration)
+		totalRate := fmt.Sprintf("rate(%s[%s])", totalMetric, rangeDuration)
+		ratioQuery := fmt.Sprintf("clamp_min(%s / clamp_min(%s, 0.0001), 0)", throttledRate, totalRate)
+		return fmt.Sprintf("avg_over_time((%s)[%s:%s])", ratioQuery, timeRange, step), nil
+	}
+
+	// Pod-level: ratio-of-sums across all containers in the pod
+	throttledRate := fmt.Sprintf("sum(rate(%s[%s]))", throttledMetric, rangeDuration)
+	totalRate := fmt.Sprintf("sum(rate(%s[%s]))", totalMetric, rangeDuration)
 	ratioQuery := fmt.Sprintf("clamp_min(%s / clamp_min(%s, 0.0001), 0)", throttledRate, totalRate)
 	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", ratioQuery, timeRange, step), nil
 }
@@ -69,7 +79,15 @@ func BuildPodCPUPressureQuery(namespace, pod, container string, rangeDuration st
 
 	baseMetric := BuildContainerMetricQuery("container_pressure_cpu_stalled_seconds_total", namespace, pod, container, "")
 	rateQuery := fmt.Sprintf("rate(%s[%s])", baseMetric, rangeDuration)
-	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step), nil
+
+	// Container-level: single-container stalled fraction
+	if container != "" {
+		return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step), nil
+	}
+
+	// Pod-level: average stalled fraction across all containers in the pod
+	aggRate := fmt.Sprintf("avg(%s)", rateQuery)
+	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", aggRate, timeRange, step), nil
 }
 
 // Builds a PromQL query for pod memory fail count
@@ -80,7 +98,20 @@ func BuildPodMemoryFailCountQuery(namespace, pod, container string, rangeDuratio
 	if pod == "" {
 		return "", fmt.Errorf("pod is required")
 	}
-	return fmt.Sprintf("increase(%s)", BuildContainerMetricQuery("container_memory_failcnt", namespace, pod, container, rangeDuration)), nil
+	if rangeDuration == "" {
+		rangeDuration = "5m"
+	}
+
+	metric := BuildContainerMetricQuery("container_memory_failcnt", namespace, pod, container, rangeDuration)
+
+	// Container-level: increase for a single container
+	if container != "" {
+		return fmt.Sprintf("increase(%s)", metric), nil
+	}
+
+	// Pod-level: sum of increases across all containers in the pod
+	query := fmt.Sprintf("sum(increase(%s))", metric)
+	return query, nil
 }
 
 // Builds a PromQL query for pod memory OOM events
@@ -91,7 +122,20 @@ func BuildPodMemoryOOMQuery(namespace, pod, container string, rangeDuration stri
 	if pod == "" {
 		return "", fmt.Errorf("pod is required")
 	}
-	return fmt.Sprintf("increase(%s)", BuildContainerMetricQuery("container_oom_events_total", namespace, pod, container, rangeDuration)), nil
+	if rangeDuration == "" {
+		rangeDuration = "5m"
+	}
+
+	metric := BuildContainerMetricQuery("container_oom_events_total", namespace, pod, container, rangeDuration)
+
+	// Container-level: increase for a single container
+	if container != "" {
+		return fmt.Sprintf("increase(%s)", metric), nil
+	}
+
+	// Pod-level: sum of increases across all containers in the pod
+	query := fmt.Sprintf("sum(increase(%s))", metric)
+	return query, nil
 }
 
 // Builds a PromQL query for pod memory pressure (stalled)
@@ -111,7 +155,15 @@ func BuildPodMemoryPressureQuery(namespace, pod, container string, rangeDuration
 
 	baseMetric := BuildContainerMetricQuery("container_pressure_memory_stalled_seconds_total", namespace, pod, container, "")
 	rateQuery := fmt.Sprintf("rate(%s[%s])", baseMetric, rangeDuration)
-	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step), nil
+
+	// Container-level: single-container stalled fraction
+	if container != "" {
+		return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step), nil
+	}
+
+	// Pod-level: average stalled fraction across all containers in the pod
+	aggRate := fmt.Sprintf("avg(%s)", rateQuery)
+	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", aggRate, timeRange, step), nil
 }
 
 // Builds a PromQL query for pod restarts
@@ -125,12 +177,15 @@ func BuildPodRestartsQuery(namespace, pod, container string, rangeDuration strin
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
-	query := fmt.Sprintf(`kube_pod_container_status_restarts_total{namespace="%s",pod="%s"`, namespace, pod)
 	if container != "" {
-		query += fmt.Sprintf(`,container="%s"`, container)
+		// Container-level: increase for a single container
+		query := fmt.Sprintf(`kube_pod_container_status_restarts_total{namespace="%s",pod="%s",container="%s"}`, namespace, pod, container)
+		return fmt.Sprintf("increase(%s[%s])", query, rangeDuration), nil
 	}
-	query += `}`
-	return fmt.Sprintf("increase(%s[%s])", query, rangeDuration), nil
+
+	// Pod-level: sum of increases across all containers in the pod
+	query := fmt.Sprintf(`kube_pod_container_status_restarts_total{namespace="%s",pod="%s"}`, namespace, pod)
+	return fmt.Sprintf("sum(increase(%s[%s]))", query, rangeDuration), nil
 }
 
 // Builds a PromQL query for namespace CPU usage
