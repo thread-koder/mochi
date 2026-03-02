@@ -88,43 +88,6 @@ func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
 	return result, nil
 }
 
-// Aggregates stability results from multiple containers into a single result (Pod or Workload level)
-func AggregateStability(stabilities []StabilityResult) StabilityResult {
-	if len(stabilities) == 0 {
-		return StabilityResult{StabilityScore: 1.0}
-	}
-
-	aggregated := StabilityResult{
-		StabilityScore: 1.0,
-	}
-
-	for _, s := range stabilities {
-		aggregated.CPUThrottling += s.CPUThrottling
-		aggregated.CPUPressure += s.CPUPressure
-		aggregated.MemoryFailCnt += s.MemoryFailCnt
-		aggregated.MemoryOOM += s.MemoryOOM
-		aggregated.MemoryPressure += s.MemoryPressure
-		aggregated.Restarts += s.Restarts
-	}
-
-	// Average percentages (CPU throttling, CPU pressure, memory pressure)
-	n := float64(len(stabilities))
-	aggregated.CPUThrottling /= n
-	aggregated.CPUPressure /= n
-	aggregated.MemoryPressure /= n
-
-	// Stability score is the minimum
-	minScore := 1.0
-	for _, s := range stabilities {
-		if s.StabilityScore < minScore {
-			minScore = s.StabilityScore
-		}
-	}
-	aggregated.StabilityScore = minScore
-
-	return aggregated
-}
-
 // Returns 0 if value is below the noise threshold, otherwise returns value.
 func filterNoise(value float64) float64 {
 	if value < stabilityNoiseThreshold {

@@ -85,9 +85,9 @@ type ContainerAnalysis struct {
 type PodAnalysis struct {
 	PodUID      string              `json:"pod_uid"`
 	PodName     string              `json:"pod_name"`
-	Containers  []ContainerAnalysis `json:"containers"`            // Individual container analyses
-	Utilization UtilizationResult   `json:"utilization"`           // Aggregated from containers
-	Stability   StabilityResult     `json:"stability"`             // Aggregated from containers
+	Containers  []ContainerAnalysis `json:"containers"`
+	Utilization UtilizationResult   `json:"utilization"`
+	Stability   StabilityResult     `json:"stability"`
 	TimeSeries  *TimeSeries         `json:"time_series,omitempty"` // Optional: raw datapoints for charting
 }
 
@@ -96,18 +96,18 @@ type WorkloadAnalysis struct {
 	WorkloadType string            `json:"workload_type"`
 	WorkloadName string            `json:"workload_name"`
 	Namespace    string            `json:"namespace"`
-	Pods         []PodAnalysis     `json:"pods"` // Individual pod analyses
+	Pods         []PodAnalysis     `json:"pods"`
 	Utilization  UtilizationResult `json:"utilization"`
-	Stability    StabilityResult   `json:"stability"`             // Aggregated from pods
+	Stability    StabilityResult   `json:"stability"`
 	TimeSeries   *TimeSeries       `json:"time_series,omitempty"` // Optional: raw datapoints for charting
 }
 
 // Represents analysis results for a namespace
 type NamespaceAnalysis struct {
 	Namespace   string             `json:"namespace"`
-	Utilization UtilizationResult  `json:"utilization"`           // Aggregated from all workloads/pods
-	Stability   StabilityResult    `json:"stability"`             // Aggregated from all workloads/pods
-	Workloads   []WorkloadAnalysis `json:"workloads,omitempty"`   // Optional: individual workload analyses
+	Utilization UtilizationResult  `json:"utilization"`
+	Stability   StabilityResult    `json:"stability"`
+	Workloads   []WorkloadAnalysis `json:"workloads"`
 	TimeSeries  *TimeSeries        `json:"time_series,omitempty"` // Optional: raw datapoints for charting
 }
 
@@ -182,9 +182,8 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 		return PodAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
 	}
 
-	// Analyze containers in parallel
+	// Analyze the pod's containers in parallel
 	containerAnalyses := make([]ContainerAnalysis, len(containers))
-	stabilities := make([]StabilityResult, len(containers))
 	g, gctx := errgroup.WithContext(ctx)
 	for i, container := range containers {
 		g.Go(func() error {
@@ -193,12 +192,11 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 				return fmt.Errorf("failed to analyze container %s: %w", container.Name, err)
 			}
 			containerAnalyses[i] = analysis
-			stabilities[i] = analysis.Stability
 			return nil
 		})
 	}
 
-	// Aggregate metrics from all containers for pod-level utilization
+	// Fetch pod-level metrics
 	metrics, err := fetchPodMetrics(ctx, pod, opts)
 	if err != nil {
 		return PodAnalysis{}, fmt.Errorf("failed to fetch pod metrics: %w", err)
@@ -209,10 +207,16 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 		return PodAnalysis{}, fmt.Errorf("no metrics available for pod %s", pod.Name)
 	}
 
-	// Analyze aggregated utilization
+	// Analyze utilization
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
 		return PodAnalysis{}, fmt.Errorf("failed to analyze pod utilization: %w", err)
+	}
+
+	// Analyze stability
+	stability, err := AnalyzeStability(metrics)
+	if err != nil {
+		return PodAnalysis{}, fmt.Errorf("failed to analyze pod stability: %w", err)
 	}
 
 	// Wait for all containers to be analyzed and check for errors
@@ -225,7 +229,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 		PodName:     pod.Name,
 		Containers:  containerAnalyses,
 		Utilization: utilization,
-		Stability:   AggregateStability(stabilities),
+		Stability:   stability,
 	}
 
 	// Include time series if requested
@@ -240,7 +244,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 }
 
 // Analyzes a workload and its pods
-func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName string, namespace string, pods []*database.Pod, opts AnalysisOptions) (WorkloadAnalysis, error) {
+func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName string, namespace string, pods []*database.Pod, opts AnalysisOptions, includePods bool) (WorkloadAnalysis, error) {
 	// Validate options
 	if err := opts.Validate(); err != nil {
 		return WorkloadAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
@@ -251,31 +255,31 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 		return WorkloadAnalysis{}, fmt.Errorf("no pods found for workload %s/%s", namespace, workloadName)
 	}
 
-	// Disable time series for pods
-	podOpts := opts
-	podOpts.IncludeTimeSeries = false
-
-	// Analyze pods in parallel
-	podAnalyses := make([]PodAnalysis, len(pods))
-	stabilities := make([]StabilityResult, len(pods))
+	// Analyze pods in parallel if requested
+	var podAnalyses []PodAnalysis
 	g, gctx := errgroup.WithContext(ctx)
-	for i, pod := range pods {
-		g.Go(func() error {
-			containers, err := database.GetContainersByPodUID(gctx, pod.UID)
-			if err != nil {
-				return fmt.Errorf("failed to fetch containers for pod %s: %w", pod.Name, err)
-			}
-			podAnalysis, err := AnalyzePod(gctx, pod, containers, podOpts)
-			if err != nil {
-				return fmt.Errorf("failed to analyze pod %s: %w", pod.Name, err)
-			}
-			podAnalyses[i] = podAnalysis
-			stabilities[i] = podAnalysis.Stability
-			return nil
-		})
+	if includePods {
+		podAnalyses = make([]PodAnalysis, len(pods))
+		// Disable time series for pods
+		podOpts := opts
+		podOpts.IncludeTimeSeries = false
+		for i, pod := range pods {
+			g.Go(func() error {
+				containers, err := database.GetContainersByPodUID(gctx, pod.UID)
+				if err != nil {
+					return fmt.Errorf("failed to fetch containers for pod %s: %w", pod.Name, err)
+				}
+				podAnalysis, err := AnalyzePod(gctx, pod, containers, podOpts)
+				if err != nil {
+					return fmt.Errorf("failed to analyze pod %s: %w", pod.Name, err)
+				}
+				podAnalyses[i] = podAnalysis
+				return nil
+			})
+		}
 	}
 
-	// Aggregate metrics from all pods for workload-level utilization
+	// Fetch workload-level metrics
 	metrics, err := fetchWorkloadMetrics(ctx, pods, opts)
 	if err != nil {
 		return WorkloadAnalysis{}, fmt.Errorf("failed to fetch workload metrics: %w", err)
@@ -286,13 +290,19 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 		return WorkloadAnalysis{}, fmt.Errorf("no metrics available for workload %s/%s", namespace, workloadName)
 	}
 
-	// Analyze aggregated utilization
+	// Analyze utilization
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
 		return WorkloadAnalysis{}, fmt.Errorf("failed to analyze workload utilization: %w", err)
 	}
 
-	// Wait for all pods to be analyzed and check for errors
+	// Analyze stability
+	stability, err := AnalyzeStability(metrics)
+	if err != nil {
+		return WorkloadAnalysis{}, fmt.Errorf("failed to analyze workload stability: %w", err)
+	}
+
+	// Wait for all pods to be analyzed if requested and check for errors
 	if err := g.Wait(); err != nil {
 		return WorkloadAnalysis{}, err
 	}
@@ -303,7 +313,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 		Namespace:    namespace,
 		Pods:         podAnalyses,
 		Utilization:  utilization,
-		Stability:    AggregateStability(stabilities),
+		Stability:    stability,
 	}
 
 	// Include time series if requested
@@ -318,7 +328,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 }
 
 // Analyzes a namespace
-func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOptions, includeWorkloads bool) (NamespaceAnalysis, error) {
+func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOptions) (NamespaceAnalysis, error) {
 	// Validate options
 	if err := opts.Validate(); err != nil {
 		return NamespaceAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
@@ -330,7 +340,6 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 
 	// Analyze workloads in parallel
 	var workloads []WorkloadAnalysis
-	var stability StabilityResult
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
 		workloadsAnalyses, err := analyzeNamespaceWorkloads(gctx, namespace, workloadOpts)
@@ -338,11 +347,6 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 			return fmt.Errorf("failed to analyze namespace workloads: %w", err)
 		}
 		workloads = workloadsAnalyses
-		stabilities := make([]StabilityResult, 0, len(workloads))
-		for _, w := range workloads {
-			stabilities = append(stabilities, w.Stability)
-		}
-		stability = AggregateStability(stabilities)
 		return nil
 	})
 
@@ -357,10 +361,16 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 		return NamespaceAnalysis{}, fmt.Errorf("no metrics available for namespace %s", namespace)
 	}
 
-	// Analyze aggregated utilization
+	// Analyze utilization
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
 		return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace utilization: %w", err)
+	}
+
+	// Analyze stability
+	stability, err := AnalyzeStability(metrics)
+	if err != nil {
+		return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace stability: %w", err)
 	}
 
 	// Wait for all workloads to be analyzed and check for errors
@@ -372,11 +382,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 		Namespace:   namespace,
 		Utilization: utilization,
 		Stability:   stability,
-	}
-
-	// Include workloads if requested
-	if includeWorkloads {
-		result.Workloads = workloads
+		Workloads:   workloads,
 	}
 
 	// Include time series if requested
@@ -403,7 +409,8 @@ func analyzeNamespaceWorkloads(ctx context.Context, namespace string, opts Analy
 			if len(pods) == 0 {
 				return nil // skip
 			}
-			analysis, err := AnalyzeWorkload(gctx, kind, name, namespace, pods, opts)
+			// Analyze the workload without including its pods analyses
+			analysis, err := AnalyzeWorkload(gctx, kind, name, namespace, pods, opts, false)
 			if err != nil {
 				return fmt.Errorf("failed to analyze workload %s/%s: %w", kind, name, err)
 			}
@@ -484,7 +491,7 @@ func analyzeNamespaceWorkloads(ctx context.Context, namespace string, opts Analy
 		return nil
 	})
 
-	// Wait for all queries to complete and check for errors
+	// Wait for all workloads to be analyzed and check for errors
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
@@ -594,9 +601,9 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		return nil
 	})
 
-	// Query container restarts metrics
+	// Query restarts metrics
 	g.Go(func() error {
-		value, _, err := prometheus.QueryContainerRestarts(gctx, opts.TimeRange, queryOpts)
+		value, _, err := prometheus.QueryPodRestarts(gctx, opts.TimeRange, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query container restarts metrics: %w", err)
 		}
@@ -604,7 +611,7 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		return nil
 	})
 
-	// Wait for all queries to complete and check for errors
+	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return ResourceMetrics{}, err
 	}
@@ -638,32 +645,101 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		RangeDuration: "5m",
 	}
 
-	var cpuMatrix, memoryMatrix model.Matrix
+	var (
+		cpuMatrix     model.Matrix
+		memoryMatrix  model.Matrix
+		cpuThrottling float64
+		cpuPressure   float64
+		memFailCnt    float64
+		memOOM        float64
+		memPressure   float64
+		restarts      float64
+	)
 
 	// Execute queries in parallel
 	g, gctx := errgroup.WithContext(ctx)
 
-	// Query pod CPU metrics
+	// Query CPU metrics
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryPodCPURange(gctx, r, queryOpts)
 		if err != nil {
-			return fmt.Errorf("failed to query pod CPU metrics: %w", err)
+			return fmt.Errorf("failed to query CPU metrics: %w", err)
 		}
 		cpuMatrix = matrix
 		return nil
 	})
 
-	// Query pod memory metrics
+	// Query memory metrics
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryPodMemoryRange(gctx, r, queryOpts)
 		if err != nil {
-			return fmt.Errorf("failed to query pod memory metrics: %w", err)
+			return fmt.Errorf("failed to query memory metrics: %w", err)
 		}
 		memoryMatrix = matrix
 		return nil
 	})
 
-	// Wait for all queries to complete and check for errors
+	// Query CPU throttling metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryPodCPUThrottling(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query CPU throttling metrics: %w", err)
+		}
+		cpuThrottling = value
+		return nil
+	})
+
+	// Query CPU pressure metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryPodCPUPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query CPU pressure metrics: %w", err)
+		}
+		cpuPressure = value
+		return nil
+	})
+
+	// Query memory fail count metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryPodMemoryFailCount(gctx, opts.TimeRange, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query memory fail count metrics: %w", err)
+		}
+		memFailCnt = value
+		return nil
+	})
+
+	// Query memory OOM metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryPodMemoryOOM(gctx, opts.TimeRange, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query memory OOM metrics: %w", err)
+		}
+		memOOM = value
+		return nil
+	})
+
+	// Query memory pressure metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryPodMemoryPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query memory pressure metrics: %w", err)
+		}
+		memPressure = value
+		return nil
+	})
+
+	// Query restarts metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryPodRestarts(gctx, opts.TimeRange, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query restarts metrics: %w", err)
+		}
+		restarts = value
+		return nil
+	})
+
+	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return ResourceMetrics{}, err
 	}
@@ -677,8 +753,14 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	aggregatedMemory := timeseries.AggregateDataPointsByTimestamp(memoryDataPoints)
 
 	return ResourceMetrics{
-		CPU:    aggregatedCPU,
-		Memory: aggregatedMemory,
+		CPU:            aggregatedCPU,
+		Memory:         aggregatedMemory,
+		CPUThrottling:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuThrottling}},
+		CPUPressure:    []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuPressure}},
+		MemoryFailCnt:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: memFailCnt}},
+		MemoryOOM:      []timeseries.DataPoint{{Timestamp: time.Now(), Value: memOOM}},
+		MemoryPressure: []timeseries.DataPoint{{Timestamp: time.Now(), Value: memPressure}},
+		Restarts:       []timeseries.DataPoint{{Timestamp: time.Now(), Value: restarts}},
 	}, nil
 }
 
@@ -699,8 +781,14 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 
 	// Per-pod results: each goroutine writes to its index
 	type podMetrics struct {
-		CPU    []timeseries.DataPoint
-		Memory []timeseries.DataPoint
+		CPU            []timeseries.DataPoint
+		Memory         []timeseries.DataPoint
+		CPUThrottling  float64
+		CPUPressure    float64
+		MemoryFailCnt  float64
+		MemoryOOM      float64
+		MemoryPressure float64
+		Restarts       float64
 	}
 	results := make([]podMetrics, len(pods))
 
@@ -715,8 +803,17 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		}
 
 		g.Go(func() error {
-			// Query CPU and Memory metrics in parallel for this pod
-			var cpuMatrix, memoryMatrix model.Matrix
+			var (
+				cpuMatrix     model.Matrix
+				memoryMatrix  model.Matrix
+				cpuThrottling float64
+				cpuPressure   float64
+				memFailCnt    float64
+				memOOM        float64
+				memPressure   float64
+				restarts      float64
+			)
+
 			// Create a new error group for this pod
 			podG, podCtx := errgroup.WithContext(gctx)
 
@@ -724,7 +821,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodCPURange(podCtx, r, queryOpts)
 				if err != nil {
-					return fmt.Errorf("failed to query CPU metrics for pod %s/%s: %w", pod.Namespace, pod.Name, err)
+					return fmt.Errorf("failed to query CPU metrics: %w", err)
 				}
 				cpuMatrix = matrix
 				return nil
@@ -734,40 +831,121 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodMemoryRange(podCtx, r, queryOpts)
 				if err != nil {
-					return fmt.Errorf("failed to query memory metrics for pod %s/%s: %w", pod.Namespace, pod.Name, err)
+					return fmt.Errorf("failed to query memory metrics: %w", err)
 				}
 				memoryMatrix = matrix
 				return nil
 			})
 
-			// Wait for both queries to complete and check for errors for this pod
+			// Query CPU throttling metrics
+			podG.Go(func() error {
+				value, _, err := prometheus.QueryPodCPUThrottling(podCtx, opts.TimeRange, opts.RangeStep, queryOpts)
+				if err != nil {
+					return fmt.Errorf("failed to query CPU throttling metrics: %w", err)
+				}
+				cpuThrottling = value
+				return nil
+			})
+
+			// Query CPU pressure metrics
+			podG.Go(func() error {
+				value, _, err := prometheus.QueryPodCPUPressure(podCtx, opts.TimeRange, opts.RangeStep, queryOpts)
+				if err != nil {
+					return fmt.Errorf("failed to query CPU pressure metrics: %w", err)
+				}
+				cpuPressure = value
+				return nil
+			})
+
+			// Query memory fail count metrics
+			podG.Go(func() error {
+				value, _, err := prometheus.QueryPodMemoryFailCount(podCtx, opts.TimeRange, queryOpts)
+				if err != nil {
+					return fmt.Errorf("failed to query memory fail count metrics: %w", err)
+				}
+				memFailCnt = value
+				return nil
+			})
+
+			// Query memory OOM metrics
+			podG.Go(func() error {
+				value, _, err := prometheus.QueryPodMemoryOOM(podCtx, opts.TimeRange, queryOpts)
+				if err != nil {
+					return fmt.Errorf("failed to query memory OOM metrics: %w", err)
+				}
+				memOOM = value
+				return nil
+			})
+
+			// Query memory pressure metrics
+			podG.Go(func() error {
+				value, _, err := prometheus.QueryPodMemoryPressure(podCtx, opts.TimeRange, opts.RangeStep, queryOpts)
+				if err != nil {
+					return fmt.Errorf("failed to query memory pressure metrics: %w", err)
+				}
+				memPressure = value
+				return nil
+			})
+
+			// Query restarts metrics
+			podG.Go(func() error {
+				value, _, err := prometheus.QueryPodRestarts(podCtx, opts.TimeRange, queryOpts)
+				if err != nil {
+					return fmt.Errorf("failed to query restarts metrics: %w", err)
+				}
+				restarts = value
+				return nil
+			})
+
+			// Wait for all queries to be completed and check for errors
 			if err := podG.Wait(); err != nil {
 				return err
 			}
 
 			results[i] = podMetrics{
-				CPU:    timeseries.MatrixToDataPoints(cpuMatrix),
-				Memory: timeseries.MatrixToDataPoints(memoryMatrix),
+				CPU:            timeseries.MatrixToDataPoints(cpuMatrix),
+				Memory:         timeseries.MatrixToDataPoints(memoryMatrix),
+				CPUThrottling:  cpuThrottling,
+				CPUPressure:    cpuPressure,
+				MemoryFailCnt:  memFailCnt,
+				MemoryOOM:      memOOM,
+				MemoryPressure: memPressure,
+				Restarts:       restarts,
 			}
 			return nil
 		})
 	}
 
-	// Wait for all queries to complete and check for errors
+	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return ResourceMetrics{}, err
 	}
 
-	// Merge all per-pod results
+	// Aggregate metrics across pods
 	var cpu, memory []timeseries.DataPoint
+	var sumThrottling, sumPressure, sumMemPressure float64
+	var sumFailCnt, sumOOM, sumRestarts float64
 	for _, p := range results {
 		cpu = timeseries.MergeDataPointsByTime(cpu, p.CPU)
 		memory = timeseries.MergeDataPointsByTime(memory, p.Memory)
+		sumThrottling += p.CPUThrottling
+		sumPressure += p.CPUPressure
+		sumMemPressure += p.MemoryPressure
+		sumFailCnt += p.MemoryFailCnt
+		sumOOM += p.MemoryOOM
+		sumRestarts += p.Restarts
 	}
 
+	podsNum := float64(len(results))
 	return ResourceMetrics{
-		CPU:    cpu,
-		Memory: memory,
+		CPU:            cpu,
+		Memory:         memory,
+		CPUThrottling:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: sumThrottling / podsNum}},
+		CPUPressure:    []timeseries.DataPoint{{Timestamp: time.Now(), Value: sumPressure / podsNum}},
+		MemoryPressure: []timeseries.DataPoint{{Timestamp: time.Now(), Value: sumMemPressure / podsNum}},
+		MemoryFailCnt:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: sumFailCnt}},
+		MemoryOOM:      []timeseries.DataPoint{{Timestamp: time.Now(), Value: sumOOM}},
+		Restarts:       []timeseries.DataPoint{{Timestamp: time.Now(), Value: sumRestarts}},
 	}, nil
 }
 
@@ -787,7 +965,16 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		RangeDuration: "5m",
 	}
 
-	var cpuMatrix, memoryMatrix model.Matrix
+	var (
+		cpuMatrix     model.Matrix
+		memoryMatrix  model.Matrix
+		cpuThrottling float64
+		cpuPressure   float64
+		memFailCnt    float64
+		memOOM        float64
+		memPressure   float64
+		restarts      float64
+	)
 
 	// Execute queries in parallel
 	g, gctx := errgroup.WithContext(ctx)
@@ -796,7 +983,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryNamespaceCPURange(gctx, r, queryOpts)
 		if err != nil {
-			return fmt.Errorf("failed to query namespace CPU metrics: %w", err)
+			return fmt.Errorf("failed to query CPU metrics: %w", err)
 		}
 		cpuMatrix = matrix
 		return nil
@@ -806,20 +993,86 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryNamespaceMemoryRange(gctx, r, queryOpts)
 		if err != nil {
-			return fmt.Errorf("failed to query namespace memory metrics: %w", err)
+			return fmt.Errorf("failed to query memory metrics: %w", err)
 		}
 		memoryMatrix = matrix
 		return nil
 	})
 
-	// Wait for all queries to complete and check for errors
+	// Query CPU throttling metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryNamespaceCPUThrottling(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query CPU throttling metrics: %w", err)
+		}
+		cpuThrottling = value
+		return nil
+	})
+
+	// Query CPU pressure metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryNamespaceCPUPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query CPU pressure metrics: %w", err)
+		}
+		cpuPressure = value
+		return nil
+	})
+
+	// Query memory fail count metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryNamespaceMemoryFailCount(gctx, opts.TimeRange, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query memory fail count metrics: %w", err)
+		}
+		memFailCnt = value
+		return nil
+	})
+
+	// Query memory OOM metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryNamespaceMemoryOOM(gctx, opts.TimeRange, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query memory OOM metrics: %w", err)
+		}
+		memOOM = value
+		return nil
+	})
+
+	// Query memory pressure metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryNamespaceMemoryPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query memory pressure metrics: %w", err)
+		}
+		memPressure = value
+		return nil
+	})
+
+	// Query restarts metrics
+	g.Go(func() error {
+		value, _, err := prometheus.QueryNamespaceRestarts(gctx, opts.TimeRange, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query restarts metrics: %w", err)
+		}
+		restarts = value
+		return nil
+	})
+
+	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return ResourceMetrics{}, err
 	}
 
 	return ResourceMetrics{
-		CPU:    timeseries.MatrixToDataPoints(cpuMatrix),
-		Memory: timeseries.MatrixToDataPoints(memoryMatrix),
+		CPU:            timeseries.MatrixToDataPoints(cpuMatrix),
+		Memory:         timeseries.MatrixToDataPoints(memoryMatrix),
+		CPUThrottling:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuThrottling}},
+		CPUPressure:    []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuPressure}},
+		MemoryFailCnt:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: memFailCnt}},
+		MemoryOOM:      []timeseries.DataPoint{{Timestamp: time.Now(), Value: memOOM}},
+		MemoryPressure: []timeseries.DataPoint{{Timestamp: time.Now(), Value: memPressure}},
+		Restarts:       []timeseries.DataPoint{{Timestamp: time.Now(), Value: restarts}},
 	}, nil
 }
 
