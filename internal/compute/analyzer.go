@@ -744,17 +744,9 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return ResourceMetrics{}, err
 	}
 
-	// Aggregate CPU metrics
-	cpuDataPoints := timeseries.MatrixToDataPoints(cpuMatrix)
-	aggregatedCPU := timeseries.AggregateDataPointsByTimestamp(cpuDataPoints)
-
-	// Aggregate memory metrics
-	memoryDataPoints := timeseries.MatrixToDataPoints(memoryMatrix)
-	aggregatedMemory := timeseries.AggregateDataPointsByTimestamp(memoryDataPoints)
-
 	return ResourceMetrics{
-		CPU:            aggregatedCPU,
-		Memory:         aggregatedMemory,
+		CPU:            timeseries.MatrixToDataPoints(cpuMatrix),
+		Memory:         timeseries.MatrixToDataPoints(memoryMatrix),
 		CPUThrottling:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuThrottling}},
 		CPUPressure:    []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuPressure}},
 		MemoryFailCnt:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: memFailCnt}},
