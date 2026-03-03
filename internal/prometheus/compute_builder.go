@@ -225,7 +225,8 @@ func BuildNamespaceCPUPressureQuery(namespace string, rangeDuration string, time
 	}
 
 	base := fmt.Sprintf(`container_pressure_cpu_stalled_seconds_total{container!="POD",container!="",namespace="%s"}`, namespace)
-	rateQuery := fmt.Sprintf("sum(rate(%s[%s]))", base, rangeDuration)
+	// Average stalled rate across containers in the namespace (keeps metric as a 0–1 fraction)
+	rateQuery := fmt.Sprintf("avg(rate(%s[%s]))", base, rangeDuration)
 	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step), nil
 }
 
@@ -262,7 +263,8 @@ func BuildNamespaceMemoryPressureQuery(namespace string, rangeDuration string, t
 	}
 
 	base := fmt.Sprintf(`container_pressure_memory_stalled_seconds_total{container!="POD",container!="",namespace="%s"}`, namespace)
-	rateQuery := fmt.Sprintf("sum(rate(%s[%s]))", base, rangeDuration)
+	// Average stalled rate across containers in the namespace (keeps metric as a 0–1 fraction)
+	rateQuery := fmt.Sprintf("avg(rate(%s[%s]))", base, rangeDuration)
 	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step), nil
 }
 
