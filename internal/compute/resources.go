@@ -62,7 +62,7 @@ type RecommendationConfig struct {
 	CostOptimizedMaxReductionRatio float64
 	BurstableMaxReductionRatio     float64
 	GuaranteedMaxReductionRatio    float64
-	// Max increase ratio per step (default 2.5)
+	// Max increase ratio per step (default 2.0)
 	MaxIncreaseRatio float64
 }
 
@@ -87,7 +87,7 @@ func DefaultRecommendationConfig() RecommendationConfig {
 		CostOptimizedMaxReductionRatio:   0.5,                                             // at most 50% reduction per step (floor 50% of current)
 		BurstableMaxReductionRatio:       0.4,                                             // at most 40% reduction per step (floor 60% of current)
 		GuaranteedMaxReductionRatio:      0.3,                                             // at most 30% reduction per step (floor 70% of current)
-		MaxIncreaseRatio:                 2.5,                                             // at most 2.5x current per step
+		MaxIncreaseRatio:                 2.0,                                             // at most 2x current per step
 	}
 }
 
@@ -733,12 +733,12 @@ func calculateCPUThrottlingPressureFactor(throttling float64) float64 {
 		return 1.0 + throttling*1.0
 	}
 	if throttling < 0.05 {
-		// Minor throttling (1% to 5%): moderate scaling from 1.01 to 1.15
-		return 1.01 + (throttling-0.01)*3.5
+		// Minor throttling (1% to 5%): moderate scaling from 1.01 to 1.2
+		return 1.01 + (throttling-0.01)*4.5
 	}
-	// Severe throttling (>= 5%): from 1.15
-	// Capped at 3.0 (reached at ~42% throttling) to avoid extreme values
-	val := 1.15 + (throttling-0.05)*5.0
+	// Severe throttling (>= 5%): from 1.2
+	// Capped at 3.0 (reached at ~41% throttling) to avoid extreme values
+	val := 1.2 + (throttling-0.05)*5.0
 	return min(val, 3.0)
 }
 
