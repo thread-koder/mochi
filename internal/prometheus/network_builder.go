@@ -138,8 +138,7 @@ func BuildNamespaceNetworkReceiveBytesQuery(namespace string, rangeDuration stri
 		rangeDuration = "5m"
 	}
 
-	query := fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{namespace="%s"}[%s]))`, namespace, rangeDuration)
-	return query, nil
+	return fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
 // Builds a PromQL query for namespace network transmit bytes (bytes/sec)
@@ -151,8 +150,7 @@ func BuildNamespaceNetworkTransmitBytesQuery(namespace string, rangeDuration str
 		rangeDuration = "5m"
 	}
 
-	query := fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{namespace="%s"}[%s]))`, namespace, rangeDuration)
-	return query, nil
+	return fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
 // Builds a PromQL query for namespace network receive errors (errors/sec)
@@ -164,8 +162,7 @@ func BuildNamespaceNetworkReceiveErrorsQuery(namespace string, rangeDuration str
 		rangeDuration = "5m"
 	}
 
-	query := fmt.Sprintf(`sum(rate(container_network_receive_errors_total{namespace="%s"}[%s]))`, namespace, rangeDuration)
-	return query, nil
+	return fmt.Sprintf(`sum(rate(container_network_receive_errors_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
 // Builds a PromQL query for namespace network transmit errors (errors/sec)
@@ -177,8 +174,7 @@ func BuildNamespaceNetworkTransmitErrorsQuery(namespace string, rangeDuration st
 		rangeDuration = "5m"
 	}
 
-	query := fmt.Sprintf(`sum(rate(container_network_transmit_errors_total{namespace="%s"}[%s]))`, namespace, rangeDuration)
-	return query, nil
+	return fmt.Sprintf(`sum(rate(container_network_transmit_errors_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
 // Builds a PromQL query for namespace network receive packets dropped (packets/sec)
@@ -190,8 +186,7 @@ func BuildNamespaceNetworkReceiveDroppedQuery(namespace string, rangeDuration st
 		rangeDuration = "5m"
 	}
 
-	query := fmt.Sprintf(`sum(rate(container_network_receive_packets_dropped_total{namespace="%s"}[%s]))`, namespace, rangeDuration)
-	return query, nil
+	return fmt.Sprintf(`sum(rate(container_network_receive_packets_dropped_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
 // Builds a PromQL query for namespace network transmit packets dropped (packets/sec)
@@ -203,6 +198,5 @@ func BuildNamespaceNetworkTransmitDroppedQuery(namespace string, rangeDuration s
 		rangeDuration = "5m"
 	}
 
-	query := fmt.Sprintf(`sum(rate(container_network_transmit_packets_dropped_total{namespace="%s"}[%s]))`, namespace, rangeDuration)
-	return query, nil
+	return fmt.Sprintf(`sum(rate(container_network_transmit_packets_dropped_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }

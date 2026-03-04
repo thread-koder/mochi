@@ -178,8 +178,7 @@ func BuildNamespaceCPUQuery(namespace string, rangeDuration string) (string, err
 		rangeDuration = "5m"
 	}
 
-	query := fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{container!="POD",container!="",namespace="%s"}[%s]))`, namespace, rangeDuration)
-	return query, nil
+	return fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{container!="POD",container!="",namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
 // Builds a PromQL query for namespace memory usage
@@ -188,8 +187,7 @@ func BuildNamespaceMemoryQuery(namespace string) (string, error) {
 		return "", fmt.Errorf("namespace is required")
 	}
 
-	query := fmt.Sprintf(`sum(container_memory_working_set_bytes{container!="POD",container!="",namespace="%s"})`, namespace)
-	return query, nil
+	return fmt.Sprintf(`sum(container_memory_working_set_bytes{container!="POD",container!="",namespace="%s"})`, namespace), nil
 }
 
 // Builds a PromQL query for namespace CPU throttling (CFS)
