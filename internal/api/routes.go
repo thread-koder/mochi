@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/internal/api/handlers"
 	computeHandlers "github.com/thread_koder/mochi/internal/api/handlers/compute"
+	networkHandlers "github.com/thread_koder/mochi/internal/api/handlers/network"
 	webHandlers "github.com/thread_koder/mochi/internal/api/handlers/web"
 	"github.com/thread_koder/mochi/internal/api/middleware"
 	"github.com/thread_koder/mochi/internal/config"
@@ -52,6 +53,18 @@ func setupRoutes(router *gin.Engine) {
 			// POST endpoints (no caching)
 			compute.POST("/recommendations/generate/:workloadType/:workloadName", computeHandlers.GenerateRecommendations)
 			compute.POST("/recommendations/apply", computeHandlers.ApplyRecommendation)
+		}
+
+		// Network domain
+		network := v1.Group("/network")
+		{
+			// Analysis endpoints (cached)
+			networkAnalysisGroup := network.Group("")
+			networkAnalysisGroup.Use(middleware.CacheMiddleware(cacheTTL))
+			{
+				networkAnalysisGroup.GET("/analyze/namespaces/:namespace", networkHandlers.AnalyzeNamespace)
+				networkAnalysisGroup.GET("/analyze/workloads/:workloadType/:workloadName", networkHandlers.AnalyzeWorkload)
+			}
 		}
 	}
 }
