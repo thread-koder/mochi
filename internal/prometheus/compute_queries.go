@@ -71,7 +71,7 @@ func QueryPodMemoryPressure(ctx context.Context, timeRange time.Duration, step t
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries pod restarts
+// Queries pod restarts metrics
 func QueryPodRestarts(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildPodRestartsQuery(opts.Namespace, opts.Pod, opts.Container, timeRange.String())
 	if err != nil {
@@ -143,7 +143,7 @@ func QueryNamespaceMemoryPressure(ctx context.Context, timeRange time.Duration, 
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries namespace container restarts
+// Queries namespace restarts metrics
 func QueryNamespaceRestarts(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildNamespaceRestartsQuery(opts.Namespace, timeRange.String())
 	if err != nil {
