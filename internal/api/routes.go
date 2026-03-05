@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/internal/api/handlers"
 	computeHandlers "github.com/thread_koder/mochi/internal/api/handlers/compute"
+	diskHandlers "github.com/thread_koder/mochi/internal/api/handlers/disk"
 	networkHandlers "github.com/thread_koder/mochi/internal/api/handlers/network"
 	webHandlers "github.com/thread_koder/mochi/internal/api/handlers/web"
 	"github.com/thread_koder/mochi/internal/api/middleware"
@@ -64,6 +65,18 @@ func setupRoutes(router *gin.Engine) {
 			{
 				networkAnalysisGroup.GET("/analyze/namespaces/:namespace", networkHandlers.AnalyzeNamespace)
 				networkAnalysisGroup.GET("/analyze/workloads/:workloadType/:workloadName", networkHandlers.AnalyzeWorkload)
+			}
+		}
+
+		// Disk domain
+		diskGroup := v1.Group("/disk")
+		{
+			// Analysis endpoints (cached)
+			diskAnalysisGroup := diskGroup.Group("")
+			diskAnalysisGroup.Use(middleware.CacheMiddleware(cacheTTL))
+			{
+				diskAnalysisGroup.GET("/analyze/namespaces/:namespace", diskHandlers.AnalyzeNamespace)
+				diskAnalysisGroup.GET("/analyze/workloads/:workloadType/:workloadName", diskHandlers.AnalyzeWorkload)
 			}
 		}
 	}

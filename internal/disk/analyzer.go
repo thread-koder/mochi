@@ -301,6 +301,7 @@ func analyzeNamespaceWorkloads(ctx context.Context, namespace string, opts Analy
 			analysis, err := AnalyzeWorkload(gctx, kind, name, namespace, pods, opts, false)
 			if err != nil {
 				// Skip workloads with no metrics
+				// Some workloads/pods may not have disk metrics exposed at all
 				if strings.Contains(err.Error(), "no metrics available") {
 					return nil
 				}
