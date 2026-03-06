@@ -5,43 +5,6 @@ import (
 	"time"
 )
 
-// Represents pod metadata
-type Pod struct {
-	ID            int64           `json:"id" db:"id"`
-	Name          string          `json:"name" db:"name"`
-	Namespace     string          `json:"namespace" db:"namespace"`
-	UID           string          `json:"uid" db:"uid"`
-	Node          *string         `json:"node,omitempty" db:"node"`
-	Phase         string          `json:"phase" db:"phase"`
-	RestartPolicy *string         `json:"restart_policy,omitempty" db:"restart_policy"`
-	Labels        json.RawMessage `json:"labels" db:"labels"`
-	Annotations   json.RawMessage `json:"annotations" db:"annotations"`
-	OwnerKind     *string         `json:"owner_kind,omitempty" db:"owner_kind"`
-	OwnerName     *string         `json:"owner_name,omitempty" db:"owner_name"`
-	CreatedAt     time.Time       `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time       `json:"updated_at" db:"updated_at"`
-	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
-}
-
-// Represents container metadata
-type Container struct {
-	ID              int64           `json:"id" db:"id"`
-	Name            string          `json:"name" db:"name"`
-	PodUID          string          `json:"pod_uid" db:"pod_uid"`
-	PodName         string          `json:"pod_name" db:"pod_name"`
-	Namespace       string          `json:"namespace" db:"namespace"`
-	Image           string          `json:"image" db:"image"`
-	ImagePullPolicy *string         `json:"image_pull_policy,omitempty" db:"image_pull_policy"`
-	Ports           json.RawMessage `json:"ports" db:"ports"`
-	CPURequest      *string         `json:"cpu_request,omitempty" db:"cpu_request"`
-	CPULimit        *string         `json:"cpu_limit,omitempty" db:"cpu_limit"`
-	MemoryRequest   *string         `json:"memory_request,omitempty" db:"memory_request"`
-	MemoryLimit     *string         `json:"memory_limit,omitempty" db:"memory_limit"`
-	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at" db:"updated_at"`
-	SyncedAt        time.Time       `json:"synced_at" db:"synced_at"`
-}
-
 // Represents node metadata
 type Node struct {
 	ID                      int64           `json:"id" db:"id"`
@@ -94,21 +57,6 @@ type Deployment struct {
 	SyncedAt          time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents statefulset metadata
-type StatefulSet struct {
-	ID            int64           `json:"id" db:"id"`
-	Name          string          `json:"name" db:"name"`
-	Namespace     string          `json:"namespace" db:"namespace"`
-	UID           string          `json:"uid" db:"uid"`
-	Replicas      int             `json:"replicas" db:"replicas"`
-	ReadyReplicas int             `json:"ready_replicas" db:"ready_replicas"`
-	Labels        json.RawMessage `json:"labels" db:"labels"`
-	Annotations   json.RawMessage `json:"annotations" db:"annotations"`
-	CreatedAt     time.Time       `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time       `json:"updated_at" db:"updated_at"`
-	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
-}
-
 // Represents replicaset metadata
 type ReplicaSet struct {
 	ID            int64           `json:"id" db:"id"`
@@ -119,6 +67,21 @@ type ReplicaSet struct {
 	ReadyReplicas int             `json:"ready_replicas" db:"ready_replicas"`
 	OwnerKind     *string         `json:"owner_kind" db:"owner_kind"`
 	OwnerName     *string         `json:"owner_name" db:"owner_name"`
+	Labels        json.RawMessage `json:"labels" db:"labels"`
+	Annotations   json.RawMessage `json:"annotations" db:"annotations"`
+	CreatedAt     time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at" db:"updated_at"`
+	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
+}
+
+// Represents statefulset metadata
+type StatefulSet struct {
+	ID            int64           `json:"id" db:"id"`
+	Name          string          `json:"name" db:"name"`
+	Namespace     string          `json:"namespace" db:"namespace"`
+	UID           string          `json:"uid" db:"uid"`
+	Replicas      int             `json:"replicas" db:"replicas"`
+	ReadyReplicas int             `json:"ready_replicas" db:"ready_replicas"`
 	Labels        json.RawMessage `json:"labels" db:"labels"`
 	Annotations   json.RawMessage `json:"annotations" db:"annotations"`
 	CreatedAt     time.Time       `json:"created_at" db:"created_at"`
@@ -159,19 +122,59 @@ type Service struct {
 	SyncedAt    time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents endpoint metadata
-type Endpoint struct {
+// Represents endpoint slice metadata
+type EndpointSlice struct {
 	ID          int64           `json:"id" db:"id"`
 	Name        string          `json:"name" db:"name"`
 	Namespace   string          `json:"namespace" db:"namespace"`
 	UID         string          `json:"uid" db:"uid"`
-	Addresses   json.RawMessage `json:"addresses" db:"addresses"`
+	AddressType string          `json:"address_type" db:"address_type"`
+	OwnerKind   *string         `json:"owner_kind" db:"owner_kind"`
+	OwnerName   *string         `json:"owner_name" db:"owner_name"`
+	Endpoints   json.RawMessage `json:"endpoints" db:"endpoints"`
 	Ports       json.RawMessage `json:"ports" db:"ports"`
 	Labels      json.RawMessage `json:"labels" db:"labels"`
 	Annotations json.RawMessage `json:"annotations" db:"annotations"`
 	CreatedAt   time.Time       `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at" db:"updated_at"`
 	SyncedAt    time.Time       `json:"synced_at" db:"synced_at"`
+}
+
+// Represents pod metadata
+type Pod struct {
+	ID            int64           `json:"id" db:"id"`
+	Name          string          `json:"name" db:"name"`
+	Namespace     string          `json:"namespace" db:"namespace"`
+	UID           string          `json:"uid" db:"uid"`
+	Node          *string         `json:"node,omitempty" db:"node"`
+	Phase         string          `json:"phase" db:"phase"`
+	RestartPolicy *string         `json:"restart_policy,omitempty" db:"restart_policy"`
+	Labels        json.RawMessage `json:"labels" db:"labels"`
+	Annotations   json.RawMessage `json:"annotations" db:"annotations"`
+	OwnerKind     *string         `json:"owner_kind,omitempty" db:"owner_kind"`
+	OwnerName     *string         `json:"owner_name,omitempty" db:"owner_name"`
+	CreatedAt     time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at" db:"updated_at"`
+	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
+}
+
+// Represents container metadata
+type Container struct {
+	ID              int64           `json:"id" db:"id"`
+	Name            string          `json:"name" db:"name"`
+	PodUID          string          `json:"pod_uid" db:"pod_uid"`
+	PodName         string          `json:"pod_name" db:"pod_name"`
+	Namespace       string          `json:"namespace" db:"namespace"`
+	Image           string          `json:"image" db:"image"`
+	ImagePullPolicy *string         `json:"image_pull_policy,omitempty" db:"image_pull_policy"`
+	Ports           json.RawMessage `json:"ports" db:"ports"`
+	CPURequest      *string         `json:"cpu_request,omitempty" db:"cpu_request"`
+	CPULimit        *string         `json:"cpu_limit,omitempty" db:"cpu_limit"`
+	MemoryRequest   *string         `json:"memory_request,omitempty" db:"memory_request"`
+	MemoryLimit     *string         `json:"memory_limit,omitempty" db:"memory_limit"`
+	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at" db:"updated_at"`
+	SyncedAt        time.Time       `json:"synced_at" db:"synced_at"`
 }
 
 // Represents compute resource recommendations for a workload

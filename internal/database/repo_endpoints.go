@@ -8,14 +8,14 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts multiple endpoints in a batch transaction
-func UpsertEndpointsBatch(ctx context.Context, endpoints []*Endpoint) error {
-	if len(endpoints) == 0 {
+// Upserts multiple endpoint slices in a batch transaction
+func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSlice) error {
+	if len(endpointSlices) == 0 {
 		return nil
 	}
 
 	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(endpoints)).Msg("Upserting endpoints batch")
+	log.Debug().Int("count", len(endpointSlices)).Msg("Upserting endpoint slices batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -24,14 +24,17 @@ func UpsertEndpointsBatch(ctx context.Context, endpoints []*Endpoint) error {
 	defer tx.Rollback(ctx)
 
 	query := `
-		INSERT INTO endpoints (
-			name, namespace, uid, addresses, ports,
-			labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO endpoint_slices (
+			name, namespace, uid, address_type,
+			owner_kind, owner_name, endpoints, ports, labels, annotations, created_at, synced_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
 			namespace = EXCLUDED.namespace,
-			addresses = EXCLUDED.addresses,
+			address_type = EXCLUDED.address_type,
+			owner_kind = EXCLUDED.owner_kind,
+			owner_name = EXCLUDED.owner_name,
+			endpoints = EXCLUDED.endpoints,
 			ports = EXCLUDED.ports,
 			labels = EXCLUDED.labels,
 			annotations = EXCLUDED.annotations,
@@ -39,21 +42,21 @@ func UpsertEndpointsBatch(ctx context.Context, endpoints []*Endpoint) error {
 	`
 
 	batch := &pgx.Batch{}
-	for _, endpoint := range endpoints {
+	for _, es := range endpointSlices {
 		batch.Queue(query,
-			endpoint.Name, endpoint.Namespace, endpoint.UID,
-			endpoint.Addresses, endpoint.Ports,
-			endpoint.Labels, endpoint.Annotations, endpoint.CreatedAt, endpoint.SyncedAt,
+			es.Name, es.Namespace, es.UID, es.AddressType,
+			es.OwnerKind, es.OwnerName, es.Endpoints, es.Ports,
+			es.Labels, es.Annotations, es.CreatedAt, es.SyncedAt,
 		)
 	}
 
 	results := tx.SendBatch(ctx, batch)
 
-	for i := range endpoints {
+	for i := range endpointSlices {
 		_, err := results.Exec()
 		if err != nil {
 			results.Close()
-			return fmt.Errorf("failed to execute batch upsert for endpoint %d: %w", i, err)
+			return fmt.Errorf("failed to execute batch upsert for endpoint slice %d: %w", i, err)
 		}
 	}
 
@@ -65,16 +68,16 @@ func UpsertEndpointsBatch(ctx context.Context, endpoints []*Endpoint) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(endpoints)).Msg("Endpoints upserted successfully")
+	log.Debug().Int("count", len(endpointSlices)).Msg("Endpoint slices upserted successfully")
 	return nil
 }
 
-// Removes endpoints in the namespace whose uid is not in the list.
-func PruneEndpoints(ctx context.Context, namespace string, uids []string) error {
+// Removes endpoint slices in the namespace whose uid is not in the list.
+func PruneEndpointSlices(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM endpoints WHERE namespace = $1`, namespace)
+		_, err := Pool.Exec(ctx, `DELETE FROM endpoint_slices WHERE namespace = $1`, namespace)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM endpoints WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	_, err := Pool.Exec(ctx, `DELETE FROM endpoint_slices WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
 	return err
 }

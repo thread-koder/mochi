@@ -1,2 +1,2 @@
 -- Drop table
-DROP TABLE IF EXISTS endpoints;
+DROP TABLE IF EXISTS endpoint_slices;

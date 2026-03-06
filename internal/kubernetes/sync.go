@@ -56,8 +56,8 @@ func SyncResources(ctx context.Context) error {
 			log.Warn().Err(err).Msg("Failed to sync services")
 		}
 
-		if err := SyncEndpoints(ctx, ns.Name); err != nil {
-			log.Warn().Err(err).Msg("Failed to sync endpoints")
+		if err := SyncEndpointSlices(ctx, ns.Name); err != nil {
+			log.Warn().Err(err).Msg("Failed to sync endpoint slices")
 		}
 
 		if err := SyncPods(ctx, ns.Name); err != nil {
@@ -501,65 +501,69 @@ func SyncServices(ctx context.Context, namespace string) error {
 	return nil
 }
 
-// Syncs endpoints to PostgreSQL
-func SyncEndpoints(ctx context.Context, namespace string) error {
+// Syncs endpoint slices to PostgreSQL
+func SyncEndpointSlices(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	endpoints, err := Clientset.CoreV1().Endpoints(namespace).List(ctx, metav1.ListOptions{})
+	endpointSlices, err := Clientset.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list endpoints: %w", err)
+		return fmt.Errorf("failed to list endpoint slices: %w", err)
 	}
 
-	log.Debug().Int("count", len(endpoints.Items)).Msg("Syncing endpoints...")
+	log.Debug().Int("count", len(endpointSlices.Items)).Msg("Syncing endpoint slices...")
 
-	dbEndpoints := make([]*database.Endpoint, 0, len(endpoints.Items))
+	dbEndpointSlices := make([]*database.EndpointSlice, 0, len(endpointSlices.Items))
 	now := time.Now()
 
-	epUIDs := make([]string, 0, len(endpoints.Items))
-	for _, ep := range endpoints.Items {
-		epUID := string(ep.UID)
-		epUIDs = append(epUIDs, epUID)
-		labelsJSON, _ := mapToJSON(ep.Labels)
-		annotationsJSON, _ := mapToJSON(ep.Annotations)
-		// Extract addresses and ports from subsets
-		var addresses []string
-		var ports []corev1.EndpointPort
-		for _, subset := range ep.Subsets {
-			for _, addr := range subset.Addresses {
-				addresses = append(addresses, addr.IP)
-			}
-			ports = append(ports, subset.Ports...)
-		}
-		addressesJSON, _ := sliceToJSON(addresses)
-		portsJSON, _ := sliceToJSON(ports)
+	esUIDs := make([]string, 0, len(endpointSlices.Items))
+	for _, es := range endpointSlices.Items {
+		esUID := string(es.UID)
+		esUIDs = append(esUIDs, esUID)
+		labelsJSON, _ := mapToJSON(es.Labels)
+		annotationsJSON, _ := mapToJSON(es.Annotations)
 
-		dbEndpoint := &database.Endpoint{
-			Name:        ep.Name,
-			Namespace:   ep.Namespace,
-			UID:         epUID,
-			Addresses:   addressesJSON,
+		// Extract owner information (Service)
+		var ownerKind, ownerName *string
+		for _, owner := range es.OwnerReferences {
+			ownerKind = &owner.Kind
+			ownerName = &owner.Name
+			break // Take first owner (Service)
+		}
+
+		// Serialize endpoints and ports
+		endpointsJSON, _ := sliceToJSON(es.Endpoints)
+		portsJSON, _ := sliceToJSON(es.Ports)
+
+		dbEndpointSlice := &database.EndpointSlice{
+			Name:        es.Name,
+			Namespace:   es.Namespace,
+			UID:         esUID,
+			AddressType: string(es.AddressType),
+			OwnerKind:   ownerKind,
+			OwnerName:   ownerName,
+			Endpoints:   endpointsJSON,
 			Ports:       portsJSON,
 			Labels:      labelsJSON,
 			Annotations: annotationsJSON,
-			CreatedAt:   ep.CreationTimestamp.Time,
+			CreatedAt:   es.CreationTimestamp.Time,
 			SyncedAt:    now,
 		}
 
-		dbEndpoints = append(dbEndpoints, dbEndpoint)
+		dbEndpointSlices = append(dbEndpointSlices, dbEndpointSlice)
 	}
 
-	if err := database.UpsertEndpointsBatch(ctx, dbEndpoints); err != nil {
-		return fmt.Errorf("failed to upsert endpoints: %w", err)
+	if err := database.UpsertEndpointSlicesBatch(ctx, dbEndpointSlices); err != nil {
+		return fmt.Errorf("failed to upsert endpoint slices: %w", err)
 	}
 
-	if err := database.PruneEndpoints(ctx, namespace, epUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete endpoints not in current state")
+	if err := database.PruneEndpointSlices(ctx, namespace, esUIDs); err != nil {
+		log.Warn().Err(err).Msg("Failed to delete endpoint slices not in current state")
 	}
-	log.Debug().Int("count", len(dbEndpoints)).Msg("Endpoints synced successfully")
+	log.Debug().Int("count", len(dbEndpointSlices)).Msg("Endpoint slices synced successfully")
 	return nil
 }
 
