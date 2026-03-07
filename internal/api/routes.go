@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/internal/api/handlers"
+	analysisHandlers "github.com/thread_koder/mochi/internal/api/handlers/analysis"
 	computeHandlers "github.com/thread_koder/mochi/internal/api/handlers/compute"
 	diskHandlers "github.com/thread_koder/mochi/internal/api/handlers/disk"
 	networkHandlers "github.com/thread_koder/mochi/internal/api/handlers/network"
@@ -77,6 +78,17 @@ func setupRoutes(router *gin.Engine) {
 			{
 				diskAnalysisGroup.GET("/analyze/namespaces/:namespace", diskHandlers.AnalyzeNamespace)
 				diskAnalysisGroup.GET("/analyze/workloads/:workloadType/:workloadName", diskHandlers.AnalyzeWorkload)
+			}
+		}
+
+		// Analysis domain (cross-domain analysis)
+		analysisGroup := v1.Group("/analysis")
+		{
+			// Correlation endpoints (cached)
+			correlationGroup := analysisGroup.Group("")
+			correlationGroup.Use(middleware.CacheMiddleware(cacheTTL))
+			{
+				correlationGroup.GET("/correlations/workloads/:workloadType/:workloadName", analysisHandlers.AnalyzeWorkloadCorrelations)
 			}
 		}
 	}
