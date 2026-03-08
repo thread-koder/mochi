@@ -132,10 +132,27 @@ func GenerateContainerRecommendation(
 		memoryRequestRecValue, memoryLimitRecValue, specs.MemoryRequest, specs.MemoryLimit, config.Mode,
 	)
 
-	// Preserve current values for resources that don't have recommendations
 	hasCPURecommendation := cpuRequestRecValue != nil || cpuLimitRecValue != nil
 	hasMemoryRecommendation := memoryRequestRecValue != nil || memoryLimitRecValue != nil
+	// Only create recommendation if we have at least one recommendation
+	if !hasCPURecommendation && !hasMemoryRecommendation {
+		return nil, nil
+	}
 
+	// Calculate overall confidence
+	overallConfidence := calculateOverallConfidence(
+		containerAnalysis.Provisioning.CPU,
+		containerAnalysis.Provisioning.Memory,
+		hasCPURecommendation,
+		hasMemoryRecommendation,
+	)
+
+	// Only create recommendation if confidence is above threshold
+	if overallConfidence < config.MinConfidenceThreshold {
+		return nil, nil
+	}
+
+	// Preserve current values for resources that don't have recommendations
 	if hasCPURecommendation && !hasMemoryRecommendation {
 		// Preserve current memory values
 		if specs.MemoryRequest != nil {
@@ -152,18 +169,6 @@ func GenerateContainerRecommendation(
 		if specs.CPULimit != nil {
 			cpuLimitRecValue = specs.CPULimit
 		}
-	}
-
-	// Calculate overall confidence
-	overallConfidence := calculateOverallConfidence(
-		containerAnalysis.Provisioning.CPU,
-		containerAnalysis.Provisioning.Memory,
-	)
-
-	// Only create recommendation if we have at least one recommendation and sufficient confidence
-	hasRecommendation := cpuRequestRecValue != nil || cpuLimitRecValue != nil || memoryRequestRecValue != nil || memoryLimitRecValue != nil
-	if !hasRecommendation || overallConfidence < config.MinConfidenceThreshold {
-		return nil, nil
 	}
 
 	// Calculate change percentages
@@ -334,6 +339,122 @@ func ComputeRecommendationToDB(rec Recommendation) (*database.ComputeRecommendat
 		UpdatedAt:          now,
 		GeneratedAt:        now,
 	}, nil
+}
+
+// Calculates overall confidence score from CPU and memory provisioning
+// Only considers confidence from resources that have recommendations
+func calculateOverallConfidence(
+	cpuProvisioning CPUProvisioning,
+	memoryProvisioning MemoryProvisioning,
+	hasCPURec bool,
+	hasMemoryRec bool,
+) float64 {
+	if hasCPURec && hasMemoryRec {
+		return max(0.0, min(1.0, (cpuProvisioning.Confidence+memoryProvisioning.Confidence)/2))
+	}
+	if hasCPURec {
+		return max(0.0, min(1.0, cpuProvisioning.Confidence))
+	}
+	if hasMemoryRec {
+		return max(0.0, min(1.0, memoryProvisioning.Confidence))
+	}
+	return 0
+}
+
+// Finalizes request and limit recommendations based on mode and constraints.
+func finalizeResourceRecommendations(
+	recommendedRequest *float64,
+	recommendedLimit *float64,
+	currentRequest *float64,
+	currentLimit *float64,
+	mode RecommendationMode,
+) (*float64, *float64) {
+	// For Guaranteed mode, both request and limit MUST be equal
+	if mode == ModeGuaranteed {
+		var guaranteedValue float64
+		if recommendedRequest != nil {
+			guaranteedValue = *recommendedRequest
+		} else if currentRequest != nil && *currentRequest > 0 {
+			guaranteedValue = *currentRequest
+		} else if recommendedLimit != nil {
+			guaranteedValue = *recommendedLimit
+		} else if currentLimit != nil && *currentLimit > 0 {
+			guaranteedValue = *currentLimit
+		} else {
+			return nil, nil
+		}
+
+		return &guaranteedValue, &guaranteedValue
+	}
+
+	// If no limit recommendation but we have a request
+	if recommendedLimit == nil && recommendedRequest != nil {
+		if currentLimit != nil && *currentLimit >= *recommendedRequest {
+			return recommendedRequest, currentLimit
+		}
+		// Recommend a limit equal to request
+		return recommendedRequest, recommendedRequest
+	}
+
+	// If no request but we have a limit
+	if recommendedRequest == nil && recommendedLimit != nil {
+		// If recommended limit is less than current request, adjust limit
+		if currentRequest != nil && *recommendedLimit < *currentRequest {
+			return currentRequest, currentRequest
+		}
+		if currentRequest != nil {
+			return currentRequest, recommendedLimit
+		}
+		// No current request: use recommended limit for both
+		return recommendedLimit, recommendedLimit
+	}
+
+	return recommendedRequest, recommendedLimit
+}
+
+// Formats CPU cores as Kubernetes resource quantity string
+func formatCPUQuantity(cores float64) string {
+	// Ensure non-negative
+	cores = max(cores, 0)
+
+	// For small values (< 1 core), use millicores (m)
+	if cores < 1.0 {
+		millicores := max(int64(cores*1000), 0)
+		return fmt.Sprintf("%dm", millicores)
+	}
+	// For larger values, use cores with 3 decimal places
+	return fmt.Sprintf("%.3f", cores)
+}
+
+// Formats memory bytes as Kubernetes resource quantity string
+func formatMemoryQuantity(bytes int64) string {
+	// Ensure non-negative
+	bytes = max(bytes, 0)
+
+	const (
+		KiB = 1024
+		MiB = 1024 * KiB
+		GiB = 1024 * MiB
+		TiB = 1024 * GiB
+	)
+
+	// Format to nearest unit
+	switch {
+	case bytes >= TiB:
+		value := math.Round(float64(bytes) / TiB)
+		return fmt.Sprintf("%dTi", int64(value))
+	case bytes >= GiB:
+		value := math.Round(float64(bytes) / GiB)
+		return fmt.Sprintf("%dGi", int64(value))
+	case bytes >= MiB:
+		value := math.Round(float64(bytes) / MiB)
+		return fmt.Sprintf("%dMi", int64(value))
+	case bytes >= KiB:
+		value := math.Round(float64(bytes) / KiB)
+		return fmt.Sprintf("%dKi", int64(value))
+	default:
+		return fmt.Sprintf("%d", bytes)
+	}
 }
 
 // Updates a target quantity string if the source is larger
