@@ -10,7 +10,7 @@
       <UiEmptyState
         v-if="!hasRecommendations"
         icon="lucide:inbox"
-        title="Workload is stable, no recommendations available."
+        title="No recommendations available."
         description="Try a different time range or recommendation mode."
       />
 
