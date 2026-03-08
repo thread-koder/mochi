@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+// Represents a data point in a time series
+type DataPoint struct {
+	Value     float64   `json:"value"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
 // Merges two slices of data points by timestamp (sums values at the same timestamp)
 // Used when combining data points from multiple sources (e.g., multiple pods in a workload)
 func MergeDataPointsByTime(existing []DataPoint, new []DataPoint) []DataPoint {

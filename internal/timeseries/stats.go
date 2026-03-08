@@ -6,6 +6,23 @@ import (
 	"sort"
 )
 
+// Represents percentile calculation results
+type PercentileResult struct {
+	P50 float64 `json:"p50"`
+	P95 float64 `json:"p95"`
+	P99 float64 `json:"p99"`
+}
+
+// Represents statistical calculation results
+type StatsResult struct {
+	Mean       float64          `json:"mean"`
+	Median     float64          `json:"median"`
+	StdDev     float64          `json:"std_dev"`
+	Min        float64          `json:"min"`
+	Max        float64          `json:"max"`
+	Percentile PercentileResult `json:"percentile"`
+}
+
 // Calculates percentiles (P50, P95, P99) from a slice of values
 func CalculatePercentiles(values []float64) (PercentileResult, error) {
 	if len(values) == 0 {

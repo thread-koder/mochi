@@ -5,6 +5,22 @@ import (
 	"math"
 )
 
+// Represents the trend direction
+type Direction string
+
+const (
+	DirectionStable     Direction = "stable"
+	DirectionIncreasing Direction = "increasing"
+	DirectionDecreasing Direction = "decreasing"
+)
+
+// Represents trend analysis results
+type TrendResult struct {
+	Direction Direction `json:"direction"` // "increasing", "decreasing", or "stable"
+	Slope     float64   `json:"slope"`     // Linear regression slope
+	Strength  float64   `json:"strength"`  // Correlation coefficient (0-1)
+}
+
 // Analyzes trend direction and strength from time series data
 func AnalyzeTrend(dataPoints []DataPoint) (TrendResult, error) {
 	if len(dataPoints) < 2 {

@@ -3,7 +3,33 @@ package timeseries
 import (
 	"fmt"
 	"math"
+	"time"
 )
+
+// Represents the severity level of an anomaly
+type Severity string
+
+const (
+	SeverityLow    Severity = "low"
+	SeverityMedium Severity = "medium"
+	SeverityHigh   Severity = "high"
+)
+
+// Represents a detected anomaly
+type Anomaly struct {
+	Value     float64   `json:"value"`
+	Timestamp time.Time `json:"timestamp"`
+	Index     int       `json:"index"`
+	Deviation float64   `json:"deviation"` // How many standard deviations from mean
+	Severity  Severity  `json:"severity"`  // "low", "medium", "high"
+}
+
+// Represents anomaly detection results
+type AnomalyResult struct {
+	Anomalies    []Anomaly `json:"anomalies"`
+	AnomalyCount int       `json:"anomaly_count"`
+	Threshold    float64   `json:"threshold"`
+}
 
 // Detects anomalies in time series data using statistical methods
 func DetectAnomalies(dataPoints []DataPoint, thresholdMultiplier float64) (AnomalyResult, error) {
