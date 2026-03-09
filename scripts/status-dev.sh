@@ -13,25 +13,25 @@ POSTGRES_RELEASE="mochi-postgres"
 PROMETHEUS_RELEASE="mochi-prometheus"
 REDIS_RELEASE="mochi-redis"
 
-echo -e "${BLUE}📊 Mochi Development Environment Status${NC}\n"
+echo -e "${BLUE}Mochi Development Environment Status${NC}\n"
 
 # Check if namespace exists
 if ! kubectl get namespace ${NAMESPACE} &>/dev/null; then
-    echo -e "${RED}❌ Namespace '${NAMESPACE}' does not exist${NC}"
-    echo -e "${YELLOW}💡 Run 'make dev-env-setup' to create the environment${NC}"
+    echo -e "${RED}Namespace '${NAMESPACE}' does not exist${NC}"
+    echo -e "${YELLOW}Run 'make dev-env-setup' to create the environment${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Namespace '${NAMESPACE}' exists${NC}\n"
+echo -e "${GREEN}Namespace '${NAMESPACE}' exists${NC}\n"
 
 # Check Helm releases
-echo -e "${BLUE}📦 Helm Releases:${NC}"
+echo -e "${BLUE}Helm Releases:${NC}"
 helm list -n ${NAMESPACE}
 
 echo ""
 
 # Check PostgreSQL
-echo -e "${BLUE}🐘 PostgreSQL:${NC}"
+echo -e "${BLUE}PostgreSQL:${NC}"
 if helm list -n ${NAMESPACE} | grep -q ${POSTGRES_RELEASE}; then
     POSTGRES_POD=$(kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=postgresql -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
     if [ -n "$POSTGRES_POD" ]; then
@@ -53,7 +53,7 @@ fi
 echo ""
 
 # Check Prometheus
-echo -e "${BLUE}📊 Prometheus:${NC}"
+echo -e "${BLUE}Prometheus:${NC}"
 if helm list -n ${NAMESPACE} | grep -q ${PROMETHEUS_RELEASE}; then
     PROMETHEUS_POD=$(kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=prometheus -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
     if [ -n "$PROMETHEUS_POD" ]; then
@@ -75,7 +75,7 @@ fi
 echo ""
 
 # Check Redis
-echo -e "${BLUE}🔴 Redis:${NC}"
+echo -e "${BLUE}Redis:${NC}"
 if helm list -n ${NAMESPACE} | grep -q ${REDIS_RELEASE}; then
     REDIS_POD=$(kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=redis -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
     if [ -n "$REDIS_POD" ]; then
@@ -97,11 +97,11 @@ fi
 echo ""
 
 # Show pods
-echo -e "${BLUE}🔍 Pods in namespace:${NC}"
+echo -e "${BLUE}Pods in namespace:${NC}"
 kubectl get pods -n ${NAMESPACE}
 
 echo ""
 
 # Show services
-echo -e "\n${BLUE}🌐 Services in namespace:${NC}"
+echo -e "\n${BLUE}Services in namespace:${NC}"
 kubectl get svc -n ${NAMESPACE}

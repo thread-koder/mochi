@@ -14,7 +14,7 @@ POSTGRES_RELEASE="mochi-postgres"
 PROMETHEUS_RELEASE="mochi-prometheus"
 REDIS_RELEASE="mochi-redis"
 
-echo -e "${YELLOW}🧹 Cleaning up Mochi development environment${NC}\n"
+echo -e "${YELLOW}Cleaning up Mochi development environment${NC}\n"
 
 # Confirm deletion
 read -p "Are you sure you want to remove all Mochi dev services? (y/N): " -n 1 -r
@@ -25,7 +25,7 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # Uninstall Helm releases
-echo -e "${GREEN}🗑️  Uninstalling Helm releases...${NC}"
+echo -e "${GREEN}Uninstalling Helm releases...${NC}"
 
 if helm list -n ${NAMESPACE} | grep -q ${POSTGRES_RELEASE}; then
     echo -e "${YELLOW}Removing PostgreSQL...${NC}"
@@ -54,7 +54,7 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${YELLOW}Removing namespace...${NC}"
     kubectl delete namespace ${NAMESPACE} --wait || true
-    echo -e "${GREEN}✅ Namespace removed${NC}"
+    echo -e "${GREEN}Namespace removed${NC}"
 fi
 
-echo -e "\n${GREEN}✅ Cleanup complete!${NC}"
+echo -e "\n${GREEN}Cleanup complete!${NC}"
