@@ -474,6 +474,10 @@ func characterizeWorkload(correlations []PairCorrelation) WorkloadType {
 func generateInsights(correlations []PairCorrelation) []string {
 	insights := make([]string, 0)
 
+	// Track whether any moderate/strong correlations exist at all
+	hasStrong := false
+	hasModerate := false
+
 	for _, c := range correlations {
 		if !c.DataAvailable {
 			continue
@@ -484,7 +488,12 @@ func generateInsights(correlations []PairCorrelation) []string {
 		lag := c.Correlation.OptimalLag
 
 		// Only generate insights for moderate or strong correlations
-		if strength == timeseries.CorrelationStrengthWeak {
+		switch strength {
+		case timeseries.CorrelationStrengthStrong:
+			hasStrong = true
+		case timeseries.CorrelationStrengthModerate:
+			hasModerate = true
+		default:
 			continue
 		}
 
@@ -530,6 +539,11 @@ func generateInsights(correlations []PairCorrelation) []string {
 				insights = append(insights, "Inverse memory-disk write correlation suggests memory caching reduces disk I/O")
 			}
 
+		case "network_receive_network_transmit":
+			if coeff > 0.7 {
+				insights = append(insights, "Incoming and outgoing network traffic are tightly coupled, indicating mostly symmetric network usage patterns")
+			}
+
 		case "network_receive_disk_write":
 			if coeff > 0.5 {
 				insights = append(insights, "Incoming network traffic correlates with disk writes, indicating pass-through or logging behavior")
@@ -545,7 +559,13 @@ func generateInsights(correlations []PairCorrelation) []string {
 	}
 
 	if len(insights) == 0 {
-		insights = append(insights, "No strong correlations detected, workload shows independent resource usage patterns")
+		if hasStrong {
+			insights = append(insights, "Strong correlations detected between some resources, but no predefined insight rules matched these patterns")
+		} else if hasModerate {
+			insights = append(insights, "Moderate correlations detected between some resources, but no predefined insight rules matched these patterns")
+		} else {
+			insights = append(insights, "No moderate or strong correlations detected, workload shows weakly coupled resource usage")
+		}
 	}
 
 	return insights
