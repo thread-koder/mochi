@@ -442,27 +442,27 @@ func characterizeWorkload(correlations []PairCorrelation) WorkloadType {
 	}
 
 	// Characterization rules
-	// High CPU↔Memory with low I/O correlations → Compute-bound
+	// High CPU↔Memory with low I/O correlations -> Compute-bound
 	if cpuMemory > 0.7 && abs(cpuNetRecv) < 0.3 && abs(cpuDiskRead) < 0.3 {
 		return WorkloadTypeComputeBound
 	}
 
-	// High CPU↔Network correlations → Request-driven
+	// High CPU↔Network correlations -> Request-driven
 	if cpuNetRecv > 0.5 || cpuNetTrans > 0.5 {
 		return WorkloadTypeRequestDriven
 	}
 
-	// High CPU↔Disk correlations → Data-processing
+	// High CPU↔Disk correlations -> Data-processing
 	if cpuDiskRead > 0.5 || cpuDiskWrite > 0.5 {
 		return WorkloadTypeDataProcessing
 	}
 
-	// High Network↔Disk correlation → Pass-through
+	// High Network↔Disk correlation -> Pass-through
 	if netRecvDiskWrite > 0.5 {
 		return WorkloadTypePassThrough
 	}
 
-	// High memory, low CPU correlation → Cache-heavy
+	// High memory, low CPU correlation -> Cache-heavy
 	if abs(cpuMemory) < 0.3 && abs(memNetRecv) > 0.3 {
 		return WorkloadTypeCacheHeavy
 	}
