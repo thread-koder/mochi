@@ -95,14 +95,15 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 	result.CurrentRequest = specs.CPURequest
 	result.CurrentLimit = specs.CPULimit
 
-	// Handle missing resources
-	if !hasRequest {
+	// If either request or limit is missing, treat as under-provisioned
+	if !hasRequest || !hasLimit {
 		result.IsUnderProvisioned = true
-		result.Efficiency = 0.0
 	}
-	if !hasLimit {
-		result.IsUnderProvisioned = true
+
+	// If both request and limit are missing, treat as completely inefficient
+	if !hasRequest && !hasLimit {
 		result.Efficiency = 0.0
+		return result, nil
 	}
 
 	// Force under-provisioned when throttling or pressure metrics are above thresholds
@@ -177,6 +178,11 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 		}
 	}
 
+	// If exactly one of request or limit is missing, treat as partially inefficient
+	if (hasRequest && !hasLimit) || (!hasRequest && hasLimit) {
+		result.Efficiency = min(result.Efficiency, 0.5)
+	}
+
 	// Clamp efficiency to 0-1
 	result.Efficiency = max(0.0, min(1.0, result.Efficiency))
 
@@ -211,14 +217,15 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 	result.CurrentRequest = specs.MemoryRequest
 	result.CurrentLimit = specs.MemoryLimit
 
-	// Handle missing resources
-	if !hasRequest {
+	// If either request or limit is missing, treat as under-provisioned
+	if !hasRequest || !hasLimit {
 		result.IsUnderProvisioned = true
-		result.Efficiency = 0.0
 	}
-	if !hasLimit {
-		result.IsUnderProvisioned = true
+
+	// If both request and limit are missing, treat as completely inefficient
+	if !hasRequest && !hasLimit {
 		result.Efficiency = 0.0
+		return result, nil
 	}
 
 	// Force under-provisioned when OOM, failcnt, or pressure are above threshold
@@ -290,6 +297,11 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 			}
 			result.Efficiency = min(result.Efficiency, limitPenalty)
 		}
+	}
+
+	// If exactly one of request or limit is missing, treat as partially inefficient
+	if (hasRequest && !hasLimit) || (!hasRequest && hasLimit) {
+		result.Efficiency = min(result.Efficiency, 0.5)
 	}
 
 	// Clamp efficiency to 0-1
