@@ -109,12 +109,12 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 	// Force under-provisioned when throttling or pressure metrics are above thresholds
 	if stability.CPUThrottling > ThrottlingThreshold {
 		result.IsUnderProvisioned = true
-		penalty := (stability.CPUThrottling - ThrottlingThreshold) * 2.0
+		penalty := (stability.CPUThrottling - ThrottlingThreshold) * 3.0
 		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 	if stability.CPUPressure > PressureThreshold {
 		result.IsUnderProvisioned = true
-		penalty := (stability.CPUPressure - PressureThreshold) * 0.5
+		penalty := (stability.CPUPressure - PressureThreshold) * 1.0
 		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 
@@ -129,10 +129,11 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 		)
 		atFloor := *specs.CPURequest <= MinCPURequestCores
 		lowThrottling := stability.CPUThrottling > 0 && stability.CPUThrottling <= ThrottlingThreshold
+		underProvisionedDueToStability := stability.CPUThrottling > ThrottlingThreshold || stability.CPUPressure > PressureThreshold
 
 		// Check for over-provisioning (P95 usage below optimal range)
-		// Treat as optimal when at floor or low throttling
-		if result.RequestUtilization < minThreshold && !atFloor && !lowThrottling {
+		// Do not mark over-provisioned when at floor, low throttling or under-provisioned due to throttling/pressure
+		if result.RequestUtilization < minThreshold && !atFloor && !lowThrottling && !underProvisionedDueToStability {
 			result.IsOverProvisioned = true
 		}
 
@@ -146,7 +147,7 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 		if result.RequestUtilization >= minThreshold && result.RequestUtilization <= OptimalUtilizationMax {
 			requestEfficiency = 1.0
 		} else if atFloor || lowThrottling {
-			// Treat as optimal despite low utilization
+			// Treat as optimal when at floor or low throttling
 			requestEfficiency = 1.0
 		} else if result.RequestUtilization < minThreshold {
 			requestEfficiency = result.RequestUtilization / minThreshold
@@ -250,10 +251,12 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 		result.RequestUtilization = utilization.Stats.Percentile.P95 / *specs.MemoryRequest
 
 		atFloor := *specs.MemoryRequest <= MinMemoryRequestBytes
+		lowMemoryPressure := stability.MemoryPressure > 0 && stability.MemoryPressure <= PressureThreshold
+		underProvisionedDueToStability := stability.MemoryOOM > 0 || stability.MemoryFailCnt > 0 || stability.MemoryPressure > PressureThreshold
 
 		// Check for over-provisioning (P95 usage below optimal range)
-		// Treat as optimal when at floor
-		if result.RequestUtilization < OptimalUtilizationMin && !atFloor {
+		// Do not mark over-provisioned when at floor, low memory pressure or under-provisioned due to OOM/failcnt/pressure
+		if result.RequestUtilization < OptimalUtilizationMin && !atFloor && !lowMemoryPressure && !underProvisionedDueToStability {
 			result.IsOverProvisioned = true
 		}
 
@@ -266,8 +269,8 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 		var requestEfficiency float64
 		if result.RequestUtilization >= OptimalUtilizationMin && result.RequestUtilization <= OptimalUtilizationMax {
 			requestEfficiency = 1.0
-		} else if atFloor {
-			// Treat as optimal despite low utilization
+		} else if atFloor || lowMemoryPressure {
+			// Treat as optimal when at floor or low memory pressure
 			requestEfficiency = 1.0
 		} else if result.RequestUtilization < OptimalUtilizationMin {
 			requestEfficiency = result.RequestUtilization / OptimalUtilizationMin
