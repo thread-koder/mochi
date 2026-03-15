@@ -79,6 +79,10 @@ const initChart = () => {
   const maxValue = Math.max(...chartData.map(d => d.y))
   const useMillicores = isCPU && maxValue < 1
 
+  // Add 10% padding to the maximum value
+  // Avoids using chart.js's "grace" feature, which can cause fill artifacts
+  const yMax = maxValue > 0 ? maxValue * 1.1 : 1
+
   // Get theme colors
   const primaryColor = isCPU
     ? cssVariableColor('--color-primary-light')
@@ -199,6 +203,7 @@ const initChart = () => {
           grid: { color: gridColor },
         },
         y: {
+          max: yMax,
           ticks: {
             color: textColor,
             font: { family: 'Inconsolata', size: 13 },
@@ -207,7 +212,6 @@ const initChart = () => {
             },
           },
           grid: { color: gridColor },
-          grace: '10%',
           title: {
             display: true,
             text: isCPU
