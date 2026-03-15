@@ -4,7 +4,7 @@
     <UiAlert
       v-if="error"
       variant="error"
-      title="Failed to load recommendations"
+      title="Error loading recommendations"
       :description="parseError(error, 'Failed to load recommendations').message"
     />
 

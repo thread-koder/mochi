@@ -38,7 +38,7 @@
     <UiAlert
       v-else-if="analysisError"
       variant="error"
-      title="Failed to load analysis"
+      title="Error loading analysis"
       :description="parseError(analysisError, 'Failed to load analysis').message"
     />
 
