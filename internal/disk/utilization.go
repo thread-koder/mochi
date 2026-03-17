@@ -14,14 +14,6 @@ type TimeSeries struct {
 	WriteOps   []timeseries.DataPoint `json:"write_ops"`
 }
 
-// Represents raw disk metrics data
-type DiskMetrics struct {
-	ReadBytes  []timeseries.DataPoint `json:"read_bytes"`
-	WriteBytes []timeseries.DataPoint `json:"write_bytes"`
-	ReadOps    []timeseries.DataPoint `json:"read_ops"`
-	WriteOps   []timeseries.DataPoint `json:"write_ops"`
-}
-
 // Represents analysis results for a single direction (read or write)
 type DirectionUtilization struct {
 	Current   float64                  `json:"current"`   // Most recent value (bytes/sec or ops/sec)

@@ -12,18 +12,6 @@ type TimeSeries struct {
 	Memory []timeseries.DataPoint `json:"memory"`
 }
 
-// Represents resource metrics (raw data)
-type ResourceMetrics struct {
-	CPU            []timeseries.DataPoint `json:"cpu"`
-	Memory         []timeseries.DataPoint `json:"memory"`
-	CPUThrottling  []timeseries.DataPoint `json:"cpu_throttling,omitempty"`
-	CPUPressure    []timeseries.DataPoint `json:"cpu_pressure,omitempty"`
-	MemoryFailCnt  []timeseries.DataPoint `json:"memory_fail_cnt,omitempty"`
-	MemoryOOM      []timeseries.DataPoint `json:"memory_oom,omitempty"`
-	MemoryPressure []timeseries.DataPoint `json:"memory_pressure,omitempty"`
-	Restarts       []timeseries.DataPoint `json:"restarts,omitempty"`
-}
-
 // Represents CPU utilization analysis results
 type CPUUtilization struct {
 	Current   float64                  `json:"current"`   // Most recent value

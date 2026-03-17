@@ -12,16 +12,6 @@ type TimeSeries struct {
 	TransmitBytes []timeseries.DataPoint `json:"transmit_bytes"`
 }
 
-// Represents raw network metrics data
-type NetworkMetrics struct {
-	ReceiveBytes    []timeseries.DataPoint `json:"receive_bytes"`
-	TransmitBytes   []timeseries.DataPoint `json:"transmit_bytes"`
-	ReceiveErrors   []timeseries.DataPoint `json:"receive_errors"`
-	TransmitErrors  []timeseries.DataPoint `json:"transmit_errors"`
-	ReceiveDropped  []timeseries.DataPoint `json:"receive_dropped"`
-	TransmitDropped []timeseries.DataPoint `json:"transmit_dropped"`
-}
-
 // Represents analysis results for a single direction (receive or transmit)
 type DirectionUtilization struct {
 	Current   float64                  `json:"current"`   // Most recent value (bytes/sec)
