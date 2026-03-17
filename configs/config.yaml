@@ -13,7 +13,7 @@ database:
   host: "localhost" # PostgreSQL host
   port: 5432 # PostgreSQL port
   user: "mochi" # PostgreSQL user
-  password: "" # Set via MOCHI_DATABASE_PASSWORD env var
+  password: "" # PostgreSQL user password
   database: "mochi" # PostgreSQL database name
   ssl_mode: "disable" # SSL mode (disable, require, verify-ca, verify-full)
   max_connections: 25 # Maximum number of connections in pool
@@ -47,7 +47,7 @@ redis:
   host: "localhost" # Redis host
   port: 6379 # Redis port
   username: "" # Redis username (empty = default user)
-  password: "" # Set via MOCHI_REDIS_PASSWORD env var
+  password: "" # Redis password
   database: 0 # Redis database number (0-15)
   max_retries: 3 # Maximum number of retries
   pool_size: 10 # Connection pool size
