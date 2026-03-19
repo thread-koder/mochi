@@ -63,6 +63,15 @@ export default defineNuxtConfig({
     // Nuxt and @tailwindcss/vite use different Vite plugin types, cast for now
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     plugins: [tailwindcss()] as any,
+    // Avoid dev page reloads by pre-bundling these deps
+    optimizeDeps: {
+      include: [
+        '@vue/devtools-core',
+        '@vue/devtools-kit',
+        'chart.js',
+        'chartjs-adapter-date-fns',
+      ],
+    },
   },
 
   eslint: {
