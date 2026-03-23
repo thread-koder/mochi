@@ -182,9 +182,9 @@ func CalculateCPURequestRecommendation(
 		percentileP95, percentileP99, peakUsage, config.BurstThreshold,
 	)
 
-	// For first-time recommendations, use peak instead of percentile
+	// For first-time recommendations, use max of adjusted percentile and peak usage instead of percentile
 	if firstTime(currentRequest) {
-		adjustedPercentile = peakUsage
+		adjustedPercentile = max(adjustedPercentile, peakUsage)
 	}
 
 	// Calculate pressure factors
@@ -459,14 +459,14 @@ func CalculateMemoryRequestRecommendation(
 		percentileP95, percentileP99, peakUsage, config.BurstThreshold,
 	)
 
-	// Apply memory pressure factor: if OOM detected, use peak instead of percentile
-	if stability.MemoryOOM > 0 {
+	// Apply memory pressure factor: if OOM or failcnt detected, use max of adjusted percentile and peak usage instead of percentile
+	if stability.MemoryOOM > 0 || stability.MemoryFailCnt > 0 {
 		adjustedPercentile = max(adjustedPercentile, peakUsage)
 	}
 
-	// For first-time recommendations, use peak instead of percentile
+	// For first-time recommendations, use max of adjusted percentile and peak usage instead of percentile
 	if firstTime(currentRequest) {
-		adjustedPercentile = peakUsage
+		adjustedPercentile = max(adjustedPercentile, peakUsage)
 	}
 
 	// Calculate memory pressure factor
@@ -524,7 +524,7 @@ func CalculateMemoryRequestRecommendation(
 	// Apply minimum
 	recommendedBytes = max(recommendedBytes, float64(config.MinMemoryRequest))
 
-	// If OOM exists and we have current memory request
+	// If OOM or failcnt exists and we have current memory request
 	// don't reduce below current request and account for pressure factor
 	if (stability.MemoryOOM > 0 || stability.MemoryFailCnt > 0) && currentRequest != nil && *currentRequest > 0 {
 		minRequestFromOOM := *currentRequest * pressureFactor
