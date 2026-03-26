@@ -3,6 +3,7 @@ package compute
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/thread_koder/mochi/internal/config"
 	"github.com/thread_koder/mochi/internal/timeseries"
@@ -437,6 +438,7 @@ func CalculateMemoryRequestRecommendation(
 	provisioning MemoryProvisioning,
 	stability StabilityResult,
 	config RecommendationConfig,
+	analysisWindow time.Duration,
 ) (*float64, error) {
 	// If not first-time recommendation and we don't have enough confidence, don't recommend
 	if !firstTime(currentRequest) && provisioning.Confidence < config.MinConfidenceThreshold {
@@ -474,6 +476,7 @@ func CalculateMemoryRequestRecommendation(
 		stability.MemoryOOM,
 		stability.MemoryFailCnt,
 		stability.MemoryPressure,
+		analysisWindow,
 	)
 
 	// Calculate recommended request based on mode
@@ -580,6 +583,7 @@ func CalculateMemoryLimitRecommendation(
 	config RecommendationConfig,
 	recommendedRequest *float64,
 	currentRequest *float64,
+	analysisWindow time.Duration,
 ) (*float64, error) {
 	// If not first-time recommendation and we don't have enough confidence, don't recommend
 	if !firstTime(currentLimit) && provisioning.Confidence < config.MinConfidenceThreshold {
@@ -600,6 +604,7 @@ func CalculateMemoryLimitRecommendation(
 		stability.MemoryOOM,
 		stability.MemoryFailCnt,
 		stability.MemoryPressure,
+		analysisWindow,
 	)
 
 	// Calculate safety margin based on mode
@@ -758,19 +763,26 @@ func calculateCPUPressureFactor(pressure float64) float64 {
 }
 
 // Calculates memory pressure factor using gradual scaling
-func calculateMemoryPressureFactor(oom float64, failCnt float64, pressure float64) float64 {
+func calculateMemoryPressureFactor(
+	oom float64,
+	failCnt float64,
+	pressure float64,
+	analysisWindow time.Duration,
+) float64 {
 	pressureFactor := 1.0
+	oomPerWeek := normalizeEventCounterToPerWeek(oom, analysisWindow)
+	failCntPerWeek := normalizeEventCounterToPerWeek(failCnt, analysisWindow)
 
 	// If allocation failures exist, add a small boost
-	if failCnt > 0 {
+	if failCntPerWeek > 0 {
 		pressureFactor = 1.25
 	}
 
 	// Calculate OOM Factor
 	oomFactor := 1.0
-	if oom > 0 {
+	if oomPerWeek > 0 {
 		// Standard: 1 OOM = 2.0x, 2 OOM = 2.5x, 3 OOM = 3.0x, 4+ OOM = 3.5x
-		extraPerOOM := max(0, (oom-1)*0.5)
+		extraPerOOM := max(0, (oomPerWeek-1)*0.5)
 		oomFactor = 2.0 + min(1.5, extraPerOOM)
 	}
 
@@ -794,6 +806,16 @@ func calculateMemoryPressureFactor(oom float64, failCnt float64, pressure float6
 	pressureFactor = max(pressureFactor, psiFactor)
 
 	return pressureFactor
+}
+
+// Normalizes event counter from a given analysis window into a per-week rate
+func normalizeEventCounterToPerWeek(counter float64, analysisWindow time.Duration) float64 {
+	if counter <= 0 || analysisWindow <= 0 {
+		return 0
+	}
+
+	const secondsPerWeek = 7 * 24 * 60 * 60
+	return (counter / analysisWindow.Seconds()) * secondsPerWeek
 }
 
 // Detects bursty workload and adjusts percentile accordingly

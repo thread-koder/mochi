@@ -55,6 +55,7 @@ func GenerateContainerRecommendation(
 	container *database.Container,
 	containerAnalysis ContainerAnalysis,
 	config RecommendationConfig,
+	analysisWindow time.Duration,
 ) (*ContainerRecommendation, error) {
 	// Validate inputs
 	if container == nil {
@@ -105,6 +106,7 @@ func GenerateContainerRecommendation(
 		containerAnalysis.Provisioning.Memory,
 		containerAnalysis.Stability,
 		config,
+		analysisWindow,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate memory request recommendation: %w", err)
@@ -119,6 +121,7 @@ func GenerateContainerRecommendation(
 		config,
 		memoryRequestRecValue,
 		specs.MemoryRequest,
+		analysisWindow,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate memory limit recommendation: %w", err)
@@ -262,7 +265,13 @@ func GenerateWorkloadRecommendations(
 			}
 
 			// Generate recommendation for this container instance
-			rec, err := GenerateContainerRecommendation(ctx, container, containerAnalysis, config)
+			rec, err := GenerateContainerRecommendation(
+				ctx,
+				container,
+				containerAnalysis,
+				config,
+				analysisOpts.TimeRange,
+			)
 			if err != nil {
 				return Recommendation{}, fmt.Errorf("failed to generate container recommendation for %s: %w", container.Name, err)
 			}
