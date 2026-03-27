@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thread_koder/mochi/internal/api/handlers/common"
 	"github.com/thread_koder/mochi/internal/database"
 )
 
@@ -55,7 +56,7 @@ func GetNamespace(c *gin.Context) {
 	namespace, err := database.GetNamespaceByName(ctx, namespaceName)
 	if err != nil {
 		c.Error(err)
-		if isNotFoundError(err) {
+		if common.IsNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error":   "namespace not found",
 				"details": err.Error(),

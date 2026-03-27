@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thread_koder/mochi/internal/api/handlers/common"
 	"github.com/thread_koder/mochi/internal/database"
 )
 
@@ -90,7 +91,7 @@ func GetWorkload(c *gin.Context) {
 		dep, err := database.GetDeploymentByName(ctx, workloadName, namespaceName)
 		if err != nil {
 			c.Error(err)
-			if isNotFoundError(err) {
+			if common.IsNotFoundError(err) {
 				c.JSON(http.StatusNotFound, gin.H{
 					"error":   "deployment not found",
 					"details": err.Error(),
@@ -115,7 +116,7 @@ func GetWorkload(c *gin.Context) {
 		sts, err := database.GetStatefulSetByName(ctx, workloadName, namespaceName)
 		if err != nil {
 			c.Error(err)
-			if isNotFoundError(err) {
+			if common.IsNotFoundError(err) {
 				c.JSON(http.StatusNotFound, gin.H{
 					"error":   "statefulset not found",
 					"details": err.Error(),
@@ -140,7 +141,7 @@ func GetWorkload(c *gin.Context) {
 		ds, err := database.GetDaemonSetByName(ctx, workloadName, namespaceName)
 		if err != nil {
 			c.Error(err)
-			if isNotFoundError(err) {
+			if common.IsNotFoundError(err) {
 				c.JSON(http.StatusNotFound, gin.H{
 					"error":   "daemonset not found",
 					"details": err.Error(),
@@ -165,7 +166,7 @@ func GetWorkload(c *gin.Context) {
 		pod, err := database.GetPodByName(ctx, workloadName, namespaceName)
 		if err != nil {
 			c.Error(err)
-			if isNotFoundError(err) {
+			if common.IsNotFoundError(err) {
 				c.JSON(http.StatusNotFound, gin.H{
 					"error":   "pod not found",
 					"details": err.Error(),

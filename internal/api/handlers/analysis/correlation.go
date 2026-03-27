@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/internal/analysis"
+	"github.com/thread_koder/mochi/internal/api/handlers/common"
 	"github.com/thread_koder/mochi/internal/database"
 )
 
@@ -51,7 +52,7 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 	opts := analysis.DefaultCorrelationOptions()
 
 	if timeRangeStr != "" {
-		timeRange, err := parseTimeRange(timeRangeStr)
+		timeRange, err := common.ParseTimeRange(timeRangeStr)
 		if err != nil {
 			c.Error(err)
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -64,7 +65,7 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 	}
 
 	if maxLagStr != "" {
-		maxLag, err := parseTimeRange(maxLagStr)
+		maxLag, err := common.ParseTimeRange(maxLagStr)
 		if err != nil {
 			c.Error(err)
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -87,7 +88,7 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
-			if isNotFoundError(err) {
+			if common.IsNotFoundError(err) {
 				c.JSON(http.StatusNotFound, gin.H{
 					"error":   "pod not found",
 					"details": err.Error(),

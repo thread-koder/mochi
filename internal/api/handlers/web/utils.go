@@ -2,28 +2,11 @@ package web
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/internal/database"
 )
-
-// Helper function to check if an error is a "not found" error
-func isNotFoundError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return true
-	}
-
-	errMsg := strings.ToLower(err.Error())
-	return strings.Contains(errMsg, "not found")
-}
 
 // Represents stats
 type Stats struct {

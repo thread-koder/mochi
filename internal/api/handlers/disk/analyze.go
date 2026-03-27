@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thread_koder/mochi/internal/api/handlers/common"
 	"github.com/thread_koder/mochi/internal/database"
 	"github.com/thread_koder/mochi/internal/disk"
 )
@@ -21,7 +22,7 @@ func AnalyzeNamespace(c *gin.Context) {
 	opts.IncludeTimeSeries = true
 
 	if timeRangeStr != "" {
-		timeRange, err := parseTimeRange(timeRangeStr)
+		timeRange, err := common.ParseTimeRange(timeRangeStr)
 		if err != nil {
 			c.Error(err)
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -90,7 +91,7 @@ func AnalyzeWorkload(c *gin.Context) {
 	opts := disk.DefaultAnalysisOptions()
 	opts.IncludeTimeSeries = true
 	if timeRangeStr != "" {
-		timeRange, err := parseTimeRange(timeRangeStr)
+		timeRange, err := common.ParseTimeRange(timeRangeStr)
 		if err != nil {
 			c.Error(err)
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -114,7 +115,7 @@ func AnalyzeWorkload(c *gin.Context) {
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
-			if isNotFoundError(err) {
+			if common.IsNotFoundError(err) {
 				c.JSON(http.StatusNotFound, gin.H{
 					"error":   "pod not found",
 					"details": err.Error(),
