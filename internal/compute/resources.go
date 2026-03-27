@@ -183,16 +183,13 @@ func CalculateCPURequestRecommendation(
 		percentileP95, percentileP99, peakUsage, config.BurstThreshold,
 	)
 
-	// For first-time recommendations, use max of adjusted percentile and peak usage instead of percentile
+	// For first-time recommendations, use max of adjusted percentile and peak usage
 	if firstTime(currentRequest) {
 		adjustedPercentile = max(adjustedPercentile, peakUsage)
 	}
 
-	// Calculate pressure factors
-	cpuThrottlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
-	cpuPressureFactor := calculateCPUPressureFactor(stability.CPUPressure)
-	// Use the higher of the two pressure factors
-	pressureFactor := max(cpuThrottlingFactor, cpuPressureFactor)
+	// Calculate stress factor
+	stressFactor := calculateCPUStressFactor(stability.CPUThrottling, stability.CPUPressure)
 
 	// Calculate recommended request based on mode
 	var recommendedCores float64
@@ -207,7 +204,7 @@ func CalculateCPURequestRecommendation(
 			utilization.Anomalies.AnomalyCount,
 			isBursty,
 		)
-		recommendedCores = adjustedPercentile * safetyMargin * pressureFactor
+		recommendedCores = adjustedPercentile * safetyMargin * stressFactor
 	case ModeGuaranteed:
 		// Guaranteed mode: use peak usage
 		baseMargin := config.CPURequestMargin
@@ -218,7 +215,7 @@ func CalculateCPURequestRecommendation(
 			utilization.Anomalies.AnomalyCount,
 			isBursty,
 		)
-		recommendedCores = peakUsage * safetyMargin * pressureFactor
+		recommendedCores = peakUsage * safetyMargin * stressFactor
 	default:
 		// Burstable mode: use adjusted percentile
 		baseMargin := config.CPURequestMargin
@@ -229,7 +226,7 @@ func CalculateCPURequestRecommendation(
 			utilization.Anomalies.AnomalyCount,
 			isBursty,
 		)
-		recommendedCores = adjustedPercentile * safetyMargin * pressureFactor
+		recommendedCores = adjustedPercentile * safetyMargin * stressFactor
 	}
 
 	// Validation: ensure recommended accounts for actual usage patterns
@@ -242,19 +239,20 @@ func CalculateCPURequestRecommendation(
 	// Apply minimum
 	recommendedCores = max(recommendedCores, config.MinCPURequest)
 
-	// If throttling exists and we have current requests
-	// don't recommend less than current and account for throttling pressure factor
-	// Cost_optimized mode: only apply floor when throttling exceeds 5% (accepts low throttling risk)
-	if stability.CPUThrottling > 0 && currentRequest != nil && *currentRequest > 0 {
-		var minRequestFromThrottling float64
-		if config.Mode == ModeCostOptimized && stability.CPUThrottling <= 0.05 {
+	// If stress is detected and we have current requests
+	// don't recommend less than current and account for cpu stress factor
+	// Cost_optimized mode: don't apply stress floor when throttling and pressure are low
+	if (stability.CPUThrottling > 0 || stability.CPUPressure > 0) && currentRequest != nil && *currentRequest > 0 {
+		var minRequestFromStress float64
+		if config.Mode == ModeCostOptimized &&
+			stability.CPUThrottling <= 0.05 &&
+			stability.CPUPressure <= 0.1 {
 			// Don't reduce below current
-			minRequestFromThrottling = *currentRequest
+			minRequestFromStress = *currentRequest
 		} else {
-			throttlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
-			minRequestFromThrottling = *currentRequest * throttlingFactor
+			minRequestFromStress = *currentRequest * stressFactor
 		}
-		recommendedCores = max(recommendedCores, minRequestFromThrottling)
+		recommendedCores = max(recommendedCores, minRequestFromStress)
 	}
 
 	// Max reduction per step: don't recommend less than (1 - maxReductionRatio) of current request
@@ -321,11 +319,8 @@ func CalculateCPULimitRecommendation(
 		cv = utilization.Stats.StdDev / utilization.Stats.Mean
 	}
 
-	// Calculate pressure factors
-	cpuThrottlingFactor := calculateCPUThrottlingPressureFactor(stability.CPUThrottling)
-	cpuPressureFactor := calculateCPUPressureFactor(stability.CPUPressure)
-	// Use the higher of the two pressure factors
-	pressureFactor := max(cpuThrottlingFactor, cpuPressureFactor)
+	// Calculate stress factor
+	stressFactor := calculateCPUStressFactor(stability.CPUThrottling, stability.CPUPressure)
 
 	// Calculate safety margin based on mode
 	var safetyMargin float64
@@ -363,7 +358,7 @@ func CalculateCPULimitRecommendation(
 	}
 
 	// Calculate limit from peak usage
-	limitFromPeak := peakUsage * safetyMargin * pressureFactor
+	limitFromPeak := peakUsage * safetyMargin * stressFactor
 
 	// Use recommended request when set, otherwise current request
 	effectiveRequest := recommendedRequest
@@ -461,18 +456,18 @@ func CalculateMemoryRequestRecommendation(
 		percentileP95, percentileP99, peakUsage, config.BurstThreshold,
 	)
 
-	// Apply memory pressure factor: if OOM or failcnt detected, use max of adjusted percentile and peak usage instead of percentile
+	// Apply memory stress factor: if OOM or failcnt detected, use max of adjusted percentile and peak usage
 	if stability.MemoryOOM > 0 || stability.MemoryFailCnt > 0 {
 		adjustedPercentile = max(adjustedPercentile, peakUsage)
 	}
 
-	// For first-time recommendations, use max of adjusted percentile and peak usage instead of percentile
+	// For first-time recommendations, use max of adjusted percentile and peak usage
 	if firstTime(currentRequest) {
 		adjustedPercentile = max(adjustedPercentile, peakUsage)
 	}
 
-	// Calculate memory pressure factor
-	pressureFactor := calculateMemoryPressureFactor(
+	// Calculate memory stress factor
+	stressFactor := calculateMemoryStressFactor(
 		stability.MemoryOOM,
 		stability.MemoryFailCnt,
 		stability.MemoryPressure,
@@ -492,7 +487,7 @@ func CalculateMemoryRequestRecommendation(
 			utilization.Anomalies.AnomalyCount,
 			isBursty,
 		)
-		recommendedBytes = adjustedPercentile * safetyMargin * pressureFactor
+		recommendedBytes = adjustedPercentile * safetyMargin * stressFactor
 	case ModeGuaranteed:
 		// Guaranteed mode: use peak usage
 		baseMargin := config.MemoryRequestMargin
@@ -503,7 +498,7 @@ func CalculateMemoryRequestRecommendation(
 			utilization.Anomalies.AnomalyCount,
 			isBursty,
 		)
-		recommendedBytes = peakUsage * safetyMargin * pressureFactor
+		recommendedBytes = peakUsage * safetyMargin * stressFactor
 	default:
 		// Burstable mode: use adjusted percentile
 		baseMargin := config.MemoryRequestMargin
@@ -514,7 +509,7 @@ func CalculateMemoryRequestRecommendation(
 			utilization.Anomalies.AnomalyCount,
 			isBursty,
 		)
-		recommendedBytes = adjustedPercentile * safetyMargin * pressureFactor
+		recommendedBytes = adjustedPercentile * safetyMargin * stressFactor
 	}
 
 	// Validate: ensure recommended accounts for actual usage patterns
@@ -530,7 +525,7 @@ func CalculateMemoryRequestRecommendation(
 	// If OOM or failcnt exists and we have current memory request
 	// don't reduce below current request and account for pressure factor
 	if (stability.MemoryOOM > 0 || stability.MemoryFailCnt > 0) && currentRequest != nil && *currentRequest > 0 {
-		minRequestFromOOM := *currentRequest * pressureFactor
+		minRequestFromOOM := *currentRequest * stressFactor
 		recommendedBytes = max(recommendedBytes, minRequestFromOOM)
 	}
 
@@ -599,8 +594,8 @@ func CalculateMemoryLimitRecommendation(
 		cv = utilization.Stats.StdDev / utilization.Stats.Mean
 	}
 
-	// Calculate memory pressure factor
-	pressureFactor := calculateMemoryPressureFactor(
+	// Calculate memory stress factor
+	stressFactor := calculateMemoryStressFactor(
 		stability.MemoryOOM,
 		stability.MemoryFailCnt,
 		stability.MemoryPressure,
@@ -643,7 +638,7 @@ func CalculateMemoryLimitRecommendation(
 	}
 
 	// Calculate limit from peak usage
-	limitFromPeak := peakUsage * safetyMargin * pressureFactor
+	limitFromPeak := peakUsage * safetyMargin * stressFactor
 
 	// Use recommended request when set, otherwise current request
 	effectiveRequest := recommendedRequest
@@ -728,27 +723,45 @@ func firstTime(current *float64) bool {
 	return current == nil || *current == 0
 }
 
-// Calculates CPU throttling pressure factor using gradual scaling
-func calculateCPUThrottlingPressureFactor(throttling float64) float64 {
+// Calculates CPU stress factor
+func calculateCPUStressFactor(throttling float64, pressure float64) float64 {
+	throttlingFactor := calculateCPUThrottlingFactor(throttling)
+	pressureFactor := calculatePSIPressureFactor(pressure)
+
+	// Use the maximum of the two signals
+	// This ensures we prioritize the most critical distress signal
+	return max(throttlingFactor, pressureFactor)
+}
+
+// Calculates CPU throttling factor using gradual scaling
+func calculateCPUThrottlingFactor(throttling float64) float64 {
 	if throttling <= 0 {
 		return 1.0
 	}
 	if throttling < 0.01 {
-		// Very small throttling (0-1%): very gentle scaling from 1.0 to 1.01
-		return 1.0 + throttling*1.0
+		// Very small throttling (0-1%): scale from 1.0 to 1.05
+		return 1.0 + throttling*5.0
 	}
 	if throttling < 0.05 {
-		// Minor throttling (1% to 5%): moderate scaling from 1.01 to 1.2
-		return 1.01 + (throttling-0.01)*4.5
+		// Minor throttling (1% to 5%): scale from 1.05 to 1.2
+		return 1.05 + (throttling-0.01)*3.75
 	}
-	// Severe throttling (>= 5%): from 1.2
-	// Capped at 3.0 (reached at ~41% throttling) to avoid extreme values
-	val := 1.2 + (throttling-0.05)*5.0
-	return min(val, 3.0)
+	if throttling < 0.1 {
+		// Moderate throttling (5% to 10%): scale from 1.2 to 1.25
+		return 1.2 + (throttling-0.05)*1.0
+	}
+	if throttling < 0.2 {
+		// Elevated throttling (10% to 20%): scale from 1.25 to 1.3
+		return 1.25 + (throttling-0.1)*0.5
+	}
+	// High throttling (>= 20%): scale from 1.3
+	// Capped at 1.8 (reached at ~60% throttling) to avoid extreme values
+	val := 1.3 + (throttling-0.2)*1.25
+	return min(val, 1.8)
 }
 
-// Calculates CPU pressure factor using gradual scaling
-func calculateCPUPressureFactor(pressure float64) float64 {
+// Calculates PSI pressure (cpu/memory) factor using gradual scaling
+func calculatePSIPressureFactor(pressure float64) float64 {
 	if pressure <= 0 {
 		return 1.0
 	}
@@ -757,55 +770,53 @@ func calculateCPUPressureFactor(pressure float64) float64 {
 		return 1.0 + pressure*0.5
 	}
 	// Higher pressure (>= 10%): moderate scaling from 1.05
-	// Capped at 2.0 (reached at ~48% pressure) to avoid extreme values
+	// Capped at 1.8 (reached at ~40% pressure) to avoid extreme values
 	val := 1.05 + (pressure-0.1)*2.5
-	return min(val, 2.0)
+	return min(val, 1.8)
 }
 
-// Calculates memory pressure factor using gradual scaling
-func calculateMemoryPressureFactor(
+// Calculates memory stress factor
+func calculateMemoryStressFactor(
 	oom float64,
 	failCnt float64,
 	pressure float64,
 	analysisWindow time.Duration,
 ) float64 {
-	pressureFactor := 1.0
+	// Normalize event counters
 	oomPerWeek := normalizeEventCounterToPerWeek(oom, analysisWindow)
 	failCntPerWeek := normalizeEventCounterToPerWeek(failCnt, analysisWindow)
 
-	// If allocation failures exist, add a small boost
-	if failCntPerWeek > 0 {
-		pressureFactor = 1.25
-	}
-
-	// Calculate OOM Factor
-	oomFactor := 1.0
-	if oomPerWeek > 0 {
-		// Standard: 1 OOM = 2.0x, 2 OOM = 2.5x, 3 OOM = 3.0x, 4+ OOM = 3.5x
-		extraPerOOM := max(0, (oomPerWeek-1)*0.5)
-		oomFactor = 2.0 + min(1.5, extraPerOOM)
-	}
-
-	// Calculate Pressure Factor
-	psiFactor := 1.0
-	if pressure > 0 {
-		if pressure < 0.1 {
-			// Low pressure (0-10%): gentle scaling from 1.0 to 1.05
-			psiFactor = 1.0 + (pressure * 0.5)
-		} else {
-			// Higher pressure (>= 10%): moderate scaling from 1.05
-			// Capped at 2.0 (reached at ~48% pressure) to avoid extreme values
-			val := 1.05 + (pressure-0.1)*2.5
-			psiFactor = min(val, 2.0)
-		}
-	}
+	// Calculate pressure factors
+	oomFactor := calculateMemoryOOMRateFactor(oomPerWeek)
+	failCntFactor := calculateMemoryFailRateFactor(failCntPerWeek)
+	psiFactor := calculatePSIPressureFactor(pressure)
 
 	// Use the maximum of the three signals
 	// This ensures we prioritize the most critical distress signal
-	pressureFactor = max(pressureFactor, oomFactor)
-	pressureFactor = max(pressureFactor, psiFactor)
+	stressFactor := max(failCntFactor, oomFactor)
+	stressFactor = max(stressFactor, psiFactor)
 
-	return pressureFactor
+	return stressFactor
+}
+
+// Calculates memory OOM factor from normalized OOM rate (events per week)
+// Using gradual scaling
+func calculateMemoryOOMRateFactor(oomPerWeek float64) float64 {
+	if oomPerWeek <= 0 {
+		return 1.0
+	}
+	factor := 1.0 + 0.8*(oomPerWeek/(oomPerWeek+1.5))
+	return min(factor, 1.8)
+}
+
+// Calculates memory fail count factor from normalized fail rate (events per week)
+// Using gradual scaling
+func calculateMemoryFailRateFactor(failCntPerWeek float64) float64 {
+	if failCntPerWeek <= 0 {
+		return 1.0
+	}
+	factor := 1.0 + 0.4*(failCntPerWeek/(failCntPerWeek+3.0))
+	return min(factor, 1.4)
 }
 
 // Normalizes event counter from a given analysis window into a per-week rate
