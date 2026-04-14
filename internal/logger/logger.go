@@ -9,58 +9,50 @@ import (
 )
 
 var (
-	// Global logger instance
+	// Logger is the global structured logger configured by Init.
 	Logger zerolog.Logger
 )
 
-// Initializes the logger with the specified level and format
+// Init configures the global logger with the given level and format.
+// Invalid levels fall back to info, so startup can continue with sane defaults.
 func Init(level string, format string) {
-	// Parse log level
-	logLevel, err := zerolog.ParseLevel(level)
+	parsedLevel, err := zerolog.ParseLevel(level)
 	if err != nil {
-		logLevel = zerolog.InfoLevel
+		parsedLevel = zerolog.InfoLevel
 	}
 
-	// Set global log level
-	zerolog.SetGlobalLevel(logLevel)
-
-	// Set time field format
+	zerolog.SetGlobalLevel(parsedLevel)
 	zerolog.TimeFieldFormat = time.RFC3339
 
-	// Format selection
 	if format == "console" {
-		// Console output formatter
-		output := zerolog.ConsoleWriter{
+		consoleWriter := zerolog.ConsoleWriter{
 			Out:        os.Stderr,
 			TimeFormat: time.RFC3339,
 		}
-		Logger = zerolog.New(output).
+		Logger = zerolog.New(consoleWriter).
 			With().
 			Timestamp().
 			Logger()
 	} else {
-		// JSON output formatter
 		Logger = zerolog.New(os.Stderr).
 			With().
 			Timestamp().
 			Logger()
 	}
 
-	// Add caller if debug level
 	if level == "debug" {
 		Logger = Logger.With().Caller().Logger()
 	}
 
-	// Set as global logger
 	log.Logger = Logger
 }
 
-// Returns a logger instance with a component field
+// WithComponent returns a logger that always includes the component field.
 func WithComponent(component string) zerolog.Logger {
 	return Logger.With().Str("component", component).Logger()
 }
 
-// Returns a logger instance with additional fields
+// WithFields returns a logger that includes each provided structured field.
 func WithFields(fields map[string]any) zerolog.Logger {
 	ctx := Logger.With()
 	for k, v := range fields {
