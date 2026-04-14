@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Represents raw disk metrics data
+// DiskMetrics holds time-aligned read/write byte rates and operation rates from Prometheus.
 type DiskMetrics struct {
 	ReadBytes  []timeseries.DataPoint `json:"read_bytes"`
 	WriteBytes []timeseries.DataPoint `json:"write_bytes"`
@@ -21,9 +21,7 @@ type DiskMetrics struct {
 	WriteOps   []timeseries.DataPoint `json:"write_ops"`
 }
 
-// Fetches pod disk metrics
 func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOptions) (DiskMetrics, error) {
-	// Set up time range
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)
 	r := v1.Range{
@@ -45,10 +43,8 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		writeOpsMatrix   model.Matrix
 	)
 
-	// Execute all queries in parallel
 	g, gctx := errgroup.WithContext(ctx)
 
-	// Query read bytes
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryPodDiskReadBytesRange(gctx, r, queryOpts)
 		if err != nil {
@@ -58,7 +54,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Query write bytes
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryPodDiskWriteBytesRange(gctx, r, queryOpts)
 		if err != nil {
@@ -68,7 +63,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Query read ops
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryPodDiskReadOpsRange(gctx, r, queryOpts)
 		if err != nil {
@@ -78,7 +72,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Query write ops
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryPodDiskWriteOpsRange(gctx, r, queryOpts)
 		if err != nil {
@@ -88,7 +81,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return DiskMetrics{}, err
 	}
@@ -101,13 +93,13 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	}, nil
 }
 
-// Aggregates metrics from all pods in a workload
+// fetchWorkloadMetrics queries each pod in parallel, then merges per-pod series
+// with MergeDataPointsByTime so each timestamp reflects summed rates across the workload.
 func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts AnalysisOptions) (DiskMetrics, error) {
 	if len(pods) == 0 {
 		return DiskMetrics{}, fmt.Errorf("no pods found for workload")
 	}
 
-	// Set up time range
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)
 	r := v1.Range{
@@ -116,7 +108,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		Step:  opts.RangeStep,
 	}
 
-	// Per-pod results: each goroutine writes to its index
 	type podMetrics struct {
 		ReadBytes  []timeseries.DataPoint
 		WriteBytes []timeseries.DataPoint
@@ -125,7 +116,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	}
 	results := make([]podMetrics, len(pods))
 
-	// Query all pods in parallel
 	g, gctx := errgroup.WithContext(ctx)
 
 	for i, pod := range pods {
@@ -143,10 +133,8 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				writeOpsMatrix   model.Matrix
 			)
 
-			// Create a new error group for this pod
 			podG, podCtx := errgroup.WithContext(gctx)
 
-			// Query read bytes
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodDiskReadBytesRange(podCtx, r, queryOpts)
 				if err != nil {
@@ -156,7 +144,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Query write bytes
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodDiskWriteBytesRange(podCtx, r, queryOpts)
 				if err != nil {
@@ -166,7 +153,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Query read ops
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodDiskReadOpsRange(podCtx, r, queryOpts)
 				if err != nil {
@@ -176,7 +162,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Query write ops
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodDiskWriteOpsRange(podCtx, r, queryOpts)
 				if err != nil {
@@ -186,7 +171,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Wait for all queries to be completed and check for errors
 			if err := podG.Wait(); err != nil {
 				return err
 			}
@@ -201,12 +185,10 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		})
 	}
 
-	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return DiskMetrics{}, err
 	}
 
-	// Aggregate metrics across pods
 	var readBytes, writeBytes []timeseries.DataPoint
 	var readOps, writeOps []timeseries.DataPoint
 	for _, p := range results {
@@ -224,9 +206,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	}, nil
 }
 
-// Fetches namespace disk metrics
 func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisOptions) (DiskMetrics, error) {
-	// Set up time range
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)
 	r := v1.Range{
@@ -247,10 +227,8 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		writeOpsMatrix   model.Matrix
 	)
 
-	// Execute queries in parallel
 	g, gctx := errgroup.WithContext(ctx)
 
-	// Query namespace read bytes
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryNamespaceDiskReadBytesRange(gctx, r, queryOpts)
 		if err != nil {
@@ -260,7 +238,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Query namespace write bytes
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryNamespaceDiskWriteBytesRange(gctx, r, queryOpts)
 		if err != nil {
@@ -270,7 +247,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Query namespace read ops
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryNamespaceDiskReadOpsRange(gctx, r, queryOpts)
 		if err != nil {
@@ -280,7 +256,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Query namespace write ops
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryNamespaceDiskWriteOpsRange(gctx, r, queryOpts)
 		if err != nil {
@@ -290,7 +265,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return DiskMetrics{}, err
 	}
