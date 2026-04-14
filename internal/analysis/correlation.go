@@ -11,15 +11,16 @@ import (
 	"golang.org/x/text/language"
 )
 
-// Holds configuration for correlation analysis
+// CorrelationOptions controls the analysis window and lag search bounds.
 type CorrelationOptions struct {
-	TimeRange time.Duration // How far back to analyze (default: 24h)
-	RangeStep time.Duration // Step size for range queries (default: 1m)
-	MaxLag    time.Duration // Maximum lag to test for cross-correlation (default: 5m)
-	LagStep   time.Duration // Step size for lag testing (default: 1m)
+	TimeRange time.Duration // How far back to analyze (default: 24h).
+	RangeStep time.Duration // Step size for Prometheus range queries (default: 1m).
+	MaxLag    time.Duration // Largest lag checked during cross-correlation (default: 5m).
+	LagStep   time.Duration // Lag increment used while searching for MaxLag (default: 1m).
 }
 
-// Returns default correlation options
+// DefaultCorrelationOptions returns a 24 hour window with a 1 minute range step,
+// a 5 minute max lag, and a 1 minute lag step.
 func DefaultCorrelationOptions() CorrelationOptions {
 	opts := CorrelationOptions{
 		TimeRange: 24 * time.Hour,
@@ -31,16 +32,15 @@ func DefaultCorrelationOptions() CorrelationOptions {
 	return opts
 }
 
-// Sets the time range and adjusts the step size to respect Prometheus limits
+// SetTimeRange stores timeRange and sets RangeStep so each range query stays near a safe
+// point count for Prometheus (targets roughly 11k samples or fewer per series according to Prometheus limits).
 func (opts *CorrelationOptions) SetTimeRange(timeRange time.Duration) {
 	opts.TimeRange = timeRange
 	const maxPoints = 11000
 
-	// Calculate minimum step needed
 	totalMinutes := timeRange.Minutes()
 	minStepMinutes := totalMinutes / maxPoints
 
-	// Round up to next reasonable interval
 	if minStepMinutes <= 1 {
 		opts.RangeStep = 1 * time.Minute
 	} else if minStepMinutes <= 5 {
@@ -58,7 +58,7 @@ func (opts *CorrelationOptions) SetTimeRange(timeRange time.Duration) {
 	}
 }
 
-// Validates correlation options
+// Validate ensures that the correlation options are valid before analyzing.
 func (opts CorrelationOptions) Validate() error {
 	if opts.TimeRange <= 0 {
 		return fmt.Errorf("TimeRange must be positive, got: %v", opts.TimeRange)
@@ -75,13 +75,13 @@ func (opts CorrelationOptions) Validate() error {
 	return nil
 }
 
-// Represents a pair of metrics being correlated
+// MetricPair identifies the two metrics to compare together.
 type MetricPair struct {
 	MetricA string `json:"metric_a"`
 	MetricB string `json:"metric_b"`
 }
 
-// Represents the correlation between a pair of metrics
+// PairCorrelation contains the computed relationship for one MetricPair.
 type PairCorrelation struct {
 	Pair           MetricPair                        `json:"pair"`
 	Correlation    timeseries.CrossCorrelationResult `json:"correlation"`
@@ -89,7 +89,8 @@ type PairCorrelation struct {
 	DataAvailable  bool                              `json:"data_available"`
 }
 
-// Represents workload characterization based on correlation patterns
+// WorkloadType describes the dominant resource pattern inferred from
+// cross-metric correlations.
 type WorkloadType string
 
 const (
@@ -101,7 +102,8 @@ const (
 	WorkloadTypeMixed          WorkloadType = "mixed"
 )
 
-// Represents the result of workload correlation analysis
+// WorkloadCorrelationResult is the final result for the workload-level
+// cross-metric correlation analysis.
 type WorkloadCorrelationResult struct {
 	WorkloadType      string            `json:"workload_type"`
 	WorkloadName      string            `json:"workload_name"`
@@ -114,7 +116,7 @@ type WorkloadCorrelationResult struct {
 	DataPointsUsed    int               `json:"data_points_used"`
 }
 
-// Holds all metrics needed for correlation analysis
+// correlationMetrics stores merged per-workload metric series from Prometheus.
 type correlationMetrics struct {
 	CPU             []timeseries.DataPoint
 	Memory          []timeseries.DataPoint
@@ -124,7 +126,7 @@ type correlationMetrics struct {
 	DiskWrite       []timeseries.DataPoint
 }
 
-// All metric pairs to analyze (12 pairs)
+// metricPairs defines a set of cross-metric comparisons to analyze.
 var metricPairs = []MetricPair{
 	{MetricA: "cpu", MetricB: "memory"},
 	{MetricA: "cpu", MetricB: "network_receive"},
@@ -140,9 +142,9 @@ var metricPairs = []MetricPair{
 	{MetricA: "disk_read", MetricB: "disk_write"},
 }
 
-// Analyzes correlations between all metrics for a workload
+// AnalyzeWorkloadCorrelations computes cross-metric correlations across compute,
+// network, and disk metrics for one workload.
 func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workloadName string, namespace string, pods []*database.Pod, opts CorrelationOptions) (WorkloadCorrelationResult, error) {
-	// Validate options
 	if err := opts.Validate(); err != nil {
 		return WorkloadCorrelationResult{}, fmt.Errorf("invalid correlation options: %w", err)
 	}
@@ -151,13 +153,11 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 		return WorkloadCorrelationResult{}, fmt.Errorf("no pods found for workload %s/%s", namespace, workloadName)
 	}
 
-	// Fetch all metrics
-	metrics, err := fetchWorkloadMetrics(ctx, pods, opts)
+	metrics, err := fetchWorkloadCorrelationMetrics(ctx, pods, opts)
 	if err != nil {
 		return WorkloadCorrelationResult{}, fmt.Errorf("failed to fetch workload metrics: %w", err)
 	}
 
-	// Calculate correlations for all pairs
 	correlations := make([]PairCorrelation, 0, len(metricPairs))
 
 	maxDataPoints := 0
@@ -189,13 +189,8 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 		correlations = append(correlations, pairCorr)
 	}
 
-	// Characterize workload based on correlation patterns
 	characterization := characterizeWorkload(correlations)
-
-	// Generate insights
 	insights := generateInsights(correlations)
-
-	// Generate optimization hints based on characterization
 	optimizationHints := generateOptimizationHints(characterization, correlations)
 
 	return WorkloadCorrelationResult{
@@ -211,7 +206,7 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 	}, nil
 }
 
-// Returns the data points for a given metric name
+// getMetricData returns the merged series for a given metric name.
 func getMetricData(metrics correlationMetrics, name string) []timeseries.DataPoint {
 	switch name {
 	case "cpu":
@@ -231,7 +226,7 @@ func getMetricData(metrics correlationMetrics, name string) []timeseries.DataPoi
 	}
 }
 
-// Generates a human-readable interpretation of a correlation result
+// interpretCorrelation summarizes strength, direction, and lag in plain text.
 func interpretCorrelation(pair MetricPair, result timeseries.CrossCorrelationResult) string {
 	coeff := result.MaxCorrelation.Coefficient
 	strength := result.MaxCorrelation.Strength
@@ -253,7 +248,7 @@ func interpretCorrelation(pair MetricPair, result timeseries.CrossCorrelationRes
 		if result.LeadingSeries == "B" {
 			leadingMetric = pair.MetricB
 		}
-		lagStr = fmt.Sprintf(" with %s leading by %v", formatMetricName(leadingMetric), absD(lag))
+		lagStr = fmt.Sprintf(" with %s leading by %v", formatMetricName(leadingMetric), absDuration(lag))
 	}
 
 	return fmt.Sprintf("%s %s correlation between %s and %s (r=%.2f)%s",
@@ -262,9 +257,8 @@ func interpretCorrelation(pair MetricPair, result timeseries.CrossCorrelationRes
 		coeff, lagStr)
 }
 
-// Characterizes workload type based on correlation patterns
+// characterizeWorkload applies heuristic thresholds to label workload behavior.
 func characterizeWorkload(correlations []PairCorrelation) WorkloadType {
-	// Extract key correlations
 	var cpuMemory, cpuNetRecv, cpuNetTrans, cpuDiskRead, cpuDiskWrite float64
 	var memNetRecv, netRecvDiskWrite float64
 
@@ -273,9 +267,9 @@ func characterizeWorkload(correlations []PairCorrelation) WorkloadType {
 			continue
 		}
 		coeff := c.Correlation.MaxCorrelation.Coefficient
-		key := c.Pair.MetricA + "_" + c.Pair.MetricB
+		pairKey := c.Pair.MetricA + "_" + c.Pair.MetricB
 
-		switch key {
+		switch pairKey {
 		case "cpu_memory":
 			cpuMemory = coeff
 		case "cpu_network_receive":
@@ -293,28 +287,29 @@ func characterizeWorkload(correlations []PairCorrelation) WorkloadType {
 		}
 	}
 
-	// Characterization rules
-	// High CPU↔Memory with low I/O correlations -> Compute-bound
+	// CPU and memory moving together while I/O stays decoupled usually means
+	// the workload saturates compute before network or storage.
 	if cpuMemory > 0.7 && abs(cpuNetRecv) < 0.3 && abs(cpuDiskRead) < 0.3 {
 		return WorkloadTypeComputeBound
 	}
 
-	// High CPU↔Network correlations -> Request-driven
+	// CPU tracking inbound or outbound traffic is a common request-driven shape.
 	if cpuNetRecv > 0.5 || cpuNetTrans > 0.5 {
 		return WorkloadTypeRequestDriven
 	}
 
-	// High CPU↔Disk correlations -> Data-processing
+	// CPU following disk activity often indicates transform/ETL style work.
 	if cpuDiskRead > 0.5 || cpuDiskWrite > 0.5 {
 		return WorkloadTypeDataProcessing
 	}
 
-	// High Network↔Disk correlation -> Pass-through
+	// Network and disk moving together often reflects pass-through pipelines.
 	if netRecvDiskWrite > 0.5 {
 		return WorkloadTypePassThrough
 	}
 
-	// High memory, low CPU correlation -> Cache-heavy
+	// Memory movement without matching CPU pressure often maps to cache-heavy
+	// access patterns.
 	if abs(cpuMemory) < 0.3 && abs(memNetRecv) > 0.3 {
 		return WorkloadTypeCacheHeavy
 	}
@@ -322,11 +317,10 @@ func characterizeWorkload(correlations []PairCorrelation) WorkloadType {
 	return WorkloadTypeMixed
 }
 
-// Generates insights based on correlation patterns
+// generateInsights generates human-readable insights for moderate/strong signals.
 func generateInsights(correlations []PairCorrelation) []string {
 	insights := make([]string, 0)
 
-	// Track whether any moderate/strong correlations exist at all
 	hasStrong := false
 	hasModerate := false
 
@@ -339,7 +333,6 @@ func generateInsights(correlations []PairCorrelation) []string {
 		strength := c.Correlation.MaxCorrelation.Strength
 		lag := c.Correlation.OptimalLag
 
-		// Only generate insights for moderate or strong correlations
 		switch strength {
 		case timeseries.CorrelationStrengthStrong:
 			hasStrong = true
@@ -349,9 +342,9 @@ func generateInsights(correlations []PairCorrelation) []string {
 			continue
 		}
 
-		key := c.Pair.MetricA + "_" + c.Pair.MetricB
+		pairKey := c.Pair.MetricA + "_" + c.Pair.MetricB
 
-		switch key {
+		switch pairKey {
 		case "cpu_memory":
 			if coeff > 0.7 {
 				insights = append(insights, "CPU and memory usage are tightly coupled, indicating the workload scales both resources together")
@@ -363,7 +356,7 @@ func generateInsights(correlations []PairCorrelation) []string {
 			if coeff > 0.5 {
 				insights = append(insights, "CPU usage correlates with incoming network traffic, suggesting a request-driven workload")
 				if lag != 0 && c.Correlation.LeadingSeries == "B" {
-					insights = append(insights, fmt.Sprintf("Network traffic leads CPU by %v, indicating request processing delay", absD(lag)))
+					insights = append(insights, fmt.Sprintf("Network traffic leads CPU by %v, indicating request processing delay", absDuration(lag)))
 				}
 			}
 
@@ -423,7 +416,8 @@ func generateInsights(correlations []PairCorrelation) []string {
 	return insights
 }
 
-// Generates optimization hints based on workload characterization
+// generateOptimizationHints generates tuning suggestions from characterization
+// plus a few targeted pair patterns.
 func generateOptimizationHints(workloadType WorkloadType, correlations []PairCorrelation) []string {
 	hints := make([]string, 0)
 
@@ -458,16 +452,15 @@ func generateOptimizationHints(workloadType WorkloadType, correlations []PairCor
 		hints = append(hints, "Consider breaking down into sub-components if resource usage varies significantly")
 	}
 
-	// Add specific hints based on correlation patterns
 	for _, c := range correlations {
 		if !c.DataAvailable {
 			continue
 		}
 
 		coeff := c.Correlation.MaxCorrelation.Coefficient
-		key := c.Pair.MetricA + "_" + c.Pair.MetricB
+		pairKey := c.Pair.MetricA + "_" + c.Pair.MetricB
 
-		switch key {
+		switch pairKey {
 		case "network_receive_network_transmit":
 			if abs(coeff) < 0.3 {
 				hints = append(hints, "Asymmetric network traffic detected, consider separate ingress/egress scaling strategies")
@@ -485,7 +478,6 @@ func generateOptimizationHints(workloadType WorkloadType, correlations []PairCor
 	return hints
 }
 
-// Formats a metric name for display
 func formatMetricName(name string) string {
 	switch name {
 	case "cpu":
@@ -505,7 +497,6 @@ func formatMetricName(name string) string {
 	}
 }
 
-// Returns absolute value of float64
 func abs(x float64) float64 {
 	if x < 0 {
 		return -x
@@ -513,8 +504,7 @@ func abs(x float64) float64 {
 	return x
 }
 
-// Returns absolute value of duration
-func absD(d time.Duration) time.Duration {
+func absDuration(d time.Duration) time.Duration {
 	if d < 0 {
 		return -d
 	}

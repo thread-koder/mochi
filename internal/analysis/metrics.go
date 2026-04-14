@@ -13,8 +13,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Fetches all metrics needed for correlation analysis
-func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts CorrelationOptions) (correlationMetrics, error) {
+// fetchWorkloadCorrelationMetrics queries per-pod metrics and merges them into workload-level
+// series for cross-metric correlation.
+//
+// At least one compute signal (CPU or memory) is required because it anchors
+// workload characterization.
+// Network and disk queries are best-effort as some pods may not expose those metrics.
+func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, opts CorrelationOptions) (correlationMetrics, error) {
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)
 	r := v1.Range{
@@ -26,7 +31,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 	var metrics correlationMetrics
 	g, gctx := errgroup.WithContext(ctx)
 
-	// Per-pod metrics
 	type podMetrics struct {
 		CPU             []timeseries.DataPoint
 		Memory          []timeseries.DataPoint
@@ -37,11 +41,12 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 	}
 	results := make([]podMetrics, len(pods))
 
-	// Fetch metrics for all pods in parallel
 	for i, pod := range pods {
 		queryOpts := prometheus.QueryOptions{
-			Namespace:     pod.Namespace,
-			Pod:           pod.Name,
+			Namespace: pod.Namespace,
+			Pod:       pod.Name,
+			// Keep per-sample rate windows fixed so timeseries stay comparable even
+			// when callers widen TimeRange.
 			RangeDuration: "5m",
 		}
 
@@ -57,7 +62,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 
 			podG, podCtx := errgroup.WithContext(gctx)
 
-			// Query CPU metrics
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodCPURange(podCtx, r, queryOpts)
 				if err != nil {
@@ -67,7 +71,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 				return nil
 			})
 
-			// Query memory metrics
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodMemoryRange(podCtx, r, queryOpts)
 				if err != nil {
@@ -77,7 +80,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 				return nil
 			})
 
-			// Query network receive metrics
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodNetworkReceiveBytesRange(podCtx, r, queryOpts)
 				if err != nil {
@@ -87,7 +89,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 				return nil
 			})
 
-			// Query network transmit metrics
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodNetworkTransmitBytesRange(podCtx, r, queryOpts)
 				if err != nil {
@@ -97,7 +98,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 				return nil
 			})
 
-			// Query disk read metrics
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodDiskReadBytesRange(podCtx, r, queryOpts)
 				if err != nil {
@@ -107,7 +107,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 				return nil
 			})
 
-			// Query disk write metrics
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodDiskWriteBytesRange(podCtx, r, queryOpts)
 				if err != nil {
@@ -117,7 +116,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 				return nil
 			})
 
-			// Wait for all queries to be completed and check for errors
 			if err := podG.Wait(); err != nil {
 				return err
 			}
@@ -134,12 +132,10 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 		})
 	}
 
-	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return correlationMetrics{}, err
 	}
 
-	// Aggregate metrics across pods
 	for _, pm := range results {
 		metrics.CPU = timeseries.MergeDataPointsByTime(metrics.CPU, pm.CPU)
 		metrics.Memory = timeseries.MergeDataPointsByTime(metrics.Memory, pm.Memory)
@@ -149,11 +145,9 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Correl
 		metrics.DiskWrite = timeseries.MergeDataPointsByTime(metrics.DiskWrite, pm.DiskWrite)
 	}
 
-	// Validate we have at least CPU and memory (compute metrics are always required)
 	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
 		return correlationMetrics{}, fmt.Errorf("no compute metrics available for correlation analysis")
 	}
 
 	return metrics, nil
 }
-
