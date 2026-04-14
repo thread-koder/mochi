@@ -8,7 +8,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts multiple pods in a batch transaction
+// UpsertPodsBatch inserts or updates pods by Kubernetes UID inside one transaction.
 func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	if len(pods) == 0 {
 		return nil
@@ -17,7 +17,6 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	log := logger.WithComponent("database")
 	log.Debug().Int("count", len(pods)).Msg("Upserting pods batch")
 
-	// Start transaction
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -75,7 +74,7 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	return nil
 }
 
-// Gets a pod by name and namespace
+// GetPodByName returns a pod by name in the namespace (first match if duplicates ever exist).
 func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, phase, restart_policy,
@@ -102,14 +101,13 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 	return &p, nil
 }
 
-// Gets all pods for a specific workload (by owner kind and name)
+// GetPodsByWorkload returns the pods for a workload. Deployment is special: pods are owned by
+// ReplicaSets, not the Deployment, so we walk RS -> Pod. Other kinds query owner_kind/owner_name directly.
 func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName string, namespace string) ([]*Pod, error) {
-	// For Deployment we need to get their ReplicaSets and then get their pods
 	if workloadType == "Deployment" {
 		return getPodsByDeployment(ctx, workloadName, namespace)
 	}
 
-	// Direct query for other owner kinds
 	query := `
 		SELECT id, name, namespace, uid, node, phase, restart_policy,
 		       labels, annotations, owner_kind, owner_name,
@@ -146,7 +144,7 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 	return pods, nil
 }
 
-// Gets standalone pods (pods without owner) in a namespace
+// GetStandalonePodsByNamespace returns the pods with no owner in the namespace.
 func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, phase, restart_policy,
@@ -184,7 +182,7 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 	return pods, nil
 }
 
-// Gets pods by owner kind in a namespace
+// GetPodsByOwnerKind returns the pods with the given owner_kind in the namespace (e.g. Node for system pods).
 func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string) ([]*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, phase, restart_policy,
@@ -222,7 +220,8 @@ func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string)
 	return pods, nil
 }
 
-// Removes pods in the namespace whose uid is not in the list.
+// PrunePods deletes pods whose UID is not in uids in the namespace.
+// Empty uids deletes all pods in that namespace.
 func PrunePods(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM pods WHERE namespace = $1`, namespace)
@@ -232,9 +231,7 @@ func PrunePods(ctx context.Context, namespace string, uids []string) error {
 	return err
 }
 
-// Gets all pods for a deployment
 func getPodsByDeployment(ctx context.Context, deploymentName, namespace string) ([]*Pod, error) {
-	// First, get all ReplicaSets owned by this Deployment
 	replicasets, err := GetReplicaSetsByDeployment(ctx, deploymentName, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get replicasets for deployment: %w", err)
@@ -244,11 +241,11 @@ func getPodsByDeployment(ctx context.Context, deploymentName, namespace string) 
 		return []*Pod{}, nil
 	}
 
-	// Collect all pods owned by these ReplicaSets
 	allPods := make([]*Pod, 0)
 	for _, rs := range replicasets {
 		pods, err := GetPodsByWorkload(ctx, "ReplicaSet", rs.Name, namespace)
 		if err != nil {
+			// Best-effort: omit pods for one RS if the subquery fails, so caller still gets partial data.
 			continue
 		}
 		allPods = append(allPods, pods...)

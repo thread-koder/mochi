@@ -1,4 +1,3 @@
--- Create containers table
 CREATE TABLE IF NOT EXISTS containers (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -18,16 +17,12 @@ CREATE TABLE IF NOT EXISTS containers (
     UNIQUE(pod_uid, name)
 );
 
--- Create index on pod_uid
 CREATE INDEX IF NOT EXISTS idx_containers_pod_uid ON containers(pod_uid);
 
--- Create index on namespace and pod_name
 CREATE INDEX IF NOT EXISTS idx_containers_namespace_pod_name ON containers(namespace, pod_name);
 
--- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_containers_synced_at ON containers(synced_at);
 
--- Create trigger to automatically update updated_at
 CREATE TRIGGER update_containers_updated_at
     BEFORE UPDATE ON containers
     FOR EACH ROW

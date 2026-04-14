@@ -8,7 +8,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts multiple containers in a batch transaction
+// UpsertContainersBatch inserts or updates containers by their (pod_uid, name) inside one transaction.
 func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 	if len(containers) == 0 {
 		return nil
@@ -17,7 +17,6 @@ func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 	log := logger.WithComponent("database")
 	log.Debug().Int("count", len(containers)).Msg("Upserting containers batch")
 
-	// Start transaction
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -77,7 +76,7 @@ func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 	return nil
 }
 
-// Gets all containers for a specific pod UID
+// GetContainersByPodUID returns all the containers for one pod, ordered by name.
 func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, error) {
 	query := `
 		SELECT id, name, pod_uid, pod_name, namespace, image, image_pull_policy, ports,
@@ -116,7 +115,8 @@ func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, er
 	return containers, nil
 }
 
-// Removes containers in the namespace whose pod_uid is not in the list.
+// PruneContainers deletes containers whose pod_uid is not in podUIDs in the namespace.
+// Empty podUIDs deletes all containers in that namespace (eg. containers that do not belong to any pod).
 func PruneContainers(ctx context.Context, namespace string, podUIDs []string) error {
 	if len(podUIDs) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM containers WHERE namespace = $1`, namespace)

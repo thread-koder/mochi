@@ -8,7 +8,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts multiple services in a batch transaction
+// UpsertServicesBatch inserts or updates Services by Kubernetes UID inside one transaction.
 func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 	if len(services) == 0 {
 		return nil
@@ -71,7 +71,8 @@ func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 	return nil
 }
 
-// Removes services in the namespace whose uid is not in the list.
+// PruneServices deletes services whose UID is not in uids in the namespace.
+// Empty uids deletes all services in that namespace.
 func PruneServices(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM services WHERE namespace = $1`, namespace)

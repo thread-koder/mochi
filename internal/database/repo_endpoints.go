@@ -8,7 +8,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts multiple endpoint slices in a batch transaction
+// UpsertEndpointSlicesBatch inserts or updates EndpointSlices by Kubernetes UID inside one transaction.
 func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSlice) error {
 	if len(endpointSlices) == 0 {
 		return nil
@@ -72,7 +72,8 @@ func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSl
 	return nil
 }
 
-// Removes endpoint slices in the namespace whose uid is not in the list.
+// PruneEndpointSlices deletes EndpointSlices whose UID is not in uids in the namespace.
+// Empty uids deletes all EndpointSlices in that namespace.
 func PruneEndpointSlices(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM endpoint_slices WHERE namespace = $1`, namespace)

@@ -1,3 +1,7 @@
+// Package database holds PostgreSQL persistence for the Kubernetes resource snapshot synced from
+// the cluster, compute recommendations. Runtime access uses the shared Pool created by Init.
+// Migrate applies embedded SQL using a separate database/sql connection
+// required by golang-migrate (see Migrate).
 package database
 
 import (
@@ -10,12 +14,10 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-var (
-	// Global database connection pool
-	Pool *pgxpool.Pool
-)
+// Pool is the global database connection pool.
+var Pool *pgxpool.Pool
 
-// Initializes the database connection pool using pgx
+// Init builds and configures the database connection pool and verifies connection.
 func Init(cfg *config.DatabaseConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("database config is nil")
@@ -26,19 +28,16 @@ func Init(cfg *config.DatabaseConfig) error {
 
 	dsn := buildDSN(cfg)
 
-	// Parse connection string and create pool config
 	poolConfig, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return fmt.Errorf("failed to parse database connection string: %w", err)
 	}
 
-	// Configure connection pool
 	poolConfig.MaxConns = int32(cfg.MaxConnections)
 	poolConfig.MaxConnIdleTime = time.Duration(cfg.ConnMaxIdleTime) * time.Second
 	poolConfig.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetime) * time.Second
 	poolConfig.MinIdleConns = int32(cfg.MinIdleConns)
 
-	// Apply TLS when SSL is enabled
 	if cfg.SSLMode != "disable" {
 		tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
 		if err != nil {
@@ -47,13 +46,11 @@ func Init(cfg *config.DatabaseConfig) error {
 		poolConfig.ConnConfig.TLSConfig = tlsConfig
 	}
 
-	// Create connection pool
 	Pool, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create database connection pool: %w", err)
 	}
 
-	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -70,14 +67,14 @@ func Init(cfg *config.DatabaseConfig) error {
 	return nil
 }
 
-// Closes the database connection pool
+// Close closes the database connection pool if it was initialized.
 func Close() {
 	if Pool != nil {
 		Pool.Close()
 	}
 }
 
-// Performs a health check on the database connection
+// HealthCheck verifies the database reachability with a Ping call.
 func HealthCheck(ctx context.Context) error {
 	if Pool == nil {
 		return fmt.Errorf("database connection not initialized")
@@ -90,7 +87,6 @@ func HealthCheck(ctx context.Context) error {
 	return nil
 }
 
-// Builds the PostgreSQL connection string (DSN) for pgx
 func buildDSN(cfg *config.DatabaseConfig) string {
 	return fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",

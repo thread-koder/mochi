@@ -8,7 +8,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts multiple nodes in a batch transaction
+// UpsertNodesBatch inserts or updates nodes by Kubernetes UID inside one transaction.
 func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 	if len(nodes) == 0 {
 		return nil
@@ -81,7 +81,8 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 	return nil
 }
 
-// Removes nodes whose uid is not in the list.
+// PruneNodes deletes nodes whose UID is not in uids. An empty uids slice clears the whole table,
+// which matches sync when the API returns zero nodes.
 func PruneNodes(ctx context.Context, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM nodes`)

@@ -1,4 +1,4 @@
--- Create function to automatically update updated_at timestamp
+-- Shared function: every table uses it.
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN

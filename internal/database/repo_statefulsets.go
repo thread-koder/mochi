@@ -8,7 +8,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts multiple statefulsets in a batch transaction
+// UpsertStatefulSetsBatch inserts or updates StatefulSets by Kubernetes UID inside one transaction.
 func UpsertStatefulSetsBatch(ctx context.Context, statefulsets []*StatefulSet) error {
 	if len(statefulsets) == 0 {
 		return nil
@@ -69,7 +69,7 @@ func UpsertStatefulSetsBatch(ctx context.Context, statefulsets []*StatefulSet) e
 	return nil
 }
 
-// Gets all statefulsets in a namespace
+// GetStatefulSetsByNamespace returns all the StatefulSets in the namespace, ordered by name.
 func GetStatefulSetsByNamespace(ctx context.Context, namespace string) ([]*StatefulSet, error) {
 	query := `
 		SELECT id, name, namespace, uid, replicas, ready_replicas,
@@ -106,7 +106,7 @@ func GetStatefulSetsByNamespace(ctx context.Context, namespace string) ([]*State
 	return statefulsets, nil
 }
 
-// Gets a statefulset by name and namespace
+// GetStatefulSetByName returns a StatefulSet by name in the namespace.
 func GetStatefulSetByName(ctx context.Context, name string, namespace string) (*StatefulSet, error) {
 	query := `
 		SELECT id, name, namespace, uid, replicas, ready_replicas,
@@ -133,7 +133,8 @@ func GetStatefulSetByName(ctx context.Context, name string, namespace string) (*
 	return &sts, nil
 }
 
-// Removes statefulsets in the namespace whose uid is not in the list.
+// PruneStatefulSets deletes StatefulSets whose UID is not in uids in the namespace.
+// Empty uids deletes all StatefulSets in that namespace.
 func PruneStatefulSets(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM statefulsets WHERE namespace = $1`, namespace)

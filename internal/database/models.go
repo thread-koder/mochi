@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Represents node metadata
+// Node represents a Kubernetes Node metadata.
 type Node struct {
 	ID                      int64           `json:"id" db:"id"`
 	Name                    string          `json:"name" db:"name"`
@@ -28,7 +28,7 @@ type Node struct {
 	SyncedAt                time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents namespace metadata
+// Namespace represents a Kubernetes Namespace metadata.
 type Namespace struct {
 	ID          int64           `json:"id" db:"id"`
 	Name        string          `json:"name" db:"name"`
@@ -41,7 +41,7 @@ type Namespace struct {
 	SyncedAt    time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents deployment metadata
+// Deployment represents a Kubernetes Deployment metadata.
 type Deployment struct {
 	ID                int64           `json:"id" db:"id"`
 	Name              string          `json:"name" db:"name"`
@@ -57,7 +57,7 @@ type Deployment struct {
 	SyncedAt          time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents replicaset metadata
+// ReplicaSet represents a Kubernetes ReplicaSet metadata.
 type ReplicaSet struct {
 	ID            int64           `json:"id" db:"id"`
 	Name          string          `json:"name" db:"name"`
@@ -74,7 +74,7 @@ type ReplicaSet struct {
 	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents statefulset metadata
+// StatefulSet represents a Kubernetes StatefulSet metadata.
 type StatefulSet struct {
 	ID            int64           `json:"id" db:"id"`
 	Name          string          `json:"name" db:"name"`
@@ -89,7 +89,7 @@ type StatefulSet struct {
 	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents daemonset metadata
+// DaemonSet represents a Kubernetes DaemonSet metadata.
 type DaemonSet struct {
 	ID                     int64           `json:"id" db:"id"`
 	Name                   string          `json:"name" db:"name"`
@@ -105,7 +105,7 @@ type DaemonSet struct {
 	SyncedAt               time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents service metadata
+// Service represents a Kubernetes Service metadata.
 type Service struct {
 	ID          int64           `json:"id" db:"id"`
 	Name        string          `json:"name" db:"name"`
@@ -122,7 +122,7 @@ type Service struct {
 	SyncedAt    time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents endpoint slice metadata
+// EndpointSlice represents a Kubernetes EndpointSlice metadata.
 type EndpointSlice struct {
 	ID          int64           `json:"id" db:"id"`
 	Name        string          `json:"name" db:"name"`
@@ -140,7 +140,7 @@ type EndpointSlice struct {
 	SyncedAt    time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents pod metadata
+// Pod represents a Kubernetes Pod metadata.
 type Pod struct {
 	ID            int64           `json:"id" db:"id"`
 	Name          string          `json:"name" db:"name"`
@@ -158,7 +158,7 @@ type Pod struct {
 	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents container metadata
+// Container represents a Kubernetes Container metadata.
 type Container struct {
 	ID              int64           `json:"id" db:"id"`
 	Name            string          `json:"name" db:"name"`
@@ -177,14 +177,14 @@ type Container struct {
 	SyncedAt        time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Represents compute resource recommendations for a workload
+// ComputeRecommendation represents a compute recommendation (CPU/memory) for a workload.
 type ComputeRecommendation struct {
 	ID                 int64           `json:"id" db:"id"`
 	WorkloadType       string          `json:"workload_type" db:"workload_type"`
 	WorkloadName       string          `json:"workload_name" db:"workload_name"`
 	Namespace          string          `json:"namespace" db:"namespace"`
 	RecommendationMode string          `json:"recommendation_mode" db:"recommendation_mode"`
-	Recommendations    json.RawMessage `json:"recommendations" db:"recommendations"` // Array of ContainerRecommendation
+	Recommendations    json.RawMessage `json:"recommendations" db:"recommendations"`
 	Status             string          `json:"status" db:"status"`
 	AnalysisTimeRange  string          `json:"analysis_time_range,omitempty" db:"analysis_time_range"`
 	CreatedAt          time.Time       `json:"created_at" db:"created_at"`

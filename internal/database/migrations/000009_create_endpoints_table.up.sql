@@ -1,4 +1,3 @@
--- Create endpoint_slices table
 CREATE TABLE IF NOT EXISTS endpoint_slices (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -17,19 +16,14 @@ CREATE TABLE IF NOT EXISTS endpoint_slices (
     UNIQUE(namespace, name)
 );
 
--- Create index on namespace and name
 CREATE INDEX IF NOT EXISTS idx_endpoint_slices_namespace_name ON endpoint_slices(namespace, name);
 
--- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_endpoint_slices_uid ON endpoint_slices(uid);
 
--- Create index on owner for lookups
 CREATE INDEX IF NOT EXISTS idx_endpoint_slices_owner ON endpoint_slices(namespace, owner_kind, owner_name);
 
--- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_endpoint_slices_synced_at ON endpoint_slices(synced_at);
 
--- Create trigger to automatically update updated_at
 CREATE TRIGGER update_endpoint_slices_updated_at
     BEFORE UPDATE ON endpoint_slices
     FOR EACH ROW

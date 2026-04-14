@@ -8,7 +8,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts multiple replicasets in a batch transaction
+// UpsertReplicaSetsBatch inserts or updates ReplicaSets by Kubernetes UID inside one transaction.
 func UpsertReplicaSetsBatch(ctx context.Context, replicasets []*ReplicaSet) error {
 	if len(replicasets) == 0 {
 		return nil
@@ -72,7 +72,7 @@ func UpsertReplicaSetsBatch(ctx context.Context, replicasets []*ReplicaSet) erro
 	return nil
 }
 
-// Gets all replicasets owned by a specific deployment
+// GetReplicaSetsByDeployment returns the ReplicaSets owned by the given Deployment (owner_kind/name match).
 func GetReplicaSetsByDeployment(ctx context.Context, deploymentName, namespace string) ([]*ReplicaSet, error) {
 	query := `
 		SELECT id, name, namespace, uid, replicas, ready_replicas,
@@ -110,7 +110,8 @@ func GetReplicaSetsByDeployment(ctx context.Context, deploymentName, namespace s
 	return replicasets, nil
 }
 
-// Removes replicasets in the namespace whose uid is not in the list.
+// PruneReplicaSets deletes ReplicaSets whose UID is not in uids in the namespace.
+// Empty uids deletes all ReplicaSets in that namespace.
 func PruneReplicaSets(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM replicasets WHERE namespace = $1`, namespace)

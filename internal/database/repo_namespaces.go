@@ -8,7 +8,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts multiple namespaces in a batch transaction
+// UpsertNamespacesBatch inserts or updates namespaces by Kubernetes UID inside one transaction.
 func UpsertNamespacesBatch(ctx context.Context, namespaces []*Namespace) error {
 	if len(namespaces) == 0 {
 		return nil
@@ -64,7 +64,7 @@ func UpsertNamespacesBatch(ctx context.Context, namespaces []*Namespace) error {
 	return nil
 }
 
-// Gets all namespaces from the database
+// GetNamespaces returns all the namespaces, ordered by name.
 func GetNamespaces(ctx context.Context) ([]*Namespace, error) {
 	query := `SELECT id, name, uid, phase, labels, annotations, created_at, updated_at, synced_at FROM namespaces ORDER BY name ASC`
 
@@ -94,7 +94,7 @@ func GetNamespaces(ctx context.Context) ([]*Namespace, error) {
 	return namespaces, nil
 }
 
-// Gets a namespace by name
+// GetNamespaceByName returns a namespace by its name.
 func GetNamespaceByName(ctx context.Context, name string) (*Namespace, error) {
 	query := `SELECT id, name, uid, phase, labels, annotations, created_at, updated_at, synced_at FROM namespaces WHERE name = $1 LIMIT 1`
 
@@ -114,7 +114,8 @@ func GetNamespaceByName(ctx context.Context, name string) (*Namespace, error) {
 	return &ns, nil
 }
 
-// Removes namespaces whose uid is not in the list.
+// PruneNamespaces deletes namespaces whose UID is not in uids. An empty uids slice clears the whole table,
+// which matches sync when the API returns zero namespaces.
 func PruneNamespaces(ctx context.Context, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM namespaces`)

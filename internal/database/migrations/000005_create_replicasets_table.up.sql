@@ -1,4 +1,3 @@
--- Create replicasets table
 CREATE TABLE IF NOT EXISTS replicasets (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -16,19 +15,14 @@ CREATE TABLE IF NOT EXISTS replicasets (
     UNIQUE(namespace, name)
 );
 
--- Create index on namespace and name
 CREATE INDEX IF NOT EXISTS idx_replicasets_namespace_name ON replicasets(namespace, name);
 
--- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_replicasets_uid ON replicasets(uid);
 
--- Create index on owner
 CREATE INDEX IF NOT EXISTS idx_replicasets_owner ON replicasets(namespace, owner_kind, owner_name);
 
--- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_replicasets_synced_at ON replicasets(synced_at);
 
--- Create trigger to automatically update updated_at
 CREATE TRIGGER update_replicasets_updated_at
     BEFORE UPDATE ON replicasets
     FOR EACH ROW

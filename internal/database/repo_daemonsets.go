@@ -8,7 +8,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Upserts multiple daemonsets in a batch transaction
+// UpsertDaemonSetsBatch inserts or updates DaemonSets by Kubernetes UID inside one transaction.
 func UpsertDaemonSetsBatch(ctx context.Context, daemonsets []*DaemonSet) error {
 	if len(daemonsets) == 0 {
 		return nil
@@ -70,7 +70,7 @@ func UpsertDaemonSetsBatch(ctx context.Context, daemonsets []*DaemonSet) error {
 	return nil
 }
 
-// Gets all daemonsets in a namespace
+// GetDaemonSetsByNamespace returns all the DaemonSets in the namespace, ordered by name.
 func GetDaemonSetsByNamespace(ctx context.Context, namespace string) ([]*DaemonSet, error) {
 	query := `
 		SELECT id, name, namespace, uid, desired_number_scheduled, number_ready, number_available,
@@ -107,7 +107,7 @@ func GetDaemonSetsByNamespace(ctx context.Context, namespace string) ([]*DaemonS
 	return daemonsets, nil
 }
 
-// Gets a daemonset by name and namespace
+// GetDaemonSetByName returns a DaemonSet by name in the namespace.
 func GetDaemonSetByName(ctx context.Context, name string, namespace string) (*DaemonSet, error) {
 	query := `
 		SELECT id, name, namespace, uid, desired_number_scheduled, number_ready, number_available,
@@ -134,7 +134,8 @@ func GetDaemonSetByName(ctx context.Context, name string, namespace string) (*Da
 	return &ds, nil
 }
 
-// Removes daemonsets in the namespace whose uid is not in the list.
+// PruneDaemonSets deletes DaemonSets whose UID is not in uids in the namespace.
+// Empty uids deletes all DaemonSets in that namespace.
 func PruneDaemonSets(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM daemonsets WHERE namespace = $1`, namespace)

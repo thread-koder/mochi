@@ -1,4 +1,3 @@
--- Create pods table
 CREATE TABLE IF NOT EXISTS pods (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -16,22 +15,16 @@ CREATE TABLE IF NOT EXISTS pods (
     synced_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- Create index on namespace and name
 CREATE INDEX IF NOT EXISTS idx_pods_namespace_name ON pods(namespace, name);
 
--- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_pods_uid ON pods(uid);
 
--- Create index on node
 CREATE INDEX IF NOT EXISTS idx_pods_node ON pods(node);
 
--- Create index on owner
 CREATE INDEX IF NOT EXISTS idx_pods_owner ON pods(owner_kind, owner_name);
 
--- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_pods_synced_at ON pods(synced_at);
 
--- Create trigger to automatically update updated_at
 CREATE TRIGGER update_pods_updated_at
     BEFORE UPDATE ON pods
     FOR EACH ROW

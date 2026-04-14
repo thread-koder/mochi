@@ -1,4 +1,3 @@
--- Create daemonsets table
 CREATE TABLE IF NOT EXISTS daemonsets (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -15,16 +14,12 @@ CREATE TABLE IF NOT EXISTS daemonsets (
     UNIQUE(namespace, name)
 );
 
--- Create index on namespace and name
 CREATE INDEX IF NOT EXISTS idx_daemonsets_namespace_name ON daemonsets(namespace, name);
 
--- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_daemonsets_uid ON daemonsets(uid);
 
--- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_daemonsets_synced_at ON daemonsets(synced_at);
 
--- Create trigger to automatically update updated_at
 CREATE TRIGGER update_daemonsets_updated_at
     BEFORE UPDATE ON daemonsets
     FOR EACH ROW

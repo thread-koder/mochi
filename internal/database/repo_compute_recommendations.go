@@ -9,7 +9,8 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Inserts a new compute recommendation into the database
+// InsertComputeRecommendation inserts a compute recommendation and sets its ID.
+// AnalysisTimeRange is stored as an interval when the string parses as a duration, otherwise the column stays unset.
 func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation) error {
 	log := logger.WithComponent("database")
 	log.Debug().
@@ -52,7 +53,7 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 	return nil
 }
 
-// Gets a compute recommendation by ID
+// GetComputeRecommendationByID returns a compute recommendation by its ID.
 func GetComputeRecommendationByID(ctx context.Context, id int64) (*ComputeRecommendation, error) {
 	query := `
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
@@ -77,14 +78,13 @@ func GetComputeRecommendationByID(ctx context.Context, id int64) (*ComputeRecomm
 	}
 
 	if analysisTimeRange != nil {
-		durationStr := analysisTimeRange.String()
-		rec.AnalysisTimeRange = durationStr
+		rec.AnalysisTimeRange = analysisTimeRange.String()
 	}
 
 	return &rec, nil
 }
 
-// Gets the latest compute recommendation for a workload
+// GetLatestComputeRecommendation returns the newest compute recommendation for the workload by created_at.
 func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadName, namespace string) (*ComputeRecommendation, error) {
 	query := `
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
@@ -111,16 +111,16 @@ func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadN
 	}
 
 	if analysisTimeRange != nil {
-		durationStr := analysisTimeRange.String()
-		rec.AnalysisTimeRange = durationStr
+		rec.AnalysisTimeRange = analysisTimeRange.String()
 	}
 
 	return &rec, nil
 }
 
-// Gets all compute recommendations with optional filters
+// GetComputeRecommendations filters by optional pointer fields (nil means no filter).
+// workloadName uses ILIKE substring match. limit and offset append only when positive,
+// limit 0 means no LIMIT clause (unbounded page).
 func GetComputeRecommendations(ctx context.Context, namespace *string, status *string, mode *string, workloadType *string, workloadName *string, limit, offset int) ([]*ComputeRecommendation, int64, error) {
-	// Build WHERE clause for both count and select queries
 	whereClause := "WHERE 1=1"
 	args := []any{}
 	argIndex := 1
@@ -155,7 +155,6 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 		argIndex++
 	}
 
-	// Get total count (without LIMIT/OFFSET)
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM compute_recommendations %s", whereClause)
 	var total int64
 	err := Pool.QueryRow(ctx, countQuery, args...).Scan(&total)
@@ -163,7 +162,6 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 		return nil, 0, fmt.Errorf("failed to count compute recommendations: %w", err)
 	}
 
-	// Get paginated results
 	selectQuery := fmt.Sprintf(`
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
 		       recommendations, status, analysis_time_range, created_at, updated_at, generated_at
@@ -209,8 +207,7 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 		}
 
 		if analysisTimeRange != nil {
-			durationStr := analysisTimeRange.String()
-			rec.AnalysisTimeRange = durationStr
+			rec.AnalysisTimeRange = analysisTimeRange.String()
 		}
 
 		recommendations = append(recommendations, &rec)
@@ -223,7 +220,8 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 	return recommendations, total, nil
 }
 
-// Updates the status of a compute recommendation
+// UpdateComputeRecommendationStatus sets status and updates updated_at.
+// Returns an error if no row matched the ID.
 func UpdateComputeRecommendationStatus(ctx context.Context, id int64, status string) error {
 	log := logger.WithComponent("database")
 	log.Debug().
@@ -254,7 +252,8 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id int64, status str
 	return nil
 }
 
-// Marks all recommendations for a workload as superseded (except the one being applied)
+// MarkRecommendationsSuperseded sets the status of all the recommendations for the same workload to superseded
+// except the applied row (excludeID).
 func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadName, namespace string, excludeID int64) error {
 	log := logger.WithComponent("database")
 	log.Debug().
@@ -289,7 +288,8 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 	return nil
 }
 
-// Deletes a compute recommendation by ID
+// DeleteComputeRecommendation deletes a compute recommendation by its ID.
+// Returns an error if nothing was deleted.
 func DeleteComputeRecommendation(ctx context.Context, id int64) error {
 	log := logger.WithComponent("database")
 	log.Debug().
@@ -314,7 +314,7 @@ func DeleteComputeRecommendation(ctx context.Context, id int64) error {
 	return nil
 }
 
-// Deletes compute recommendations older than the specified time
+// DeleteComputeRecommendationsOlderThan deletes compute recommendations with created_at before since (retention cleanup).
 func DeleteComputeRecommendationsOlderThan(ctx context.Context, since time.Time) error {
 	log := logger.WithComponent("database")
 
@@ -332,11 +332,12 @@ func DeleteComputeRecommendationsOlderThan(ctx context.Context, since time.Time)
 	return nil
 }
 
-// Deletes compute recommendations for workloads that no longer exist
+// DeleteComputeRecommendationsForDeletedWorkloads deletes compute recommendations whose workload no longer appears
+// in the synced tables: Deployment/StatefulSet/DaemonSet by name, or Pod when workload_type is Pod and
+// the pod has no owner (i.e. standalone pods).
 func DeleteComputeRecommendationsForDeletedWorkloads(ctx context.Context) error {
 	log := logger.WithComponent("database")
 
-	// Delete recommendations for workloads that don't exist in any workload table
 	query := `
 		DELETE FROM compute_recommendations cr
 		WHERE NOT EXISTS (

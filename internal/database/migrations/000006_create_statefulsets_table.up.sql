@@ -1,4 +1,3 @@
--- Create statefulsets table
 CREATE TABLE IF NOT EXISTS statefulsets (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -14,16 +13,12 @@ CREATE TABLE IF NOT EXISTS statefulsets (
     UNIQUE(namespace, name)
 );
 
--- Create index on namespace and name
 CREATE INDEX IF NOT EXISTS idx_statefulsets_namespace_name ON statefulsets(namespace, name);
 
--- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_statefulsets_uid ON statefulsets(uid);
 
--- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_statefulsets_synced_at ON statefulsets(synced_at);
 
--- Create trigger to automatically update updated_at
 CREATE TRIGGER update_statefulsets_updated_at
     BEFORE UPDATE ON statefulsets
     FOR EACH ROW

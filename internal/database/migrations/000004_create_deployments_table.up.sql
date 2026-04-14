@@ -1,4 +1,3 @@
--- Create deployments table
 CREATE TABLE IF NOT EXISTS deployments (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -15,16 +14,12 @@ CREATE TABLE IF NOT EXISTS deployments (
     UNIQUE(namespace, name)
 );
 
--- Create index on namespace and name
 CREATE INDEX IF NOT EXISTS idx_deployments_namespace_name ON deployments(namespace, name);
 
--- Create index on uid
 CREATE INDEX IF NOT EXISTS idx_deployments_uid ON deployments(uid);
 
--- Create index on synced_at
 CREATE INDEX IF NOT EXISTS idx_deployments_synced_at ON deployments(synced_at);
 
--- Create trigger to automatically update updated_at
 CREATE TRIGGER update_deployments_updated_at
     BEFORE UPDATE ON deployments
     FOR EACH ROW
