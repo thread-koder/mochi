@@ -83,7 +83,6 @@ const close = () => {
   isOpen.value = false
 }
 
-// Close on ESC key
 onKeyStroke('Escape', () => {
   if (isOpen.value) {
     close()

@@ -190,14 +190,12 @@ const generateRecommendation = async () => {
   }
 }
 
-// Reset when modal opens
 watch(isOpen, () => {
   selectedMode.value = 'burstable'
   timeRange.value = props.defaultTimeRange ?? '7d'
   error.value = null
 })
 
-// Clear error when mode or time range changes
 watch([selectedMode, timeRange], () => {
   error.value = null
 })

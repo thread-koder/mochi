@@ -178,7 +178,6 @@ interface Recommendation {
   analysis_time_range: string
 }
 
-// Compute recommendation database record
 interface RecommendationRecord {
   id: number
   workload_type: string

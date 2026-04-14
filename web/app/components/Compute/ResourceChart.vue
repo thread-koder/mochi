@@ -232,7 +232,8 @@ watch(() => props.data, () => {
   })
 }, { immediate: true })
 
-// Watch the color mode and re-initialize the chart if it changes
+// We watch the color mode and re-initialize the chart if it changes
+// This is to ensure the chart is updated with the new color scheme
 const colorMode = useColorMode({ storageKey: 'mochi-theme' })
 watch(colorMode, () => {
   if (chartInstance) {

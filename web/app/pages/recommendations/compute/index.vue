@@ -62,6 +62,5 @@ const filters = ref<FilterState>({
   workloadName: null,
 })
 
-// Fetch namespaces for the filter dropdown
 const { data: namespacesData } = await useApiData<Namespace.Namespace[]>('/api/v1/namespaces')
 </script>

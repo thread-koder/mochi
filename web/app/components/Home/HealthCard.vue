@@ -37,11 +37,11 @@ const props = defineProps<{
 
 const healthIndicators = computed(() => {
   const checks = [
-    { name: 'Database', key: 'database' as const },
-    { name: 'Kubernetes', key: 'kubernetes' as const },
-    { name: 'Prometheus', key: 'prometheus' as const },
-    { name: 'Redis', key: 'redis' as const },
-  ]
+    { name: 'Database', key: 'database' },
+    { name: 'Kubernetes', key: 'kubernetes' },
+    { name: 'Prometheus', key: 'prometheus' },
+    { name: 'Redis', key: 'redis' },
+  ] as const
 
   return checks.map((check) => {
     const status = props.healthChecks?.[check.key] ?? false

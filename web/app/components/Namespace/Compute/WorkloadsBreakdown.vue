@@ -212,14 +212,12 @@ const filteredWorkloads = computed(() => {
 
   let filtered = [...props.workloads]
 
-  // Filter by type
   if (filterType.value) {
     filtered = filtered.filter(
       w => w.workload_type.toLowerCase() === filterType.value!.toLowerCase(),
     )
   }
 
-  // Sort
   filtered.sort((a, b) => {
     let aValue: number | undefined
     let bValue: number | undefined

@@ -290,7 +290,6 @@ const applyRecommendation = async () => {
   }
 }
 
-// Reset state when modal opens
 watch(isOpen, () => {
   applied.value = false
   error.value = null

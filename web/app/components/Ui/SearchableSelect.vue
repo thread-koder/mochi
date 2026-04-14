@@ -197,7 +197,6 @@ const selectNull = () => {
 const selectOption = (option: string | { value: string, label: string }) => {
   const value = optionValue(option)
   if (value === modelValue.value) {
-    // Allow deselecting if nullOption is provided
     if (props.nullOption) {
       modelValue.value = null
       emit('select', null)
@@ -213,14 +212,12 @@ const selectOption = (option: string | { value: string, label: string }) => {
   closeDropdown()
 }
 
-// Close dropdown when clicking outside
 onClickOutside(containerRef, () => {
   if (isOpen.value) {
     closeDropdown()
   }
 }, { ignore: [dropdownRef] })
 
-// Close dropdown on ESC key
 onKeyStroke('Escape', () => {
   if (isOpen.value) {
     closeDropdown()

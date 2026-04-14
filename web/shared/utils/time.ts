@@ -36,7 +36,6 @@ export const timeAgo = (timestamp: string) => {
 export const formatDuration = (duration: string): string => {
   if (!duration) return duration
 
-  // Parse the duration string
   const hoursMatch = duration.match(/(\d+)h/)
   const minutesMatch = duration.match(/(\d+)m/)
   const secondsMatch = duration.match(/(\d+)s/)
@@ -45,22 +44,18 @@ export const formatDuration = (duration: string): string => {
   const minutes = minutesMatch && minutesMatch[1] ? parseInt(minutesMatch[1], 10) : 0
   const seconds = secondsMatch && secondsMatch[1] ? parseInt(secondsMatch[1], 10) : 0
 
-  // If not full hours, return as-is
   if (minutes > 0 || seconds > 0) {
     return duration
   }
 
-  // If full hours and a whole number of days, convert to days
   if (hours >= 24 && hours % 24 === 0) {
     const days = Math.floor(hours / 24)
     return `${days} ${days === 1 ? 'day' : 'days'}`
   }
 
-  // Otherwise format as hours
   if (hours > 0) {
     return `${hours} ${hours === 1 ? 'hour' : 'hours'}`
   }
 
-  // Otherwise return as-is
   return duration
 }

@@ -289,17 +289,14 @@ const filters = defineModel<FilterState>({
 
 const workloadNameInput = ref<string>('')
 
-// Debounced function to update workload name filter
 const updateWorkloadNameFilter = useDebounceFn((value: string) => {
   filters.value.workloadName = value || null
 }, 500)
 
-// Watch workload name input and trigger debounced update
 watch(workloadNameInput, (value) => {
   updateWorkloadNameFilter(value)
 })
 
-// Sync workload name filter to input
 watch(() => filters.value.workloadName, (value) => {
   if (value !== workloadNameInput.value) {
     workloadNameInput.value = value || ''

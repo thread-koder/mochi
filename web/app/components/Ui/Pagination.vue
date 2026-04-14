@@ -98,7 +98,6 @@ const visibleItems = computed(() => {
   const items: (number | 'ellipsis')[] = []
 
   if (total <= 5) {
-    // Show all pages, no ellipsis
     for (let i = 1; i <= total; i++) items.push(i)
     return items
   }

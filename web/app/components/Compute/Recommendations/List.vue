@@ -198,7 +198,6 @@ const props = defineProps<{
   filters: FilterState
 }>()
 
-// Pagination settings
 const pageSize = 20
 const currentPage = ref(1)
 
@@ -228,7 +227,6 @@ const records = computed(() => recommendations.value?.recommendations ?? [])
 const total = computed(() => recommendations.value?.total ?? 0)
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
 
-// Reset to page 1 when filters change
 watch(() => props.filters, () => {
   currentPage.value = 1
 }, { deep: true })

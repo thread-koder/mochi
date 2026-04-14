@@ -124,7 +124,6 @@ watch(timeRange, async (newTimeRange, oldTimeRange) => {
   }
 })
 
-// Watch for when tab becomes active to trigger initial load
 watch(() => props.isActive, async (isActive) => {
   if (isActive && !timeRange.value) {
     timeRange.value = '24h'
