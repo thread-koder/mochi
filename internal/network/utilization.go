@@ -6,27 +6,27 @@ import (
 	"github.com/thread_koder/mochi/internal/timeseries"
 )
 
-// Represents network I/O time series for charting
+// TimeSeries holds receive and transmit byte-rate samples for charting.
 type TimeSeries struct {
 	ReceiveBytes  []timeseries.DataPoint `json:"receive_bytes"`
 	TransmitBytes []timeseries.DataPoint `json:"transmit_bytes"`
 }
 
-// Represents analysis results for a single direction (receive or transmit)
+// DirectionUtilization summarizes one byte-rate direction (receive or transmit).
 type DirectionUtilization struct {
-	Current   float64                  `json:"current"`   // Most recent value (bytes/sec)
-	Stats     timeseries.StatsResult   `json:"stats"`     // Contains Mean, Max, Min, Percentiles, etc.
-	Trend     timeseries.TrendResult   `json:"trend"`     // Trend analysis (increasing/decreasing/stable)
-	Anomalies timeseries.AnomalyResult `json:"anomalies"` // Detected anomalies (outliers)
+	Current   float64                  `json:"current"` // latest sample (bytes/sec)
+	Stats     timeseries.StatsResult   `json:"stats"`
+	Trend     timeseries.TrendResult   `json:"trend"`
+	Anomalies timeseries.AnomalyResult `json:"anomalies"`
 }
 
-// Represents analysis results for errors in a single direction
+// ErrorsResult summarizes error or drop counters for one direction at the latest step and across the window.
 type ErrorsResult struct {
-	Current float64 `json:"current"` // Most recent value (errors/sec or packets/sec)
-	Total   float64 `json:"total"`   // Sum over the analysis period
+	Current float64 `json:"current"`
+	Total   float64 `json:"total"`
 }
 
-// Represents overall network utilization analysis results
+// UtilizationResult joins byte-rate directions with error and drop counter summaries.
 type UtilizationResult struct {
 	Receive         DirectionUtilization `json:"receive"`
 	Transmit        DirectionUtilization `json:"transmit"`
@@ -36,25 +36,24 @@ type UtilizationResult struct {
 	TransmitDropped ErrorsResult         `json:"transmit_dropped"`
 }
 
-// Analyzes receive bytes utilization from time series data
+const anomalyStdDevs = 4.0
+
+// AnalyzeReceiveUtilization summarizes receive byte-rate samples. Trend or anomaly steps return
+// stable or empty results when the series is too thin, so stats and Current still surface.
 func AnalyzeReceiveUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
 	if len(data) == 0 {
 		return DirectionUtilization{}, fmt.Errorf("cannot analyze receive utilization from empty dataset")
 	}
 
-	// Calculate current (most recent value)
 	current := data[len(data)-1].Value
 
-	// Calculate stats
 	stats, err := timeseries.CalculateStats(data)
 	if err != nil {
 		return DirectionUtilization{}, fmt.Errorf("failed to calculate receive stats: %w", err)
 	}
 
-	// Analyze trend
 	trend, err := timeseries.AnalyzeTrend(data)
 	if err != nil {
-		// If trend analysis fails (e.g., insufficient data), use stable trend
 		trend = timeseries.TrendResult{
 			Direction: timeseries.DirectionStable,
 			Slope:     0,
@@ -62,10 +61,8 @@ func AnalyzeReceiveUtilization(data []timeseries.DataPoint) (DirectionUtilizatio
 		}
 	}
 
-	// Detect anomalies
-	anomalies, err := timeseries.DetectAnomalies(data, 4.0) // 4 standard deviations
+	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
 	if err != nil {
-		// If anomaly detection fails, use empty result
 		anomalies = timeseries.AnomalyResult{
 			Anomalies:    []timeseries.Anomaly{},
 			AnomalyCount: 0,
@@ -81,25 +78,22 @@ func AnalyzeReceiveUtilization(data []timeseries.DataPoint) (DirectionUtilizatio
 	}, nil
 }
 
-// Analyzes transmit bytes utilization from time series data
+// AnalyzeTransmitUtilization summarizes transmit byte-rate samples. Thin series degrade trend and
+// anomaly fields the same way as AnalyzeReceiveUtilization.
 func AnalyzeTransmitUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
 	if len(data) == 0 {
 		return DirectionUtilization{}, fmt.Errorf("cannot analyze transmit utilization from empty dataset")
 	}
 
-	// Calculate current (most recent value)
 	current := data[len(data)-1].Value
 
-	// Calculate stats
 	stats, err := timeseries.CalculateStats(data)
 	if err != nil {
 		return DirectionUtilization{}, fmt.Errorf("failed to calculate transmit stats: %w", err)
 	}
 
-	// Analyze trend
 	trend, err := timeseries.AnalyzeTrend(data)
 	if err != nil {
-		// If trend analysis fails (e.g., insufficient data), use stable trend
 		trend = timeseries.TrendResult{
 			Direction: timeseries.DirectionStable,
 			Slope:     0,
@@ -107,10 +101,8 @@ func AnalyzeTransmitUtilization(data []timeseries.DataPoint) (DirectionUtilizati
 		}
 	}
 
-	// Detect anomalies
-	anomalies, err := timeseries.DetectAnomalies(data, 4.0) // 4 standard deviations
+	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
 	if err != nil {
-		// If anomaly detection fails, use empty result
 		anomalies = timeseries.AnomalyResult{
 			Anomalies:    []timeseries.Anomaly{},
 			AnomalyCount: 0,
@@ -126,7 +118,7 @@ func AnalyzeTransmitUtilization(data []timeseries.DataPoint) (DirectionUtilizati
 	}, nil
 }
 
-// Analyzes errors/dropped packets from time series data
+// AnalyzeErrors returns the latest sample as Current and the sum of step values as Total.
 func AnalyzeErrors(data []timeseries.DataPoint) ErrorsResult {
 	if len(data) == 0 {
 		return ErrorsResult{Current: 0, Total: 0}
@@ -144,9 +136,9 @@ func AnalyzeErrors(data []timeseries.DataPoint) ErrorsResult {
 	}
 }
 
-// Analyzes network utilization from metrics
+// AnalyzeUtilization fills UtilizationResult from NetworkMetrics. At least one of receive or
+// transmit byte series must be non-empty, and error and drop series may be empty and yield zeros.
 func AnalyzeUtilization(metrics NetworkMetrics) (UtilizationResult, error) {
-	// Validate we have at least receive or transmit metrics
 	if len(metrics.ReceiveBytes) == 0 && len(metrics.TransmitBytes) == 0 {
 		return UtilizationResult{}, fmt.Errorf("no metrics provided for utilization analysis")
 	}
@@ -154,7 +146,6 @@ func AnalyzeUtilization(metrics NetworkMetrics) (UtilizationResult, error) {
 	var result UtilizationResult
 	var err error
 
-	// Analyze receive bytes
 	if len(metrics.ReceiveBytes) > 0 {
 		result.Receive, err = AnalyzeReceiveUtilization(metrics.ReceiveBytes)
 		if err != nil {
@@ -162,7 +153,6 @@ func AnalyzeUtilization(metrics NetworkMetrics) (UtilizationResult, error) {
 		}
 	}
 
-	// Analyze transmit bytes
 	if len(metrics.TransmitBytes) > 0 {
 		result.Transmit, err = AnalyzeTransmitUtilization(metrics.TransmitBytes)
 		if err != nil {
@@ -170,7 +160,6 @@ func AnalyzeUtilization(metrics NetworkMetrics) (UtilizationResult, error) {
 		}
 	}
 
-	// Analyze errors and dropped packets
 	result.ReceiveErrors = AnalyzeErrors(metrics.ReceiveErrors)
 	result.TransmitErrors = AnalyzeErrors(metrics.TransmitErrors)
 	result.ReceiveDropped = AnalyzeErrors(metrics.ReceiveDropped)
