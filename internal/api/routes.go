@@ -13,29 +13,25 @@ import (
 	"github.com/thread_koder/mochi/internal/redis"
 )
 
-// Configures all API routes
+// setupRoutes registers all public HTTP routes.
 func setupRoutes(router *gin.Engine) {
 	cacheTTL := redis.GetDefaultTTL(&config.AppConfig.Redis)
-	// Health check endpoints
+
 	router.GET("/health", handlers.Health)
 	router.GET("/health/database", handlers.DatabaseHealth)
 	router.GET("/health/kubernetes", handlers.KubernetesHealth)
 	router.GET("/health/prometheus", handlers.PrometheusHealth)
 	router.GET("/health/redis", handlers.RedisHealth)
 
-	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
-		// Web UI API endpoints (no caching)
 		v1.GET("/home", webHandlers.GetHome)
 		v1.GET("/namespaces", webHandlers.GetNamespaces)
 		v1.GET("/namespaces/:namespace", webHandlers.GetNamespace)
 		v1.GET("/workloads/:namespace/:type/:name", webHandlers.GetWorkload)
 
-		// Compute domain
 		compute := v1.Group("/compute")
 		{
-			// Analysis endpoints (cached)
 			analysisGroup := compute.Group("")
 			analysisGroup.Use(middleware.CacheMiddleware(cacheTTL))
 			{
@@ -43,7 +39,6 @@ func setupRoutes(router *gin.Engine) {
 				analysisGroup.GET("/analyze/workloads/:workloadType/:workloadName", computeHandlers.AnalyzeWorkload)
 			}
 
-			// Recommendation endpoints (cached)
 			recommendationsGroup := compute.Group("")
 			recommendationsGroup.Use(middleware.CacheMiddleware(cacheTTL))
 			{
@@ -52,15 +47,12 @@ func setupRoutes(router *gin.Engine) {
 				recommendationsGroup.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestWorkloadRecommendation)
 			}
 
-			// POST endpoints (no caching)
 			compute.POST("/recommendations/generate/:workloadType/:workloadName", computeHandlers.GenerateRecommendations)
 			compute.POST("/recommendations/apply", computeHandlers.ApplyRecommendation)
 		}
 
-		// Network domain
 		network := v1.Group("/network")
 		{
-			// Analysis endpoints (cached)
 			networkAnalysisGroup := network.Group("")
 			networkAnalysisGroup.Use(middleware.CacheMiddleware(cacheTTL))
 			{
@@ -69,10 +61,8 @@ func setupRoutes(router *gin.Engine) {
 			}
 		}
 
-		// Disk domain
 		diskGroup := v1.Group("/disk")
 		{
-			// Analysis endpoints (cached)
 			diskAnalysisGroup := diskGroup.Group("")
 			diskAnalysisGroup.Use(middleware.CacheMiddleware(cacheTTL))
 			{
@@ -81,10 +71,10 @@ func setupRoutes(router *gin.Engine) {
 			}
 		}
 
-		// Analysis domain (cross-domain analysis)
+		// This group is used for analyses that are not specific
+		// to a single domain (cross-domain).
 		analysisGroup := v1.Group("/analysis")
 		{
-			// Correlation endpoints (cached)
 			correlationGroup := analysisGroup.Group("")
 			correlationGroup.Use(middleware.CacheMiddleware(cacheTTL))
 			{

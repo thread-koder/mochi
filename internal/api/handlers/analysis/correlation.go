@@ -12,7 +12,7 @@ import (
 	"github.com/thread_koder/mochi/internal/database"
 )
 
-// Analyzes correlations between metrics for a workload
+// AnalyzeWorkloadCorrelations runs cross-metric correlation analysis for a workload.
 func AnalyzeWorkloadCorrelations(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
@@ -20,7 +20,6 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 	timeRangeStr := c.Query("timeRange")
 	maxLagStr := c.Query("maxLag")
 
-	// Validate workload type
 	validTypes := map[string]bool{
 		"Deployment":  true,
 		"StatefulSet": true,
@@ -37,7 +36,6 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 		return
 	}
 
-	// Validate namespace
 	if namespace == "" {
 		err := fmt.Errorf("namespace query parameter is empty or missing")
 		c.Error(err)
@@ -48,7 +46,6 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 		return
 	}
 
-	// Parse analysis options
 	opts := analysis.DefaultCorrelationOptions()
 
 	if timeRangeStr != "" {
@@ -77,13 +74,11 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 		opts.MaxLag = maxLag
 	}
 
-	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	var pods []*database.Pod
 
-	// Handle standalone pods
 	if workloadType == "Pod" {
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
 		if err != nil {
@@ -102,7 +97,7 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 			return
 		}
 
-		// Validate it's a standalone pod (no owner) or a system pod (Node-owned)
+		// Reject controller-owned pods so the caller uses the correct workload type.
 		if pod.OwnerKind != nil && *pod.OwnerKind != "" && *pod.OwnerKind != "Node" {
 			err := fmt.Errorf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
 				workloadName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind)
@@ -116,7 +111,6 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 
 		pods = []*database.Pod{pod}
 	} else {
-		// Get pods for this workload (Deployment, StatefulSet, DaemonSet)
 		podsList, err := database.GetPodsByWorkload(ctx, workloadType, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
@@ -139,7 +133,6 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 		return
 	}
 
-	// Perform correlation analysis
 	result, err := analysis.AnalyzeWorkloadCorrelations(ctx, workloadType, workloadName, namespace, pods, opts)
 	if err != nil {
 		c.Error(err)

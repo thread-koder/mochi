@@ -13,7 +13,7 @@ import (
 	"github.com/thread_koder/mochi/internal/database"
 )
 
-// Generates compute resource recommendations for a workload
+// GenerateRecommendations creates compute recommendations for a workload.
 func GenerateRecommendations(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
@@ -21,12 +21,11 @@ func GenerateRecommendations(c *gin.Context) {
 	timeRangeStr := c.Query("timeRange")
 	modeStr := strings.ToLower(c.Query("mode"))
 
-	// Validate workload type
 	validTypes := map[string]bool{
 		"Deployment":  true,
 		"StatefulSet": true,
 		"DaemonSet":   true,
-		"Pod":         true, // For standalone pods
+		"Pod":         true,
 	}
 	if !validTypes[workloadType] {
 		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
@@ -38,7 +37,6 @@ func GenerateRecommendations(c *gin.Context) {
 		return
 	}
 
-	// Validate namespace
 	if namespace == "" {
 		err := fmt.Errorf("namespace query parameter is empty or missing")
 		c.Error(err)
@@ -49,7 +47,6 @@ func GenerateRecommendations(c *gin.Context) {
 		return
 	}
 
-	// Parse analysis options
 	analysisOpts := compute.DefaultAnalysisOptions()
 	if timeRangeStr != "" {
 		timeRange, err := common.ParseTimeRange(timeRangeStr)
@@ -64,7 +61,6 @@ func GenerateRecommendations(c *gin.Context) {
 		analysisOpts.SetTimeRange(timeRange)
 	}
 
-	// Parse recommendation config
 	recConfig := compute.DefaultRecommendationConfig()
 	if modeStr != "" {
 		mode := compute.RecommendationMode(modeStr)
@@ -80,15 +76,12 @@ func GenerateRecommendations(c *gin.Context) {
 		recConfig.Mode = mode
 	}
 
-	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	var pods []*database.Pod
 
-	// Handle standalone pods
 	if workloadType == "Pod" {
-		// Get the standalone pod by name
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
@@ -106,7 +99,7 @@ func GenerateRecommendations(c *gin.Context) {
 			return
 		}
 
-		// Validate it's a standalone pod (no owner) or a system pod (Node-owned)
+		// Reject controller-owned pods so the caller uses the correct workload type.
 		if pod.OwnerKind != nil && *pod.OwnerKind != "" && *pod.OwnerKind != "Node" {
 			err := fmt.Errorf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
 				workloadName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind)
@@ -120,7 +113,6 @@ func GenerateRecommendations(c *gin.Context) {
 
 		pods = []*database.Pod{pod}
 	} else {
-		// Get pods for this workload (Deployment, StatefulSet, DaemonSet)
 		podsList, err := database.GetPodsByWorkload(ctx, workloadType, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
@@ -143,7 +135,6 @@ func GenerateRecommendations(c *gin.Context) {
 		return
 	}
 
-	// Generate recommendations
 	recommendation, err := compute.GenerateWorkloadRecommendations(
 		ctx,
 		workloadType,
@@ -165,7 +156,7 @@ func GenerateRecommendations(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendation)
 }
 
-// Gets compute recommendations with optional filters
+// GetRecommendations lists stored compute recommendations.
 func GetRecommendations(c *gin.Context) {
 	namespace := c.Query("namespace")
 	status := c.Query("status")
@@ -173,12 +164,11 @@ func GetRecommendations(c *gin.Context) {
 	workloadType := c.Query("workloadType")
 	workloadName := c.Query("workloadName")
 
-	// Validate workload type
 	validTypes := map[string]bool{
 		"Deployment":  true,
 		"StatefulSet": true,
 		"DaemonSet":   true,
-		"Pod":         true, // For standalone pods
+		"Pod":         true,
 	}
 	if workloadType != "" && !validTypes[workloadType] {
 		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
@@ -190,9 +180,8 @@ func GetRecommendations(c *gin.Context) {
 		return
 	}
 
-	// Parse pagination parameters
-	limit := 100 // Default limit
-	offset := 0  // Default offset
+	limit := 100
+	offset := 0
 	if limitStr := c.Query("limit"); limitStr != "" {
 		if parsed, err := parseInt(limitStr); err == nil && parsed > 0 {
 			limit = parsed
@@ -204,11 +193,9 @@ func GetRecommendations(c *gin.Context) {
 		}
 	}
 
-	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Prepare filter pointers
 	var namespacePtr, statusPtr, modePtr, workloadTypePtr, workloadNamePtr *string
 	if namespace != "" {
 		namespacePtr = new(namespace)
@@ -226,7 +213,6 @@ func GetRecommendations(c *gin.Context) {
 		workloadNamePtr = new(workloadName)
 	}
 
-	// Get recommendations
 	recommendations, total, err := database.GetComputeRecommendations(
 		ctx,
 		namespacePtr,
@@ -252,11 +238,10 @@ func GetRecommendations(c *gin.Context) {
 	})
 }
 
-// Gets a compute recommendation by ID
+// GetRecommendationByID returns one recommendation by ID.
 func GetRecommendationByID(c *gin.Context) {
 	idStr := c.Param("id")
 
-	// Parse ID
 	id, err := parseInt64(idStr)
 	if err != nil {
 		c.Error(err)
@@ -267,11 +252,9 @@ func GetRecommendationByID(c *gin.Context) {
 		return
 	}
 
-	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Get recommendation
 	recommendation, err := database.GetComputeRecommendationByID(ctx, id)
 	if err != nil {
 		c.Error(err)
@@ -292,18 +275,17 @@ func GetRecommendationByID(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendation)
 }
 
-// Gets the latest compute recommendation for a workload
+// GetLatestWorkloadRecommendation returns the latest recommendation for a workload.
 func GetLatestWorkloadRecommendation(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
 
-	// Validate workload type
 	validTypes := map[string]bool{
 		"Deployment":  true,
 		"StatefulSet": true,
 		"DaemonSet":   true,
-		"Pod":         true, // For standalone pods
+		"Pod":         true,
 	}
 	if !validTypes[workloadType] {
 		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
@@ -315,7 +297,6 @@ func GetLatestWorkloadRecommendation(c *gin.Context) {
 		return
 	}
 
-	// Validate namespace
 	if namespace == "" {
 		err := fmt.Errorf("namespace query parameter is empty or missing")
 		c.Error(err)
@@ -326,11 +307,9 @@ func GetLatestWorkloadRecommendation(c *gin.Context) {
 		return
 	}
 
-	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Get latest recommendation
 	recommendation, err := database.GetLatestComputeRecommendation(ctx, workloadType, workloadName, namespace)
 	if err != nil {
 		c.Error(err)
@@ -351,19 +330,16 @@ func GetLatestWorkloadRecommendation(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendation)
 }
 
-// Applies a compute recommendation to the target workload
+// ApplyRecommendation applies an existing or inline recommendation to a workload.
 func ApplyRecommendation(c *gin.Context) {
-	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	var recommendation *database.ComputeRecommendation
 	var id int64
 
-	// Check if ID is provided in query param
 	idStr := c.Query("id")
 	if idStr != "" {
-		// Apply by ID (stored recommendation)
 		var err error
 		id, err = parseInt64(idStr)
 		if err != nil {
@@ -375,7 +351,6 @@ func ApplyRecommendation(c *gin.Context) {
 			return
 		}
 
-		// Get recommendation from database
 		recommendation, err = database.GetComputeRecommendationByID(ctx, id)
 		if err != nil {
 			c.Error(err)
@@ -393,7 +368,6 @@ func ApplyRecommendation(c *gin.Context) {
 			return
 		}
 
-		// Check if recommendation is already applied
 		if recommendation.Status == "applied" {
 			err := fmt.Errorf("recommendation %d was already applied", id)
 			c.Error(err)
@@ -404,7 +378,6 @@ func ApplyRecommendation(c *gin.Context) {
 			return
 		}
 	} else {
-		// Apply from body (immediate apply)
 		var bodyRec compute.Recommendation
 		if err := c.ShouldBindJSON(&bodyRec); err != nil {
 			c.Error(err)
@@ -419,9 +392,8 @@ func ApplyRecommendation(c *gin.Context) {
 			"Deployment":  true,
 			"StatefulSet": true,
 			"DaemonSet":   true,
-			"Pod":         true, // For standalone pods
+			"Pod":         true,
 		}
-		// Validate workload type
 		if !validTypes[bodyRec.WorkloadType] {
 			err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
 			c.Error(err)
@@ -432,7 +404,6 @@ func ApplyRecommendation(c *gin.Context) {
 			return
 		}
 
-		// Validate required fields
 		if bodyRec.WorkloadName == "" || bodyRec.Namespace == "" || bodyRec.AnalysisTimeRange == "" || bodyRec.RecommendationMode == "" {
 			err := fmt.Errorf("workload_name, namespace, analysis_time_range, and recommendation_mode are required")
 			c.Error(err)
@@ -453,7 +424,6 @@ func ApplyRecommendation(c *gin.Context) {
 			return
 		}
 
-		// Convert to database model
 		dbRec, err := compute.ComputeRecommendationToDB(bodyRec)
 		if err != nil {
 			c.Error(err)
@@ -476,11 +446,9 @@ func ApplyRecommendation(c *gin.Context) {
 		id = recommendation.ID
 	}
 
-	// Apply the recommendation
 	if err := compute.ApplyRecommendation(ctx, recommendation); err != nil {
 		if idStr == "" {
 			if delErr := database.DeleteComputeRecommendation(ctx, id); delErr != nil {
-				// Log error but don't fail
 				c.Error(delErr)
 			}
 		}
@@ -492,15 +460,11 @@ func ApplyRecommendation(c *gin.Context) {
 		return
 	}
 
-	// Update status to "applied"
 	if err := database.UpdateComputeRecommendationStatus(ctx, id, "applied"); err != nil {
-		// Log error but don't fail
 		c.Error(err)
 	}
 
-	// Mark other pending recommendations as superseded
 	if err := database.MarkRecommendationsSuperseded(ctx, recommendation.WorkloadType, recommendation.WorkloadName, recommendation.Namespace, id); err != nil {
-		// Log error but don't fail
 		c.Error(err)
 	}
 

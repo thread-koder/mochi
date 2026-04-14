@@ -9,13 +9,13 @@ import (
 	"github.com/thread_koder/mochi/internal/database"
 )
 
-// Represents a namespace
+// Namespace represents one namespace row in the web list response.
 type Namespace struct {
 	Name  string `json:"name"`
 	Phase string `json:"phase"`
 }
 
-// Returns list of namespaces
+// GetNamespaces returns all namespaces for the web UI.
 func GetNamespaces(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

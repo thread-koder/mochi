@@ -12,7 +12,7 @@ import (
 	"github.com/thread_koder/mochi/internal/redis"
 )
 
-// Returns the overall health status
+// Health reports aggregated service health for readiness checks.
 func Health(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -22,7 +22,6 @@ func Health(c *gin.Context) {
 		"checks": gin.H{},
 	}
 
-	// Check database
 	if err := database.HealthCheck(ctx); err != nil {
 		c.Error(err)
 		health["status"] = "unhealthy"
@@ -36,7 +35,6 @@ func Health(c *gin.Context) {
 		}
 	}
 
-	// Check Kubernetes
 	if err := kubernetes.HealthCheck(ctx); err != nil {
 		c.Error(err)
 		health["status"] = "unhealthy"
@@ -50,7 +48,6 @@ func Health(c *gin.Context) {
 		}
 	}
 
-	// Check Prometheus
 	if err := prometheus.HealthCheck(ctx); err != nil {
 		c.Error(err)
 		health["status"] = "unhealthy"
@@ -64,7 +61,6 @@ func Health(c *gin.Context) {
 		}
 	}
 
-	// Check Redis
 	if err := redis.HealthCheck(ctx); err != nil {
 		c.Error(err)
 		health["status"] = "unhealthy"
@@ -86,7 +82,7 @@ func Health(c *gin.Context) {
 	c.JSON(statusCode, health)
 }
 
-// Returns the database health status
+// DatabaseHealth reports database connectivity health.
 func DatabaseHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -105,7 +101,7 @@ func DatabaseHealth(c *gin.Context) {
 	})
 }
 
-// Returns the Kubernetes health status
+// KubernetesHealth reports Kubernetes client health.
 func KubernetesHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -124,7 +120,7 @@ func KubernetesHealth(c *gin.Context) {
 	})
 }
 
-// Returns the Prometheus health status
+// PrometheusHealth reports Prometheus API health.
 func PrometheusHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -143,7 +139,7 @@ func PrometheusHealth(c *gin.Context) {
 	})
 }
 
-// Returns the Redis health status
+// RedisHealth reports Redis connectivity health.
 func RedisHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

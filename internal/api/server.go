@@ -12,33 +12,28 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Holds the HTTP server and router
+// Server owns the Gin router and HTTP server lifecycle.
 type Server struct {
 	router *gin.Engine
 	server *http.Server
 	cfg    *config.APIConfig
 }
 
-// Creates a new API server instance
+// NewServer builds an API server from the given API config.
 func NewServer(cfg *config.APIConfig) (*Server, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("api config is nil")
 	}
 
-	// Set Gin mode
 	gin.SetMode(cfg.Mode)
 
-	// Create router
 	router := gin.New()
 
-	// Apply middleware
 	router.Use(gin.Recovery())
 	router.Use(middleware.LoggingMiddleware())
 
-	// Setup routes
 	setupRoutes(router)
 
-	// Create HTTP server
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Handler:      router,
@@ -53,7 +48,7 @@ func NewServer(cfg *config.APIConfig) (*Server, error) {
 	}, nil
 }
 
-// Starts the HTTP server
+// Start begins serving HTTP requests until shutdown is requested.
 func (s *Server) Start() error {
 	log := logger.WithComponent("server")
 	log.Info().
@@ -69,7 +64,7 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Shuts down the server gracefully
+// Shutdown gracefully stops the HTTP server.
 func (s *Server) Shutdown(ctx context.Context) error {
 	log := logger.WithComponent("server")
 	log.Info().Msg("Shutting down server...")

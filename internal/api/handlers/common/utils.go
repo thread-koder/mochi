@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Parses time range from query parameter (e.g., "24h", "7d", "1h30m")
+// ParseTimeRange parses time range values like "24h", "7d", or "1h30m".
 func ParseTimeRange(timeRangeStr string) (time.Duration, error) {
 	if len(timeRangeStr) > 0 && timeRangeStr[len(timeRangeStr)-1] == 'd' {
 		daysStr := timeRangeStr[:len(timeRangeStr)-1]
@@ -36,7 +36,7 @@ func ParseTimeRange(timeRangeStr string) (time.Duration, error) {
 	return duration, nil
 }
 
-// Helper function to check if an error is a "not found" error
+// IsNotFoundError reports whether err represents a missing resource.
 func IsNotFoundError(err error) bool {
 	if err == nil {
 		return false

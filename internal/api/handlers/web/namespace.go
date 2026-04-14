@@ -11,7 +11,7 @@ import (
 	"github.com/thread_koder/mochi/internal/database"
 )
 
-// Represents namespace API response
+// NamespaceResponse is the payload for namespace detail pages.
 type NamespaceResponse struct {
 	Name       string          `json:"name"`
 	Phase      string          `json:"phase"`
@@ -21,14 +21,14 @@ type NamespaceResponse struct {
 	System     []StandalonePod `json:"system_pods"`
 }
 
-// Represents namespace statistics
+// NamespaceStats holds namespace-level workload and resource counts.
 type NamespaceStats struct {
 	Workloads  int `json:"workloads"`
 	Pods       int `json:"pods"`
 	Containers int `json:"containers"`
 }
 
-// Represents a workload
+// Workload represents one workload row in namespace details.
 type Workload struct {
 	Type      string    `json:"type"`
 	Name      string    `json:"name"`
@@ -37,7 +37,7 @@ type Workload struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Represents a standalone pod
+// StandalonePod represents a pod that is not managed by a workload controller.
 type StandalonePod struct {
 	Name      string    `json:"name"`
 	Phase     string    `json:"phase"`
@@ -45,14 +45,13 @@ type StandalonePod struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Returns namespace page data
+// GetNamespace returns metadata, workloads, and pods for a namespace.
 func GetNamespace(c *gin.Context) {
 	namespaceName := c.Param("namespace")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Get namespace
 	namespace, err := database.GetNamespaceByName(ctx, namespaceName)
 	if err != nil {
 		c.Error(err)
@@ -79,7 +78,6 @@ func GetNamespace(c *gin.Context) {
 		System:     make([]StandalonePod, 0),
 	}
 
-	// Get workloads
 	deployments, err := database.GetDeploymentsByNamespace(ctx, namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get deployments: %w", err))
@@ -128,7 +126,6 @@ func GetNamespace(c *gin.Context) {
 		response.Stats.Workloads += len(daemonsets)
 	}
 
-	// Get standalone pods
 	standalonePods, err := database.GetStandalonePodsByNamespace(ctx, namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get standalone pods: %w", err))
@@ -147,7 +144,7 @@ func GetNamespace(c *gin.Context) {
 		}
 	}
 
-	// Get system pods (Node-owned)
+	// Node-owned pods are shown separately from standalone user pods.
 	systemPods, err := database.GetPodsByOwnerKind(ctx, "Node", namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get system pods: %w", err))
@@ -166,7 +163,6 @@ func GetNamespace(c *gin.Context) {
 		}
 	}
 
-	// Get pod count
 	podCount, err := database.GetPodCountByNamespace(ctx, namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get pod count: %w", err))
@@ -174,7 +170,6 @@ func GetNamespace(c *gin.Context) {
 		response.Stats.Pods = podCount
 	}
 
-	// Get container count
 	containerCount, err := database.GetContainerCountByNamespace(ctx, namespace.Name)
 	if err != nil {
 		c.Error(fmt.Errorf("failed to get container count: %w", err))

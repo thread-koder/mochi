@@ -8,7 +8,7 @@ import (
 	"github.com/thread_koder/mochi/internal/database"
 )
 
-// Represents stats
+// Stats summarizes top-level cluster counts for the home endpoint.
 type Stats struct {
 	Namespaces  int `json:"namespaces"`
 	Workloads   int `json:"workloads"`
@@ -16,7 +16,7 @@ type Stats struct {
 	HealthScore int `json:"health_score"`
 }
 
-// Gets stats
+// GetStats loads summary counters for namespaces, workloads, and pods.
 func GetStats(ctx context.Context) (Stats, error) {
 	stats := Stats{}
 
@@ -41,14 +41,14 @@ func GetStats(ctx context.Context) (Stats, error) {
 	return stats, nil
 }
 
-// Represents an activity
+// Activity describes a recent recommendation event shown on the home page.
 type Activity struct {
 	Type      string    `json:"type"`
 	Message   string    `json:"message"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Gets activities
+// GetActivities converts recent recommendations into UI activity entries.
 func GetActivities(ctx context.Context, limit int) ([]Activity, error) {
 	computeRecommendations, _, err := database.GetComputeRecommendations(
 		ctx,

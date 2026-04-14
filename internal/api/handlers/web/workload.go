@@ -11,7 +11,7 @@ import (
 	"github.com/thread_koder/mochi/internal/database"
 )
 
-// Represents workload API response
+// WorkloadResponse is the payload for workload detail pages.
 type WorkloadResponse struct {
 	Namespace  string        `json:"namespace"`
 	Type       string        `json:"type"`
@@ -24,13 +24,13 @@ type WorkloadResponse struct {
 	Stats      WorkloadStats `json:"stats"`
 }
 
-// Represents workload statistics
+// WorkloadStats summarizes pod and container totals for a workload.
 type WorkloadStats struct {
 	Pods       int `json:"pods"`
 	Containers int `json:"containers"`
 }
 
-// Represents a pod
+// Pod describes one pod included in workload details.
 type Pod struct {
 	Name      string    `json:"name"`
 	UID       string    `json:"uid"`
@@ -39,7 +39,7 @@ type Pod struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Represents a container
+// Container describes one unique container included in workload details.
 type Container struct {
 	Name          string `json:"name"`
 	Image         string `json:"image"`
@@ -49,13 +49,12 @@ type Container struct {
 	MemoryLimit   string `json:"memory_limit"`
 }
 
-// Returns workload page data
+// GetWorkload returns metadata, pods, and containers for a workload.
 func GetWorkload(c *gin.Context) {
 	namespaceName := c.Param("namespace")
 	workloadType := c.Param("type")
 	workloadName := c.Param("name")
 
-	// Validate workload type
 	validTypes := map[string]bool{
 		"Deployment":  true,
 		"StatefulSet": true,
@@ -84,7 +83,6 @@ func GetWorkload(c *gin.Context) {
 		Stats:      WorkloadStats{},
 	}
 
-	// Get workload metadata based on type
 	var pods []*database.Pod
 	switch workloadType {
 	case "Deployment":
@@ -179,11 +177,12 @@ func GetWorkload(c *gin.Context) {
 			}
 			return
 		}
-		// Validate it's a standalone pod (no owner) or a system pod (Node-owned)
+		// Reject controller-owned pods so the caller uses the correct workload type.
 		if pod.OwnerKind != nil && *pod.OwnerKind != "" && *pod.OwnerKind != "Node" {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "invalid pod",
-				"details": fmt.Sprintf("Pod '%s' belongs to %s/%s. Use the workload endpoint instead.", workloadName, *pod.OwnerKind, *pod.OwnerName),
+				"error": "invalid pod",
+				"details": fmt.Sprintf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
+					workloadName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind),
 			})
 			return
 		}
@@ -195,7 +194,6 @@ func GetWorkload(c *gin.Context) {
 		pods = []*database.Pod{pod}
 	}
 
-	// Process pods
 	response.Stats.Pods = len(pods)
 	uniqueContainers := make(map[string]Container)
 
@@ -214,7 +212,6 @@ func GetWorkload(c *gin.Context) {
 		}
 		response.Pods = append(response.Pods, podDetail)
 
-		// Get containers for this pod
 		containers, err := database.GetContainersByPodUID(ctx, pod.UID)
 		if err != nil {
 			c.Error(fmt.Errorf("failed to get containers for pod %s: %w", pod.Name, err))

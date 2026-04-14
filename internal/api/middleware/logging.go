@@ -8,20 +8,17 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Logs HTTP requests
+// LoggingMiddleware emits structured request logs with status-dependent severity.
 func LoggingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
 		raw := c.Request.URL.RawQuery
 
-		// Process request
 		c.Next()
 
-		// Calculate latency
 		latency := time.Since(start)
 
-		// Build base fields
 		fields := map[string]any{
 			"component":  "server",
 			"method":     c.Request.Method,
@@ -32,12 +29,10 @@ func LoggingMiddleware() gin.HandlerFunc {
 			"user_agent": c.Request.UserAgent(),
 		}
 
-		// Add query string if present
 		if raw != "" {
 			fields["query"] = raw
 		}
 
-		// Add errors if present
 		if len(c.Errors) > 0 {
 			var errorStrs []string
 			for _, err := range c.Errors {
@@ -46,7 +41,6 @@ func LoggingMiddleware() gin.HandlerFunc {
 			fields["errors"] = errorStrs
 		}
 
-		// Log based on status code
 		eventLogger := logger.WithFields(fields)
 		statusCode := c.Writer.Status()
 

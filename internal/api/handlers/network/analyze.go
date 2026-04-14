@@ -12,12 +12,11 @@ import (
 	"github.com/thread_koder/mochi/internal/network"
 )
 
-// Analyzes a namespace
+// AnalyzeNamespace runs network analysis for all workloads in a namespace.
 func AnalyzeNamespace(c *gin.Context) {
 	namespace := c.Param("namespace")
 	timeRangeStr := c.Query("timeRange")
 
-	// Parse analysis options
 	opts := network.DefaultAnalysisOptions()
 	opts.IncludeTimeSeries = true
 
@@ -34,11 +33,9 @@ func AnalyzeNamespace(c *gin.Context) {
 		opts.SetTimeRange(timeRange)
 	}
 
-	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	// Perform analysis
 	analysis, err := network.AnalyzeNamespace(ctx, namespace, opts)
 	if err != nil {
 		c.Error(err)
@@ -52,19 +49,18 @@ func AnalyzeNamespace(c *gin.Context) {
 	c.JSON(http.StatusOK, analysis)
 }
 
-// Analyzes a workload (deployment, statefulset, daemonset, or standalone pod)
+// AnalyzeWorkload runs network analysis for one workload or standalone pod.
 func AnalyzeWorkload(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
 	timeRangeStr := c.Query("timeRange")
 
-	// Validate workload type
 	validTypes := map[string]bool{
 		"Deployment":  true,
 		"StatefulSet": true,
 		"DaemonSet":   true,
-		"Pod":         true, // For standalone pods
+		"Pod":         true,
 	}
 	if !validTypes[workloadType] {
 		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
@@ -76,7 +72,6 @@ func AnalyzeWorkload(c *gin.Context) {
 		return
 	}
 
-	// Validate namespace
 	if namespace == "" {
 		err := fmt.Errorf("namespace query parameter is empty or missing")
 		c.Error(err)
@@ -87,7 +82,6 @@ func AnalyzeWorkload(c *gin.Context) {
 		return
 	}
 
-	// Parse analysis options
 	opts := network.DefaultAnalysisOptions()
 	opts.IncludeTimeSeries = true
 	if timeRangeStr != "" {
@@ -103,15 +97,12 @@ func AnalyzeWorkload(c *gin.Context) {
 		opts.SetTimeRange(timeRange)
 	}
 
-	// Create context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	var pods []*database.Pod
 
-	// Handle standalone pods
 	if workloadType == "Pod" {
-		// Get the standalone pod by name
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
@@ -129,7 +120,7 @@ func AnalyzeWorkload(c *gin.Context) {
 			return
 		}
 
-		// Validate it's a standalone pod (no owner) or a system pod (Node-owned)
+		// Reject controller-owned pods so the caller uses the correct workload type.
 		if pod.OwnerKind != nil && *pod.OwnerKind != "" && *pod.OwnerKind != "Node" {
 			err := fmt.Errorf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
 				workloadName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind)
@@ -143,7 +134,6 @@ func AnalyzeWorkload(c *gin.Context) {
 
 		pods = []*database.Pod{pod}
 	} else {
-		// Get pods for this workload (Deployment, StatefulSet, DaemonSet)
 		podsList, err := database.GetPodsByWorkload(ctx, workloadType, workloadName, namespace)
 		if err != nil {
 			c.Error(err)
@@ -166,7 +156,6 @@ func AnalyzeWorkload(c *gin.Context) {
 		return
 	}
 
-	// Perform analysis
 	analysis, err := network.AnalyzeWorkload(ctx, workloadType, workloadName, namespace, pods, opts, true)
 	if err != nil {
 		c.Error(err)
