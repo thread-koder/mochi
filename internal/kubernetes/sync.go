@@ -15,7 +15,8 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Syncs resources to PostgreSQL
+// SyncResources fetches cluster resources and stores a DB snapshot.
+// Each stage logs and continues so one failed resource kind does not block the rest.
 func SyncResources(ctx context.Context) error {
 	log := logger.WithComponent("kubernetes")
 
@@ -73,12 +74,12 @@ func SyncResources(ctx context.Context) error {
 	return nil
 }
 
-// Syncs nodes to PostgreSQL
+// SyncNodes syncs nodes and prunes stale rows.
 func SyncNodes(ctx context.Context) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
 	nodes, err := Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
@@ -98,7 +99,6 @@ func SyncNodes(ctx context.Context) error {
 		labelsJSON, _ := mapToJSON(node.Labels)
 		annotationsJSON, _ := mapToJSON(node.Annotations)
 
-		// Extract IP addresses
 		var internalIP, externalIP *string
 		for _, addr := range node.Status.Addresses {
 			switch addr.Type {
@@ -109,7 +109,6 @@ func SyncNodes(ctx context.Context) error {
 			}
 		}
 
-		// Extract capacity and allocatable
 		cpuCapacity := node.Status.Capacity[corev1.ResourceCPU]
 		memoryCapacity := node.Status.Capacity[corev1.ResourceMemory]
 		cpuAllocatable := node.Status.Allocatable[corev1.ResourceCPU]
@@ -120,7 +119,6 @@ func SyncNodes(ctx context.Context) error {
 		cpuAllocatableStr := cpuAllocatable.String()
 		memoryAllocatableStr := memoryAllocatable.String()
 
-		// Convert conditions to JSON
 		conditionsJSON, _ := sliceToJSON(node.Status.Conditions)
 
 		dbNode := &database.Node{
@@ -157,12 +155,12 @@ func SyncNodes(ctx context.Context) error {
 	return nil
 }
 
-// Syncs namespaces to PostgreSQL
+// SyncNamespaces syncs namespaces and prunes stale rows.
 func SyncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
 	log.Debug().Int("count", len(namespaces.Items)).Msg("Syncing namespaces...")
@@ -204,12 +202,12 @@ func SyncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList) error
 	return nil
 }
 
-// Syncs deployments to PostgreSQL
+// SyncDeployments syncs deployments in one namespace and prunes stale rows.
 func SyncDeployments(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
 	deployments, err := Clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
@@ -261,12 +259,12 @@ func SyncDeployments(ctx context.Context, namespace string) error {
 	return nil
 }
 
-// Syncs replicasets to PostgreSQL
+// SyncReplicaSets syncs active ReplicaSets in one namespace and prunes stale rows.
 func SyncReplicaSets(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
 	replicasets, err := Clientset.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{})
@@ -281,7 +279,7 @@ func SyncReplicaSets(ctx context.Context, namespace string) error {
 
 	rsUIDs := make([]string, 0, len(replicasets.Items))
 	for _, rs := range replicasets.Items {
-		// Only sync active ReplicaSets
+		// Skip scaled-to-zero sets to avoid persisting historical rollout artifacts.
 		if rs.Status.Replicas == 0 {
 			continue
 		}
@@ -290,18 +288,16 @@ func SyncReplicaSets(ctx context.Context, namespace string) error {
 		labelsJSON, _ := mapToJSON(rs.Labels)
 		annotationsJSON, _ := mapToJSON(rs.Annotations)
 
-		// Desired replicas
 		replicas := int32(0)
 		if rs.Spec.Replicas != nil {
 			replicas = *rs.Spec.Replicas
 		}
 
-		// Extract owner information (Deployment)
 		var ownerKind, ownerName *string
 		for _, owner := range rs.OwnerReferences {
 			ownerKind = new(owner.Kind)
 			ownerName = new(owner.Name)
-			break // Take first owner (Deployment)
+			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Deployment).
 		}
 
 		dbReplicaSet := &database.ReplicaSet{
@@ -332,12 +328,12 @@ func SyncReplicaSets(ctx context.Context, namespace string) error {
 	return nil
 }
 
-// Syncs statefulsets to PostgreSQL
+// SyncStatefulSets syncs statefulsets in one namespace and prunes stale rows.
 func SyncStatefulSets(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
 	statefulsets, err := Clientset.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
@@ -388,12 +384,12 @@ func SyncStatefulSets(ctx context.Context, namespace string) error {
 	return nil
 }
 
-// Syncs daemonsets to PostgreSQL
+// SyncDaemonSets syncs daemonsets in one namespace and prunes stale rows.
 func SyncDaemonSets(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
 	daemonsets, err := Clientset.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
@@ -440,12 +436,12 @@ func SyncDaemonSets(ctx context.Context, namespace string) error {
 	return nil
 }
 
-// Syncs services to PostgreSQL
+// SyncServices syncs services in one namespace and prunes stale rows.
 func SyncServices(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
 	services, err := Clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
@@ -501,12 +497,12 @@ func SyncServices(ctx context.Context, namespace string) error {
 	return nil
 }
 
-// Syncs endpoint slices to PostgreSQL
+// SyncEndpointSlices syncs EndpointSlices in one namespace and prunes stale rows.
 func SyncEndpointSlices(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
 	endpointSlices, err := Clientset.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{})
@@ -526,15 +522,13 @@ func SyncEndpointSlices(ctx context.Context, namespace string) error {
 		labelsJSON, _ := mapToJSON(es.Labels)
 		annotationsJSON, _ := mapToJSON(es.Annotations)
 
-		// Extract owner information (Service)
 		var ownerKind, ownerName *string
 		for _, owner := range es.OwnerReferences {
 			ownerKind = &owner.Kind
 			ownerName = &owner.Name
-			break // Take first owner (Service)
+			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Service).
 		}
 
-		// Serialize endpoints and ports
 		endpointsJSON, _ := sliceToJSON(es.Endpoints)
 		portsJSON, _ := sliceToJSON(es.Ports)
 
@@ -567,12 +561,12 @@ func SyncEndpointSlices(ctx context.Context, namespace string) error {
 	return nil
 }
 
-// Syncs pods to PostgreSQL
+// SyncPods syncs pods in one namespace and prunes stale rows.
 func SyncPods(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
 	pods, err := Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
@@ -592,12 +586,11 @@ func SyncPods(ctx context.Context, namespace string) error {
 		labelsJSON, _ := mapToJSON(pod.Labels)
 		annotationsJSON, _ := mapToJSON(pod.Annotations)
 
-		// Extract owner information
 		var ownerKind, ownerName *string
 		for _, owner := range pod.OwnerReferences {
 			ownerKind = new(owner.Kind)
 			ownerName = new(owner.Name)
-			break // Take first owner
+			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Deployment).
 		}
 
 		restartPolicy := string(pod.Spec.RestartPolicy)
@@ -635,12 +628,12 @@ func SyncPods(ctx context.Context, namespace string) error {
 	return nil
 }
 
-// Syncs containers to PostgreSQL
+// SyncContainers syncs pod container specs in one namespace and prunes stale rows.
 func SyncContainers(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
 
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
 	pods, err := Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
@@ -658,12 +651,10 @@ func SyncContainers(ctx context.Context, namespace string) error {
 		podName := pod.Name
 		namespace := pod.Namespace
 
-		// Extract containers from pod spec
 		for _, container := range pod.Spec.Containers {
 			var cpuRequest, cpuLimit, memoryRequest, memoryLimit *string
 			var imagePullPolicy *string
 
-			// Extract resource requests and limits
 			if container.Resources.Requests != nil {
 				if cpu := container.Resources.Requests[corev1.ResourceCPU]; !cpu.IsZero() {
 					cpuRequest = new(cpu.String())
@@ -681,12 +672,10 @@ func SyncContainers(ctx context.Context, namespace string) error {
 				}
 			}
 
-			// Extract image pull policy
 			if container.ImagePullPolicy != "" {
 				imagePullPolicy = new(string(container.ImagePullPolicy))
 			}
 
-			// Extract container ports
 			portsJSON, _ := sliceToJSON(container.Ports)
 
 			dbContainer := &database.Container{
@@ -723,7 +712,8 @@ func SyncContainers(ctx context.Context, namespace string) error {
 	return nil
 }
 
-// Checks if a namespace should be synced based on include/exclude lists
+// shouldSyncNamespace returns whether a namespace should be included in the sync.
+// IncludeNamespaces takes precedence over ExcludeNamespaces for explicit allowlists.
 func shouldSyncNamespace(namespace string) bool {
 	cfg := config.AppConfig.Workers
 
@@ -738,7 +728,7 @@ func shouldSyncNamespace(namespace string) bool {
 	return true
 }
 
-// Helper function to convert map to JSON bytes
+// mapToJSON encodes a string map for jsonb columns.
 func mapToJSON(m map[string]string) (json.RawMessage, error) {
 	if len(m) == 0 {
 		return json.RawMessage("{}"), nil
@@ -750,7 +740,7 @@ func mapToJSON(m map[string]string) (json.RawMessage, error) {
 	return json.RawMessage(data), nil
 }
 
-// Helper function to convert slice to JSON bytes
+// sliceToJSON encodes arbitrary slices/structs for jsonb columns.
 func sliceToJSON(s any) (json.RawMessage, error) {
 	if s == nil {
 		return json.RawMessage("[]"), nil

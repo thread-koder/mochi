@@ -16,13 +16,13 @@ import (
 )
 
 var (
-	// Global Kubernetes clientset
+	// Clientset is the global Kubernetes client.
 	Clientset *kubernetes.Clientset
-	// Global Kubernetes REST config
+	// RestConfig is the global client configuration used by Clientset.
 	RestConfig *rest.Config
 )
 
-// Holds information about the connected Kubernetes cluster
+// ClusterInfo describes the connected cluster.
 type ClusterInfo struct {
 	ServerVersion string `json:"server_version"`
 	ClusterName   string `json:"cluster_name"`
@@ -30,7 +30,7 @@ type ClusterInfo struct {
 	APIServerURL  string `json:"api_server_url"`
 }
 
-// Initializes the Kubernetes client with the provided configuration
+// Init configures and verifies the Kubernetes client connection.
 func Init(cfg *config.KubernetesConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("kubernetes config is nil")
@@ -42,17 +42,14 @@ func Init(cfg *config.KubernetesConfig) error {
 	log := logger.WithComponent("kubernetes")
 	log.Info().Msg("Initializing client...")
 
-	// Determine kubeconfig path
 	if cfg.KubeconfigPath != "" {
 		kubeconfig = cfg.KubeconfigPath
 	} else {
-		// Try default locations
 		if home := homedir.HomeDir(); home != "" {
 			kubeconfig = filepath.Join(home, ".kube", "config")
 		}
 	}
 
-	// Build config from kubeconfig file or in-cluster config
 	if cfg.InCluster {
 		log.Info().Msg("Using in-cluster config")
 		RestConfig, err = rest.InClusterConfig()
@@ -69,23 +66,18 @@ func Init(cfg *config.KubernetesConfig) error {
 		return fmt.Errorf("no kubeconfig path provided and not running in-cluster")
 	}
 
-	// Configure timeouts
 	RestConfig.Timeout = time.Duration(cfg.RequestTimeout) * time.Second
 
-	// Set QPS and Burst for rate limiting
 	RestConfig.QPS = float32(cfg.QPS)
 	RestConfig.Burst = cfg.Burst
 
-	// Set Agent Name
 	RestConfig.UserAgent = "mochi"
 
-	// Create the clientset
 	Clientset, err = kubernetes.NewForConfig(RestConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes clientset: %w", err)
 	}
 
-	// Test connection by getting server version
 	version, err := Clientset.Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("failed to connect to Kubernetes cluster: %w", err)
@@ -99,17 +91,16 @@ func Init(cfg *config.KubernetesConfig) error {
 	return nil
 }
 
-// Returns information about the connected Kubernetes cluster
+// GetClusterInfo returns basic cluster metadata.
 func GetClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 	if Clientset == nil {
-		return nil, fmt.Errorf("Kubernetes client not initialized")
+		return nil, fmt.Errorf("kubernetes client not initialized")
 	}
 
 	info := &ClusterInfo{
 		APIServerURL: RestConfig.Host,
 	}
 
-	// Get server version
 	version, err := Clientset.Discovery().ServerVersion()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get server version: %w", err)
@@ -119,16 +110,15 @@ func GetClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 	return info, nil
 }
 
-// Performs a health check on the Kubernetes connection
+// HealthCheck verifies the API server reachability with a discovery call.
 func HealthCheck(ctx context.Context) error {
 	if Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
+		return fmt.Errorf("kubernetes client not initialized")
 	}
 
-	// Try to get server version as a health check
 	_, err := Clientset.Discovery().ServerVersion()
 	if err != nil {
-		return fmt.Errorf("Kubernetes health check failed: %w", err)
+		return fmt.Errorf("kubernetes health check failed: %w", err)
 	}
 
 	return nil
