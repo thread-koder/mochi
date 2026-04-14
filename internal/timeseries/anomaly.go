@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Represents the severity level of an anomaly
+// Severity labels how far an outlier is from the baseline distribution.
 type Severity string
 
 const (
@@ -15,30 +15,31 @@ const (
 	SeverityHigh   Severity = "high"
 )
 
-// Represents a detected anomaly
+// Anomaly represents one outlier detected in a series.
 type Anomaly struct {
 	Value     float64   `json:"value"`
 	Timestamp time.Time `json:"timestamp"`
 	Index     int       `json:"index"`
-	Deviation float64   `json:"deviation"` // How many standard deviations from mean
-	Severity  Severity  `json:"severity"`  // "low", "medium", "high"
+	Deviation float64   `json:"deviation"`
+	Severity  Severity  `json:"severity"`
 }
 
-// Represents anomaly detection results
+// AnomalyResult contains all detected anomalies and the threshold used.
 type AnomalyResult struct {
 	Anomalies    []Anomaly `json:"anomalies"`
 	AnomalyCount int       `json:"anomaly_count"`
 	Threshold    float64   `json:"threshold"`
 }
 
-// Detects anomalies in time series data using statistical methods
+// DetectAnomalies flags points whose deviation clears both an absolute threshold
+// (N * stddev) and a relative-change guardrail to avoid noisy tiny baselines.
 func DetectAnomalies(dataPoints []DataPoint, thresholdMultiplier float64) (AnomalyResult, error) {
 	if len(dataPoints) == 0 {
 		return AnomalyResult{}, fmt.Errorf("cannot detect anomalies from empty dataset")
 	}
 
 	if thresholdMultiplier <= 0 {
-		thresholdMultiplier = 3.0 // Default: 3 standard deviations
+		thresholdMultiplier = 3.0
 	}
 
 	stats, err := CalculateStats(dataPoints)
@@ -61,6 +62,7 @@ func DetectAnomalies(dataPoints []DataPoint, thresholdMultiplier float64) (Anoma
 		deviation := math.Abs(dp.Value - stats.Mean)
 		stdDevs := deviation / stats.StdDev
 
+		// The relative guardrail avoids marking tiny absolute wiggles as anomalies.
 		isSignificant := stats.Mean == 0 || (deviation/stats.Mean) > 0.1
 
 		if deviation > threshold && isSignificant {

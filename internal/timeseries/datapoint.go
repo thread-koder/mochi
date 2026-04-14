@@ -5,49 +5,49 @@ import (
 	"time"
 )
 
-// Represents a data point in a time series
+// DataPoint is one timestamped sample in a metric time series.
 type DataPoint struct {
 	Value     float64   `json:"value"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Merges two slices of data points by timestamp (sums values at the same timestamp)
-// Used when combining data points from multiple sources (e.g., multiple pods in a workload)
-func MergeDataPointsByTime(existing []DataPoint, new []DataPoint) []DataPoint {
+// MergeDataPointsByTime combines two series by exact timestamp and sums values that land
+// on the same instant. Callers use this to collapse per-resource series into a single view.
+func MergeDataPointsByTime(existing []DataPoint, incoming []DataPoint) []DataPoint {
 	if len(existing) == 0 {
-		return AggregateDataPointsByTimestamp(new)
+		return AggregateDataPointsByTimestamp(incoming)
 	}
 
-	timeMap := make(map[time.Time]float64)
+	valuesByTime := make(map[time.Time]float64)
 	for _, dp := range existing {
-		timeMap[dp.Timestamp] += dp.Value
+		valuesByTime[dp.Timestamp] += dp.Value
 	}
-	for _, dp := range new {
-		timeMap[dp.Timestamp] += dp.Value
+	for _, dp := range incoming {
+		valuesByTime[dp.Timestamp] += dp.Value
 	}
 
-	return TimeMapToSortedDataPoints(timeMap)
+	return TimeMapToSortedDataPoints(valuesByTime)
 }
 
-// Aggregates a single slice of data points by timestamp (sums values at the same timestamp)
-// Used when a single data source contains multiple series (e.g., multiple containers in a pod)
+// AggregateDataPointsByTimestamp collapses duplicate timestamps within one slice by summing
+// their values. This keeps downstream stats/trend code working on one point per timestamp.
 func AggregateDataPointsByTimestamp(dataPoints []DataPoint) []DataPoint {
 	if len(dataPoints) == 0 {
 		return dataPoints
 	}
 
-	timeMap := make(map[time.Time]float64)
+	valuesByTime := make(map[time.Time]float64)
 	for _, dp := range dataPoints {
-		timeMap[dp.Timestamp] += dp.Value
+		valuesByTime[dp.Timestamp] += dp.Value
 	}
 
-	return TimeMapToSortedDataPoints(timeMap)
+	return TimeMapToSortedDataPoints(valuesByTime)
 }
 
-// Converts a timestamp->value map to a sorted slice of DataPoints
-func TimeMapToSortedDataPoints(timeMap map[time.Time]float64) []DataPoint {
-	result := make([]DataPoint, 0, len(timeMap))
-	for ts, val := range timeMap {
+// TimeMapToSortedDataPoints converts a timestamp map into a chronologically sorted slice.
+func TimeMapToSortedDataPoints(valuesByTime map[time.Time]float64) []DataPoint {
+	result := make([]DataPoint, 0, len(valuesByTime))
+	for ts, val := range valuesByTime {
 		result = append(result, DataPoint{
 			Timestamp: ts,
 			Value:     val,

@@ -6,14 +6,14 @@ import (
 	"sort"
 )
 
-// Represents percentile calculation results
+// PercentileResult contains the percentile values.
 type PercentileResult struct {
 	P50 float64 `json:"p50"`
 	P95 float64 `json:"p95"`
 	P99 float64 `json:"p99"`
 }
 
-// Represents statistical calculation results
+// StatsResult is the statistical summary derived from a data series.
 type StatsResult struct {
 	Mean       float64          `json:"mean"`
 	Median     float64          `json:"median"`
@@ -23,7 +23,7 @@ type StatsResult struct {
 	Percentile PercentileResult `json:"percentile"`
 }
 
-// Calculates percentiles (P50, P95, P99) from a slice of values
+// CalculatePercentiles computes P50, P95, and P99 from the provided values.
 func CalculatePercentiles(values []float64) (PercentileResult, error) {
 	if len(values) == 0 {
 		return PercentileResult{}, fmt.Errorf("cannot calculate percentiles from empty dataset")
@@ -44,7 +44,6 @@ func CalculatePercentiles(values []float64) (PercentileResult, error) {
 	}, nil
 }
 
-// Calculates the mean of a slice of values
 func CalculateMean(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
@@ -56,7 +55,7 @@ func CalculateMean(values []float64) float64 {
 	return sum / float64(len(values))
 }
 
-// Extracts values from data points
+// ExtractValues copies only the numeric values from data points.
 func ExtractValues(dataPoints []DataPoint) []float64 {
 	values := make([]float64, len(dataPoints))
 	for i, dp := range dataPoints {
@@ -65,7 +64,7 @@ func ExtractValues(dataPoints []DataPoint) []float64 {
 	return values
 }
 
-// Calculates statistical summary from time series data
+// CalculateStats calculates a full summary (central tendency, spread, and percentiles).
 func CalculateStats(dataPoints []DataPoint) (StatsResult, error) {
 	if len(dataPoints) == 0 {
 		return StatsResult{}, fmt.Errorf("cannot calculate stats from empty dataset")
@@ -104,7 +103,6 @@ func CalculateStats(dataPoints []DataPoint) (StatsResult, error) {
 	}, nil
 }
 
-// Calculates a specific percentile from a sorted slice
 func percentile(sorted []float64, p float64) float64 {
 	if len(sorted) == 0 {
 		return 0
@@ -125,7 +123,6 @@ func percentile(sorted []float64, p float64) float64 {
 	return sorted[lower]*(1-weight) + sorted[upper]*weight
 }
 
-// Calculates the median of a slice of values
 func median(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
@@ -140,7 +137,6 @@ func median(values []float64) float64 {
 	return sorted[n/2]
 }
 
-// Calculates the standard deviation of a slice of values
 func stdDev(values []float64, mean float64) float64 {
 	if len(values) == 0 {
 		return 0

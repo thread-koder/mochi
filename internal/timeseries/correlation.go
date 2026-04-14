@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Represents the strength of a correlation
+// CorrelationStrength maps coefficient magnitude into weak, moderate, and strong.
 type CorrelationStrength string
 
 const (
@@ -16,7 +16,7 @@ const (
 	CorrelationStrengthStrong   CorrelationStrength = "strong"
 )
 
-// Represents the direction of a correlation
+// CorrelationDirection captures the sign of the relationship.
 type CorrelationDirection string
 
 const (
@@ -25,37 +25,36 @@ const (
 	CorrelationDirectionNone     CorrelationDirection = "none"
 )
 
-// Represents the result of a correlation calculation
+// CorrelationResult is the Pearson correlation summary for one aligned series pair.
 type CorrelationResult struct {
-	Coefficient float64              `json:"coefficient"` // Pearson r (-1 to +1)
-	Strength    CorrelationStrength  `json:"strength"`    // weak, moderate, strong
-	Direction   CorrelationDirection `json:"direction"`   // positive, negative, none
-	SampleSize  int                  `json:"sample_size"` // Number of aligned data points used
+	Coefficient float64              `json:"coefficient"`
+	Strength    CorrelationStrength  `json:"strength"`
+	Direction   CorrelationDirection `json:"direction"`
+	SampleSize  int                  `json:"sample_size"`
 }
 
-// Represents correlation at a specific lag
+// LagCorrelation stores the correlation observed at one tested lag.
 type LagCorrelation struct {
 	Lag         time.Duration     `json:"lag"`
 	Correlation CorrelationResult `json:"correlation"`
 }
 
-// Represents the result of cross-correlation analysis with lag detection
+// CrossCorrelationResult summarizes lag exploration and the strongest relationship found.
 type CrossCorrelationResult struct {
-	MaxCorrelation  CorrelationResult `json:"max_correlation"`  // Correlation at optimal lag
-	OptimalLag      time.Duration     `json:"optimal_lag"`      // Lag that produces max |correlation|
-	ZeroLag         CorrelationResult `json:"zero_lag"`         // Correlation with no lag
-	LagCorrelations []LagCorrelation  `json:"lag_correlations"` // Correlations at each tested lag
-	LeadingSeries   string            `json:"leading_series"`   // Which series leads (A or B), empty if no significant lag
+	MaxCorrelation  CorrelationResult `json:"max_correlation"`
+	OptimalLag      time.Duration     `json:"optimal_lag"`
+	ZeroLag         CorrelationResult `json:"zero_lag"`
+	LagCorrelations []LagCorrelation  `json:"lag_correlations"`
+	LeadingSeries   string            `json:"leading_series"`
 }
 
-// Aligns two time series by matching timestamps within a tolerance window
-// Returns two slices of equal length containing only the aligned data points
+// AlignDataPointsByTime pairs samples whose timestamps fall within tolerance.
+// This accepts small scrape/sampling skew without forcing exact timestamp equality.
 func AlignDataPointsByTime(a, b []DataPoint, tolerance time.Duration) ([]DataPoint, []DataPoint, error) {
 	if len(a) == 0 || len(b) == 0 {
 		return nil, nil, fmt.Errorf("cannot align empty data series")
 	}
 
-	// Sort both series by timestamp
 	sortedA := make([]DataPoint, len(a))
 	sortedB := make([]DataPoint, len(b))
 	copy(sortedA, a)
@@ -70,10 +69,8 @@ func AlignDataPointsByTime(a, b []DataPoint, tolerance time.Duration) ([]DataPoi
 	alignedA := make([]DataPoint, 0)
 	alignedB := make([]DataPoint, 0)
 
-	// For each point in A, find the closest point in B within tolerance
 	bIndex := 0
 	for _, pointA := range sortedA {
-		// Advance bIndex to find potential matches
 		for bIndex < len(sortedB) && sortedB[bIndex].Timestamp.Before(pointA.Timestamp.Add(-tolerance)) {
 			bIndex++
 		}
@@ -82,7 +79,6 @@ func AlignDataPointsByTime(a, b []DataPoint, tolerance time.Duration) ([]DataPoi
 			break
 		}
 
-		// Check if the current B point is within tolerance
 		timeDiff := sortedB[bIndex].Timestamp.Sub(pointA.Timestamp)
 		if timeDiff < 0 {
 			timeDiff = -timeDiff
@@ -102,8 +98,7 @@ func AlignDataPointsByTime(a, b []DataPoint, tolerance time.Duration) ([]DataPoi
 	return alignedA, alignedB, nil
 }
 
-// Calculates the Pearson correlation coefficient between two time series
-// The series must be pre-aligned (same length and corresponding timestamps)
+// CalculatePearsonCorrelation computes Pearson r for pre-aligned time series.
 func CalculatePearsonCorrelation(a, b []DataPoint) (CorrelationResult, error) {
 	if len(a) != len(b) {
 		return CorrelationResult{}, fmt.Errorf("series must have equal length: got %d and %d", len(a), len(b))
@@ -112,7 +107,6 @@ func CalculatePearsonCorrelation(a, b []DataPoint) (CorrelationResult, error) {
 		return CorrelationResult{}, fmt.Errorf("need at least 2 data points for correlation: got %d", len(a))
 	}
 
-	// Extract values
 	valuesA := make([]float64, len(a))
 	valuesB := make([]float64, len(b))
 	for i := range a {
@@ -120,7 +114,6 @@ func CalculatePearsonCorrelation(a, b []DataPoint) (CorrelationResult, error) {
 		valuesB[i] = b[i].Value
 	}
 
-	// Calculate means
 	var sumA, sumB float64
 	for i := range valuesA {
 		sumA += valuesA[i]
@@ -129,7 +122,6 @@ func CalculatePearsonCorrelation(a, b []DataPoint) (CorrelationResult, error) {
 	meanA := sumA / float64(len(valuesA))
 	meanB := sumB / float64(len(valuesB))
 
-	// Calculate Pearson correlation coefficient
 	var numerator, sumSqA, sumSqB float64
 	for i := range valuesA {
 		diffA := valuesA[i] - meanA
@@ -139,7 +131,8 @@ func CalculatePearsonCorrelation(a, b []DataPoint) (CorrelationResult, error) {
 		sumSqB += diffB * diffB
 	}
 
-	// Handle edge cases (constant series)
+	// Constant series have zero variance, so correlation is undefined in practice.
+	// We report neutral correlation to keep API output stable for callers.
 	if sumSqA == 0 || sumSqB == 0 {
 		return CorrelationResult{
 			Coefficient: 0,
@@ -151,7 +144,7 @@ func CalculatePearsonCorrelation(a, b []DataPoint) (CorrelationResult, error) {
 
 	coefficient := numerator / math.Sqrt(sumSqA*sumSqB)
 
-	// Clamp to [-1, 1] to handle floating point errors
+	// Guard against floating-point drift slightly outside the valid Pearson range.
 	coefficient = max(min(coefficient, 1.0), -1.0)
 
 	return CorrelationResult{
@@ -162,8 +155,7 @@ func CalculatePearsonCorrelation(a, b []DataPoint) (CorrelationResult, error) {
 	}, nil
 }
 
-// Calculates cross-correlation between two time series at various time lags
-// This helps identify lead-lag relationships between metrics
+// CalculateCrossCorrelation scans lag offsets to detect lead/lag relationships.
 func CalculateCrossCorrelation(a, b []DataPoint, maxLag time.Duration, lagStep time.Duration) (CrossCorrelationResult, error) {
 	if len(a) < 2 || len(b) < 2 {
 		return CrossCorrelationResult{}, fmt.Errorf("need at least 2 data points in each series")
@@ -173,7 +165,6 @@ func CalculateCrossCorrelation(a, b []DataPoint, maxLag time.Duration, lagStep t
 		lagStep = time.Minute
 	}
 
-	// Calculate zero-lag correlation first
 	tolerance := max(lagStep/2, 30*time.Second)
 
 	alignedA, alignedB, err := AlignDataPointsByTime(a, b, tolerance)
@@ -186,7 +177,6 @@ func CalculateCrossCorrelation(a, b []DataPoint, maxLag time.Duration, lagStep t
 		return CrossCorrelationResult{}, fmt.Errorf("failed to calculate zero-lag correlation: %w", err)
 	}
 
-	// Calculate correlations at different lags
 	lagCorrelations := make([]LagCorrelation, 0)
 	lagCorrelations = append(lagCorrelations, LagCorrelation{
 		Lag:         0,
@@ -197,15 +187,15 @@ func CalculateCrossCorrelation(a, b []DataPoint, maxLag time.Duration, lagStep t
 	optimalLag := time.Duration(0)
 	leadingSeries := ""
 
-	// Test positive lags (B leads A)
+	// Positive lag means B is shifted earlier, so B potentially leads A.
 	for lag := lagStep; lag <= maxLag; lag += lagStep {
 		shiftedB := shiftDataPoints(b, -lag)
-		aligned1, aligned2, err := AlignDataPointsByTime(a, shiftedB, tolerance)
-		if err != nil || len(aligned1) < 2 {
+		alignedA, alignedB, err := AlignDataPointsByTime(a, shiftedB, tolerance)
+		if err != nil || len(alignedA) < 2 {
 			continue
 		}
 
-		corr, err := CalculatePearsonCorrelation(aligned1, aligned2)
+		corr, err := CalculatePearsonCorrelation(alignedA, alignedB)
 		if err != nil {
 			continue
 		}
@@ -222,15 +212,15 @@ func CalculateCrossCorrelation(a, b []DataPoint, maxLag time.Duration, lagStep t
 		}
 	}
 
-	// Test negative lags (A leads B)
+	// Negative lag means A is shifted earlier, so A potentially leads B.
 	for lag := lagStep; lag <= maxLag; lag += lagStep {
 		shiftedA := shiftDataPoints(a, -lag)
-		aligned1, aligned2, err := AlignDataPointsByTime(shiftedA, b, tolerance)
-		if err != nil || len(aligned1) < 2 {
+		alignedA, alignedB, err := AlignDataPointsByTime(shiftedA, b, tolerance)
+		if err != nil || len(alignedA) < 2 {
 			continue
 		}
 
-		corr, err := CalculatePearsonCorrelation(aligned1, aligned2)
+		corr, err := CalculatePearsonCorrelation(alignedA, alignedB)
 		if err != nil {
 			continue
 		}
@@ -247,12 +237,11 @@ func CalculateCrossCorrelation(a, b []DataPoint, maxLag time.Duration, lagStep t
 		}
 	}
 
-	// Sort lag correlations by lag
 	sort.Slice(lagCorrelations, func(i, j int) bool {
 		return lagCorrelations[i].Lag < lagCorrelations[j].Lag
 	})
 
-	// Only report leading series if the lag is significant and correlation is moderate+
+	// Avoid overclaiming leadership when the best signal is weak or at zero lag.
 	if optimalLag == 0 || maxCorr.Strength == CorrelationStrengthWeak {
 		leadingSeries = ""
 	}
@@ -266,7 +255,7 @@ func CalculateCrossCorrelation(a, b []DataPoint, maxLag time.Duration, lagStep t
 	}, nil
 }
 
-// Shifts data points by a time offset
+// shiftDataPoints copies data while shifting timestamps by offset.
 func shiftDataPoints(data []DataPoint, offset time.Duration) []DataPoint {
 	shifted := make([]DataPoint, len(data))
 	for i, dp := range data {
@@ -278,7 +267,7 @@ func shiftDataPoints(data []DataPoint, offset time.Duration) []DataPoint {
 	return shifted
 }
 
-// Classifies correlation strength based on coefficient magnitude
+// classifyCorrelationStrength buckets absolute coefficient magnitude.
 func classifyCorrelationStrength(coefficient float64) CorrelationStrength {
 	absCoeff := math.Abs(coefficient)
 	if absCoeff >= 0.7 {
@@ -289,7 +278,7 @@ func classifyCorrelationStrength(coefficient float64) CorrelationStrength {
 	return CorrelationStrengthWeak
 }
 
-// Classifies correlation direction based on coefficient sign
+// classifyCorrelationDirection maps coefficient sign to a readable label.
 func classifyCorrelationDirection(coefficient float64) CorrelationDirection {
 	if math.Abs(coefficient) < 0.1 {
 		return CorrelationDirectionNone

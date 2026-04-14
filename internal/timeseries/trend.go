@@ -5,7 +5,7 @@ import (
 	"math"
 )
 
-// Represents the trend direction
+// Direction classifies the direction of change in a series.
 type Direction string
 
 const (
@@ -14,14 +14,14 @@ const (
 	DirectionDecreasing Direction = "decreasing"
 )
 
-// Represents trend analysis results
+// TrendResult is the output of linear trend analysis.
 type TrendResult struct {
-	Direction Direction `json:"direction"` // "increasing", "decreasing", or "stable"
-	Slope     float64   `json:"slope"`     // Linear regression slope
-	Strength  float64   `json:"strength"`  // Correlation coefficient (0-1)
+	Direction Direction `json:"direction"`
+	Slope     float64   `json:"slope"`
+	Strength  float64   `json:"strength"`
 }
 
-// Analyzes trend direction and strength from time series data
+// AnalyzeTrend estimates direction and strength with simple linear regression.
 func AnalyzeTrend(dataPoints []DataPoint) (TrendResult, error) {
 	if len(dataPoints) < 2 {
 		return TrendResult{}, fmt.Errorf("need at least 2 data points for trend analysis")
@@ -58,7 +58,7 @@ func AnalyzeTrend(dataPoints []DataPoint) (TrendResult, error) {
 	}, nil
 }
 
-// Performs linear regression on two slices of values
+// linearRegression returns slope/intercept and Pearson r for paired x/y series.
 func linearRegression(x, y []float64) (slope, intercept, correlation float64) {
 	n := len(x)
 	if n != len(y) || n == 0 {
