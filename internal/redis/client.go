@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	// Global Redis client
+	// Client is the global Redis client.
 	Client *redis.Client
 )
 
-// Initializes the Redis client
+// Init configures and verifies the Redis client connection.
 func Init(cfg *config.RedisConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("redis config is nil")
@@ -24,7 +24,6 @@ func Init(cfg *config.RedisConfig) error {
 	log := logger.WithComponent("redis")
 	log.Info().Msg("Initializing client...")
 
-	// Create Redis client options
 	opts := &redis.Options{
 		Addr:            fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Username:        cfg.Username,
@@ -45,10 +44,8 @@ func Init(cfg *config.RedisConfig) error {
 		opts.TLSConfig = tlsConfig
 	}
 
-	// Create Redis client
 	Client = redis.NewClient(opts)
 
-	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -65,21 +62,21 @@ func Init(cfg *config.RedisConfig) error {
 	return nil
 }
 
-// Closes the Redis client connection
+// Close closes the Redis client if it was initialized.
 func Close() {
 	if Client != nil {
 		Client.Close()
 	}
 }
 
-// Performs a health check on the Redis connection
+// HealthCheck verifies Redis reachability with a Ping call.
 func HealthCheck(ctx context.Context) error {
 	if Client == nil {
-		return fmt.Errorf("Redis client not initialized")
+		return fmt.Errorf("redis client not initialized")
 	}
 
 	if err := Client.Ping(ctx).Err(); err != nil {
-		return fmt.Errorf("Redis health check failed: %w", err)
+		return fmt.Errorf("redis health check failed: %w", err)
 	}
 
 	return nil
