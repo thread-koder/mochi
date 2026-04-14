@@ -1,77 +1,76 @@
+# Sample layout for Mochi configuration. Nothing reads this file unless you list it in MOCHI_CONFIG_FILES
+# (comma-separated paths, first file is the base, later files override). Otherwise defaults plus MOCHI_* env apply.
+
 log:
-  level: "info" # debug, info, warn, error
-  format: "console" # json, console
+  level: "info" # debug | info | warn | error
+  format: "console" # json | console
 
 api:
-  host: "0.0.0.0" # API server host
-  port: 8080 # API server port
-  read_timeout: 30 # Read timeout in seconds
-  write_timeout: 30 # Write timeout in seconds
-  mode: "release" # debug, release, test
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 30 # seconds
+  write_timeout: 30 # seconds
+  mode: "release" # debug | release | test
 
 database:
-  host: "localhost" # PostgreSQL host
-  port: 5432 # PostgreSQL port
-  user: "mochi" # PostgreSQL user
-  password: "" # PostgreSQL user password
-  database: "mochi" # PostgreSQL database name
-  ssl_mode: "disable" # SSL mode (disable, require, verify-ca, verify-full)
-  max_connections: 25 # Maximum number of connections in pool
-  min_idle_conns: 5 # Minimum number of idle connections in pool
-  conn_max_lifetime: 3600 # Maximum connection lifetime in seconds
-  conn_max_idle_time: 1800 # Maximum idle time in seconds
-  # Used when ssl_mode is not "disable"
+  host: "localhost"
+  port: 5432
+  user: "mochi"
+  password: ""
+  database: "mochi"
+  ssl_mode: "disable" # disable | require | verify-ca | verify-full
+  max_connections: 25
+  min_idle_conns: 5
+  conn_max_lifetime: 3600 # seconds
+  conn_max_idle_time: 1800 # seconds
+  # Only used when ssl_mode is not "disable"
   tls:
-    insecure_skip_verify: false # Skip server certificate verification
-    root_ca_path: "" # Path to CA cert for server verification
-    client_cert_path: "" # Path to client cert for mutual TLS
-    client_key_path: "" # Path to client key for mutual TLS
+    insecure_skip_verify: false
+    root_ca_path: ""
+    client_cert_path: ""
+    client_key_path: ""
 
 kubernetes:
-  kubeconfig_path: "" # Empty = use default (~/.kube/config), or set path to kubeconfig file
-  in_cluster: false # Set to true when running as a pod in cluster
-  request_timeout: 30 # Request timeout in seconds
-  qps: 50 # Queries per second (rate limiting)
-  burst: 100 # Burst limit (rate limiting)
+  kubeconfig_path: "" # empty: default discovery (~/.kube/config or KUBECONFIG)
+  in_cluster: false # true for in-cluster client config
+  request_timeout: 30 # seconds
+  qps: 50
+  burst: 100
 
 prometheus:
-  url: "http://localhost:9090" # Prometheus server URL
-  timeout: 30 # Request timeout in seconds
+  url: "http://localhost:9090"
+  timeout: 30 # seconds
   tls:
-    insecure_skip_verify: false # Skip server certificate verification
-    root_ca_path: "" # Path to CA cert for server verification
-    client_cert_path: "" # Path to client cert for mutual TLS
-    client_key_path: "" # Path to client key for mutual TLS
+    insecure_skip_verify: false
+    root_ca_path: ""
+    client_cert_path: ""
+    client_key_path: ""
 
 redis:
-  host: "localhost" # Redis host
-  port: 6379 # Redis port
-  username: "" # Redis username (empty = default user)
-  password: "" # Redis password
-  database: 0 # Redis database number (0-15)
-  max_retries: 3 # Maximum number of retries
-  pool_size: 10 # Connection pool size
-  min_idle_conns: 5 # Minimum idle connections
-  conn_max_lifetime: 3600 # Maximum connection lifetime in seconds
-  conn_max_idle_time: 1800 # Maximum idle time in seconds
-  cache_ttl: 300 # Default cache TTL in seconds
-  use_tls: false # Enable TLS for Redis connection
+  host: "localhost"
+  port: 6379
+  username: ""
+  password: ""
+  database: 0 # 0–15
+  max_retries: 3
+  pool_size: 10
+  min_idle_conns: 5
+  conn_max_lifetime: 3600 # seconds
+  conn_max_idle_time: 1800 # seconds
+  cache_ttl: 300 # seconds
+  use_tls: false
   tls:
-    insecure_skip_verify: false # Skip server certificate verification
-    root_ca_path: "" # Path to CA cert for server verification
-    client_cert_path: "" # Path to client cert for mutual TLS
-    client_key_path: "" # Path to client key for mutual TLS
+    insecure_skip_verify: false
+    root_ca_path: ""
+    client_cert_path: ""
+    client_key_path: ""
 
 workers:
-  resource_sync_interval: 120 # Resource sync interval in seconds (2 minutes)
-  retention: 90 # Retention period in days, records older than this are eligible for cleanup
-  exclude_namespaces: # List of namespaces to exclude from syncing
+  resource_sync_interval: 120 # seconds
+  retention: 90 # days. Older records eligible for cleanup
+  exclude_namespaces:
     - "default"
     - "kube-system"
     - "kube-public"
     - "kube-node-lease"
-  include_namespaces: [] # If non-empty, only sync these namespaces (exclude_namespaces ignored)
-
-# Compute / recommendation tuning
-compute:
-  min_confidence_threshold: 0.8 # Minimum confidence (0-1) to generate recommendations
+  include_namespaces: [] # if non-empty, only these namespaces (exclude_namespaces ignored)

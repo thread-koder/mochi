@@ -1,3 +1,14 @@
+// Package config loads, validates, and exposes application settings for Mochi.
+//
+// Values are resolved in order: default values, optional YAML files listed in MOCHI_CONFIG_FILES
+// (comma-separated paths, the first file is the base, each later file merged on top), then
+// environment variables with the MOCHI_ prefix. Nested keys use underscores in env names
+// (for example log.level becomes MOCHI_LOG_LEVEL).
+//
+// If MOCHI_CONFIG_FILES is unset or empty, no YAML is loaded. Only defaults and environment variables apply.
+// The configs/config.yaml file in the repository is a reference layout until you point
+// MOCHI_CONFIG_FILES at it (or another file). Load assigns AppConfig for callers that read
+// the global config after startup.
 package config
 
 import (
@@ -11,15 +22,15 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Holds TLS settings for clients
+// TLSConfig holds optional TLS settings for outbound clients (database, Prometheus, Redis, etc.).
 type TLSConfig struct {
-	InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"` // Skip server certificate verification
-	RootCAPath         string `mapstructure:"root_ca_path"`         // Path to CA cert for server verification (optional)
-	ClientCertPath     string `mapstructure:"client_cert_path"`     // Path to client cert for mutual TLS (optional)
-	ClientKeyPath      string `mapstructure:"client_key_path"`      // Path to client key for mutual TLS (optional)
+	InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"`
+	RootCAPath         string `mapstructure:"root_ca_path"`
+	ClientCertPath     string `mapstructure:"client_cert_path"`
+	ClientKeyPath      string `mapstructure:"client_key_path"`
 }
 
-// Holds all application configuration
+// Config is the top-level application configuration.
 type Config struct {
 	Log        LogConfig        `mapstructure:"log"`
 	API        APIConfig        `mapstructure:"api"`
@@ -28,93 +39,95 @@ type Config struct {
 	Prometheus PrometheusConfig `mapstructure:"prometheus"`
 	Redis      RedisConfig      `mapstructure:"redis"`
 	Workers    WorkerConfig     `mapstructure:"workers"`
-	Compute    ComputeConfig    `mapstructure:"compute"`
 }
 
-// Holds logger configuration
+// LogConfig configures application logging (level and serialization format).
+// Level must be one of debug, info, warn, error. Format must be json or console.
 type LogConfig struct {
-	Level  string `mapstructure:"level"`  // debug, info, warn, error
-	Format string `mapstructure:"format"` // json, console
+	Level  string `mapstructure:"level"`
+	Format string `mapstructure:"format"`
 }
 
-// Holds API server configuration
+// APIConfig configures the HTTP API server (bind address, timeouts, Gin mode).
+// Mode must be one of debug, release, test. Durations are in seconds.
 type APIConfig struct {
-	Host         string `mapstructure:"host"`          // API server host
-	Port         int    `mapstructure:"port"`          // API server port
-	ReadTimeout  int    `mapstructure:"read_timeout"`  // Read timeout in seconds
-	WriteTimeout int    `mapstructure:"write_timeout"` // Write timeout in seconds
-	Mode         string `mapstructure:"mode"`          // debug, release, test
+	Host         string `mapstructure:"host"`
+	Port         int    `mapstructure:"port"`
+	ReadTimeout  int    `mapstructure:"read_timeout"`
+	WriteTimeout int    `mapstructure:"write_timeout"`
+	Mode         string `mapstructure:"mode"`
 }
 
-// Holds database configuration
+// DatabaseConfig configures the PostgreSQL client and pool.
+// SSLMode must be one of disable, require, verify-ca, verify-full. TLS applies when connecting
+// with encryption (so ssl_mode is not "disable").
 type DatabaseConfig struct {
-	Host            string    `mapstructure:"host"`               // PostgreSQL host
-	Port            int       `mapstructure:"port"`               // PostgreSQL port
-	User            string    `mapstructure:"user"`               // PostgreSQL user
-	Password        string    `mapstructure:"password"`           // PostgreSQL password
-	Database        string    `mapstructure:"database"`           // PostgreSQL database name
-	SSLMode         string    `mapstructure:"ssl_mode"`           // SSL mode (disable, require, verify-ca, verify-full)
-	MaxConnections  int       `mapstructure:"max_connections"`    // Maximum number of connections in pool
-	MinIdleConns    int       `mapstructure:"min_idle_conns"`     // Minimum number of idle connections in pool
-	ConnMaxLifetime int       `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
-	ConnMaxIdleTime int       `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
-	TLS             TLSConfig `mapstructure:"tls"`                // TLS config (used when ssl_mode != disable)
+	Host            string    `mapstructure:"host"`
+	Port            int       `mapstructure:"port"`
+	User            string    `mapstructure:"user"`
+	Password        string    `mapstructure:"password"`
+	Database        string    `mapstructure:"database"`
+	SSLMode         string    `mapstructure:"ssl_mode"`
+	MaxConnections  int       `mapstructure:"max_connections"`
+	MinIdleConns    int       `mapstructure:"min_idle_conns"`
+	ConnMaxLifetime int       `mapstructure:"conn_max_lifetime"`
+	ConnMaxIdleTime int       `mapstructure:"conn_max_idle_time"`
+	TLS             TLSConfig `mapstructure:"tls"`
 }
 
-// Holds Kubernetes configuration
+// KubernetesConfig configures the Kubernetes API client (kubeconfig vs in-cluster, rate limits).
+// Empty KubeconfigPath uses the default loader rules (for example KUBECONFIG or ~/.kube/config).
 type KubernetesConfig struct {
-	KubeconfigPath string `mapstructure:"kubeconfig_path"` // Path to kubeconfig file (empty = use default)
-	InCluster      bool   `mapstructure:"in_cluster"`      // Use in-cluster config
-	RequestTimeout int    `mapstructure:"request_timeout"` // Request timeout in seconds
-	QPS            int    `mapstructure:"qps"`             // Queries per second (rate limiting)
-	Burst          int    `mapstructure:"burst"`           // Burst limit for rate limiting
+	KubeconfigPath string `mapstructure:"kubeconfig_path"`
+	InCluster      bool   `mapstructure:"in_cluster"`
+	RequestTimeout int    `mapstructure:"request_timeout"`
+	QPS            int    `mapstructure:"qps"`
+	Burst          int    `mapstructure:"burst"`
 }
 
-// Holds Prometheus configuration
+// PrometheusConfig configures the Prometheus client base URL and timeouts.
 type PrometheusConfig struct {
-	URL     string    `mapstructure:"url"`     // Prometheus server URL
-	Timeout int       `mapstructure:"timeout"` // Request timeout in seconds
-	TLS     TLSConfig `mapstructure:"tls"`     // TLS config for HTTPS
+	URL     string    `mapstructure:"url"`
+	Timeout int       `mapstructure:"timeout"`
+	TLS     TLSConfig `mapstructure:"tls"`
 }
 
-// Holds Redis configuration
+// RedisConfig configures the Redis client, pool, default cache TTL, and optional TLS.
+// Database is the logical DB index (0–15). When UseTLS is true, TLS fields apply.
 type RedisConfig struct {
-	Host            string    `mapstructure:"host"`               // Redis host
-	Port            int       `mapstructure:"port"`               // Redis port
-	Username        string    `mapstructure:"username"`           // Redis username (ACL, empty = default)
-	Password        string    `mapstructure:"password"`           // Redis password (empty = no auth)
-	Database        int       `mapstructure:"database"`           // Redis database number (0-15)
-	MaxRetries      int       `mapstructure:"max_retries"`        // Maximum number of retries
-	PoolSize        int       `mapstructure:"pool_size"`          // Connection pool size
-	MinIdleConns    int       `mapstructure:"min_idle_conns"`     // Minimum idle connections
-	ConnMaxLifetime int       `mapstructure:"conn_max_lifetime"`  // Maximum connection lifetime in seconds
-	ConnMaxIdleTime int       `mapstructure:"conn_max_idle_time"` // Maximum idle time in seconds
-	CacheTTL        int       `mapstructure:"cache_ttl"`          // Default cache TTL in seconds
-	UseTLS          bool      `mapstructure:"use_tls"`            // Enable TLS for connection
-	TLS             TLSConfig `mapstructure:"tls"`                // TLS config (used when use_tls is true)
+	Host            string    `mapstructure:"host"`
+	Port            int       `mapstructure:"port"`
+	Username        string    `mapstructure:"username"`
+	Password        string    `mapstructure:"password"`
+	Database        int       `mapstructure:"database"`
+	MaxRetries      int       `mapstructure:"max_retries"`
+	PoolSize        int       `mapstructure:"pool_size"`
+	MinIdleConns    int       `mapstructure:"min_idle_conns"`
+	ConnMaxLifetime int       `mapstructure:"conn_max_lifetime"`
+	ConnMaxIdleTime int       `mapstructure:"conn_max_idle_time"`
+	CacheTTL        int       `mapstructure:"cache_ttl"`
+	UseTLS          bool      `mapstructure:"use_tls"`
+	TLS             TLSConfig `mapstructure:"tls"`
 }
 
-// Holds worker configuration
+// WorkerConfig configures background sync intervals, namespace filters, and retention for stored data.
+// If IncludeNamespaces is non-empty, only those namespaces are synced and ExcludeNamespaces is ignored.
 type WorkerConfig struct {
-	ResourceSyncInterval int      `mapstructure:"resource_sync_interval"` // Resource sync interval in seconds
-	ExcludeNamespaces    []string `mapstructure:"exclude_namespaces"`     // List of namespaces to exclude from syncing
-	IncludeNamespaces    []string `mapstructure:"include_namespaces"`     // If non-empty, only sync these namespaces (exclude_namespaces ignored)
-	Retention            int      `mapstructure:"retention"`              // Keep data for this many days
+	ResourceSyncInterval int      `mapstructure:"resource_sync_interval"`
+	ExcludeNamespaces    []string `mapstructure:"exclude_namespaces"`
+	IncludeNamespaces    []string `mapstructure:"include_namespaces"`
+	Retention            int      `mapstructure:"retention"`
 }
 
-// Holds compute recommendation configuration
-type ComputeConfig struct {
-	MinConfidenceThreshold float64 `mapstructure:"min_confidence_threshold"` // Minimum confidence (0-1) to generate recommendations
-}
-
+// AppConfig holds the configuration from the last successful Load.
+// Call Load before reading it. Prefer threading *Config from Load where possible.
 var AppConfig *Config
 
-// Reads configuration from file and environment variables
+// Load reads configuration from defaults, optional YAML files (MOCHI_CONFIG_FILES), and MOCHI_* env vars,
+// unmarshals into a Config, validates it, assigns AppConfig, and returns a pointer to the same value.
 func Load() (*Config, error) {
-	// Set defaults
 	setDefaults()
 
-	// Read and merge config files
 	viper.SetConfigType("yaml")
 	configFiles := parseConfigFilesEnv(os.Getenv("MOCHI_CONFIG_FILES"))
 	if len(configFiles) > 0 {
@@ -123,9 +136,7 @@ func Load() (*Config, error) {
 		}
 	}
 
-	// Setup environment variables
 	viper.SetEnvPrefix("MOCHI")
-	// Replace dots with underscores for nested keys (e.g., log.level -> MOCHI_LOG_LEVEL)
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
@@ -134,7 +145,6 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
 
-	// Validate configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
@@ -144,18 +154,15 @@ func Load() (*Config, error) {
 }
 
 func setDefaults() {
-	// Log defaults
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.format", "console")
 
-	// API defaults
 	viper.SetDefault("api.host", "0.0.0.0")
 	viper.SetDefault("api.port", 8080)
 	viper.SetDefault("api.read_timeout", 30)
 	viper.SetDefault("api.write_timeout", 30)
 	viper.SetDefault("api.mode", "release")
 
-	// Database defaults
 	viper.SetDefault("database.host", "localhost")
 	viper.SetDefault("database.port", 5432)
 	viper.SetDefault("database.user", "mochi")
@@ -171,14 +178,12 @@ func setDefaults() {
 	viper.SetDefault("database.tls.client_cert_path", "")
 	viper.SetDefault("database.tls.client_key_path", "")
 
-	// Kubernetes defaults
 	viper.SetDefault("kubernetes.kubeconfig_path", "")
 	viper.SetDefault("kubernetes.in_cluster", false)
 	viper.SetDefault("kubernetes.request_timeout", 30)
 	viper.SetDefault("kubernetes.qps", 50)
 	viper.SetDefault("kubernetes.burst", 100)
 
-	// Prometheus defaults
 	viper.SetDefault("prometheus.url", "http://localhost:9090")
 	viper.SetDefault("prometheus.timeout", 30)
 	viper.SetDefault("prometheus.tls.insecure_skip_verify", false)
@@ -186,7 +191,6 @@ func setDefaults() {
 	viper.SetDefault("prometheus.tls.client_cert_path", "")
 	viper.SetDefault("prometheus.tls.client_key_path", "")
 
-	// Redis defaults
 	viper.SetDefault("redis.host", "localhost")
 	viper.SetDefault("redis.port", 6379)
 	viper.SetDefault("redis.username", "")
@@ -204,17 +208,12 @@ func setDefaults() {
 	viper.SetDefault("redis.tls.client_cert_path", "")
 	viper.SetDefault("redis.tls.client_key_path", "")
 
-	// Worker defaults
-	viper.SetDefault("workers.resource_sync_interval", 120) // 2 minutes
+	viper.SetDefault("workers.resource_sync_interval", 120)
 	viper.SetDefault("workers.exclude_namespaces", []string{"default", "kube-system", "kube-public", "kube-node-lease"})
 	viper.SetDefault("workers.include_namespaces", []string{})
-	viper.SetDefault("workers.retention", 90) // Days
-
-	// Compute defaults
-	viper.SetDefault("compute.min_confidence_threshold", 0.8)
+	viper.SetDefault("workers.retention", 90)
 }
 
-// Returns a slice of config files paths from a comma-separated string
 func parseConfigFilesEnv(pathsList string) []string {
 	if pathsList == "" {
 		return nil
@@ -228,7 +227,8 @@ func parseConfigFilesEnv(pathsList string) []string {
 	return paths
 }
 
-// Reads each config files in order and merges it
+// readConfigFiles reads the first path as the primary config, then merges each additional path in order
+// so later files override overlapping keys.
 func readConfigFiles(configFiles []string) error {
 	viper.SetConfigFile(configFiles[0])
 	if err := viper.ReadInConfig(); err != nil {
@@ -243,7 +243,7 @@ func readConfigFiles(configFiles []string) error {
 	return nil
 }
 
-// Validates the entire configuration
+// Validate checks every section of configuration and returns the first error, wrapped with the section name.
 func (c *Config) Validate() error {
 	if err := c.Log.Validate(); err != nil {
 		return fmt.Errorf("log config: %w", err)
@@ -266,13 +266,10 @@ func (c *Config) Validate() error {
 	if err := c.Workers.Validate(); err != nil {
 		return fmt.Errorf("workers config: %w", err)
 	}
-	if err := c.Compute.Validate(); err != nil {
-		return fmt.Errorf("compute config: %w", err)
-	}
 	return nil
 }
 
-// Validates log configuration
+// Validate checks LogConfig allowed level and format values.
 func (c *LogConfig) Validate() error {
 	validLevels := map[string]bool{
 		"debug": true,
@@ -294,7 +291,7 @@ func (c *LogConfig) Validate() error {
 	return nil
 }
 
-// Validates API configuration
+// Validate checks APIConfig port, timeouts, and mode.
 func (c *APIConfig) Validate() error {
 	if c.Port <= 0 || c.Port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535, got: %d", c.Port)
@@ -317,7 +314,7 @@ func (c *APIConfig) Validate() error {
 	return nil
 }
 
-// Validates database configuration
+// Validate checks DatabaseConfig connectivity-related fields and ssl_mode.
 func (c *DatabaseConfig) Validate() error {
 	if c.Port <= 0 || c.Port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535, got: %d", c.Port)
@@ -350,7 +347,7 @@ func (c *DatabaseConfig) Validate() error {
 	return nil
 }
 
-// Validates Kubernetes configuration
+// Validate checks KubernetesConfig timeouts and client rate limiter settings.
 func (c *KubernetesConfig) Validate() error {
 	if c.RequestTimeout <= 0 {
 		return fmt.Errorf("request_timeout must be greater than 0, got: %d", c.RequestTimeout)
@@ -364,7 +361,7 @@ func (c *KubernetesConfig) Validate() error {
 	return nil
 }
 
-// Validates Prometheus configuration
+// Validate checks PrometheusConfig URL and timeout.
 func (c *PrometheusConfig) Validate() error {
 	if c.URL == "" {
 		return fmt.Errorf("url cannot be empty")
@@ -378,7 +375,7 @@ func (c *PrometheusConfig) Validate() error {
 	return nil
 }
 
-// Validates Redis configuration
+// Validate checks RedisConfig pool sizing, DB index, and TTL fields.
 func (c *RedisConfig) Validate() error {
 	if c.Port <= 0 || c.Port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535, got: %d", c.Port)
@@ -407,7 +404,8 @@ func (c *RedisConfig) Validate() error {
 	return nil
 }
 
-// Validates worker configuration
+// Validate checks WorkerConfig intervals and retention bounds, and normalizes nil namespace slices to empty.
+// YAML or JSON null for a list would otherwise leave nil slices. Empty slices make “no filter” logic predictable.
 func (c *WorkerConfig) Validate() error {
 	if c.ResourceSyncInterval <= 0 {
 		return fmt.Errorf("resource_sync_interval must be greater than 0, got: %d", c.ResourceSyncInterval)
@@ -427,18 +425,9 @@ func (c *WorkerConfig) Validate() error {
 	return nil
 }
 
-// Validates compute configuration
-func (c *ComputeConfig) Validate() error {
-	if c.MinConfidenceThreshold <= 0.2 {
-		return fmt.Errorf("min_confidence_threshold must be greater than 0.2 (values 0.2 or lower produce low-confidence recommendations); use a value between 0.5 and 0.95, got: %g", c.MinConfidenceThreshold)
-	}
-	if c.MinConfidenceThreshold >= 1.0 {
-		return fmt.Errorf("min_confidence_threshold must be less than 1.0 (1.0 would exclude all recommendations); use a value between 0.5 and 0.95, got: %g", c.MinConfidenceThreshold)
-	}
-	return nil
-}
-
-// builds a TLS configuration for TLS clients
+// BuildTLSConfig builds a TLS configuration for clients from TLSConfig.
+// It optionally loads a custom root CA from RootCAPath and, when both ClientCertPath and ClientKeyPath are set,
+// loads a mutual TLS client certificate. Setting only one of the client paths is ignored here, so configure both or neither.
 func BuildTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: cfg.InsecureSkipVerify,
