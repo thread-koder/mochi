@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// Queries pod disk read bytes metrics over a time range (bytes/sec)
+// QueryPodDiskReadBytesRange returns pod disk read byte rate over the requested range.
 func QueryPodDiskReadBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodDiskReadBytesQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
 	if err != nil {
@@ -16,7 +16,7 @@ func QueryPodDiskReadBytesRange(ctx context.Context, r v1.Range, opts QueryOptio
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries pod disk write bytes metrics over a time range (bytes/sec)
+// QueryPodDiskWriteBytesRange returns pod disk write byte rate over the requested range.
 func QueryPodDiskWriteBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodDiskWriteBytesQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
 	if err != nil {
@@ -25,7 +25,7 @@ func QueryPodDiskWriteBytesRange(ctx context.Context, r v1.Range, opts QueryOpti
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries pod disk read operations metrics over a time range (IOPS)
+// QueryPodDiskReadOpsRange returns pod disk read operations rate over the requested range.
 func QueryPodDiskReadOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodDiskReadOpsQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
 	if err != nil {
@@ -34,7 +34,7 @@ func QueryPodDiskReadOpsRange(ctx context.Context, r v1.Range, opts QueryOptions
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries pod disk write operations metrics over a time range (IOPS)
+// QueryPodDiskWriteOpsRange returns pod disk write operations rate over the requested range.
 func QueryPodDiskWriteOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodDiskWriteOpsQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
 	if err != nil {
@@ -43,7 +43,7 @@ func QueryPodDiskWriteOpsRange(ctx context.Context, r v1.Range, opts QueryOption
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace disk read bytes metrics over a time range (bytes/sec)
+// QueryNamespaceDiskReadBytesRange returns namespace disk read byte rate over the requested range.
 func QueryNamespaceDiskReadBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceDiskReadBytesQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
@@ -52,7 +52,7 @@ func QueryNamespaceDiskReadBytesRange(ctx context.Context, r v1.Range, opts Quer
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace disk write bytes metrics over a time range (bytes/sec)
+// QueryNamespaceDiskWriteBytesRange returns namespace disk write byte rate over the requested range.
 func QueryNamespaceDiskWriteBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceDiskWriteBytesQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
@@ -61,7 +61,7 @@ func QueryNamespaceDiskWriteBytesRange(ctx context.Context, r v1.Range, opts Que
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace disk read operations metrics over a time range (IOPS)
+// QueryNamespaceDiskReadOpsRange returns namespace disk read operations rate over the requested range.
 func QueryNamespaceDiskReadOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceDiskReadOpsQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
@@ -70,7 +70,7 @@ func QueryNamespaceDiskReadOpsRange(ctx context.Context, r v1.Range, opts QueryO
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace disk write operations metrics over a time range (IOPS)
+// QueryNamespaceDiskWriteOpsRange returns namespace disk write operations rate over the requested range.
 func QueryNamespaceDiskWriteOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceDiskWriteOpsQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {

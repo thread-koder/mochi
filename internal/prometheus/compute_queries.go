@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// Queries pod CPU usage metrics over a time range
+// QueryPodCPURange returns pod CPU usage over the requested range.
 func QueryPodCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodCPUQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
 	if err != nil {
@@ -17,7 +17,7 @@ func QueryPodCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries pod memory usage metrics over a time range
+// QueryPodMemoryRange returns pod memory working set over the requested range.
 func QueryPodMemoryRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodMemoryQuery(opts.Namespace, opts.Pod, opts.Container)
 	if err != nil {
@@ -26,7 +26,7 @@ func QueryPodMemoryRange(ctx context.Context, r v1.Range, opts QueryOptions) (mo
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries pod CPU throttling metrics
+// QueryPodCPUThrottling returns the pod CFS throttling ratio.
 func QueryPodCPUThrottling(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildPodCPUThrottlingQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration, timeRange.String(), step.String())
 	if err != nil {
@@ -35,7 +35,7 @@ func QueryPodCPUThrottling(ctx context.Context, timeRange time.Duration, step ti
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries pod CPU pressure metrics
+// QueryPodCPUPressure returns the pod CPU pressure ratio.
 func QueryPodCPUPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildPodCPUPressureQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration, timeRange.String(), step.String())
 	if err != nil {
@@ -44,7 +44,7 @@ func QueryPodCPUPressure(ctx context.Context, timeRange time.Duration, step time
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries pod memory fail count metrics
+// QueryPodMemoryFailCount returns memory failcnt increases for the pod.
 func QueryPodMemoryFailCount(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildPodMemoryFailCountQuery(opts.Namespace, opts.Pod, opts.Container, timeRange.String())
 	if err != nil {
@@ -53,7 +53,7 @@ func QueryPodMemoryFailCount(ctx context.Context, timeRange time.Duration, opts 
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries pod memory OOM metrics
+// QueryPodMemoryOOM returns OOM event increases for the pod.
 func QueryPodMemoryOOM(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildPodMemoryOOMQuery(opts.Namespace, opts.Pod, opts.Container, timeRange.String())
 	if err != nil {
@@ -62,7 +62,7 @@ func QueryPodMemoryOOM(ctx context.Context, timeRange time.Duration, opts QueryO
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries pod memory pressure metrics
+// QueryPodMemoryPressure returns the pod memory pressure ratio.
 func QueryPodMemoryPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildPodMemoryPressureQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration, timeRange.String(), step.String())
 	if err != nil {
@@ -71,7 +71,7 @@ func QueryPodMemoryPressure(ctx context.Context, timeRange time.Duration, step t
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries pod restarts metrics
+// QueryPodRestarts returns restart increases for the pod/container scope.
 func QueryPodRestarts(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildPodRestartsQuery(opts.Namespace, opts.Pod, opts.Container, timeRange.String())
 	if err != nil {
@@ -80,7 +80,7 @@ func QueryPodRestarts(ctx context.Context, timeRange time.Duration, opts QueryOp
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries namespace CPU usage metrics over a time range
+// QueryNamespaceCPURange returns namespace CPU usage over the requested range.
 func QueryNamespaceCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceCPUQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
@@ -89,7 +89,7 @@ func QueryNamespaceCPURange(ctx context.Context, r v1.Range, opts QueryOptions) 
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace memory usage metrics over a time range
+// QueryNamespaceMemoryRange returns namespace memory working set over the requested range.
 func QueryNamespaceMemoryRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceMemoryQuery(opts.Namespace)
 	if err != nil {
@@ -98,7 +98,7 @@ func QueryNamespaceMemoryRange(ctx context.Context, r v1.Range, opts QueryOption
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace CPU throttling metrics
+// QueryNamespaceCPUThrottling returns the namespace CFS throttling ratio.
 func QueryNamespaceCPUThrottling(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildNamespaceCPUThrottlingQuery(opts.Namespace, opts.RangeDuration, timeRange.String(), step.String())
 	if err != nil {
@@ -107,7 +107,7 @@ func QueryNamespaceCPUThrottling(ctx context.Context, timeRange time.Duration, s
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries namespace CPU pressure metrics
+// QueryNamespaceCPUPressure returns the namespace CPU pressure ratio.
 func QueryNamespaceCPUPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildNamespaceCPUPressureQuery(opts.Namespace, opts.RangeDuration, timeRange.String(), step.String())
 	if err != nil {
@@ -116,7 +116,7 @@ func QueryNamespaceCPUPressure(ctx context.Context, timeRange time.Duration, ste
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries namespace memory fail count metrics
+// QueryNamespaceMemoryFailCount returns memory failcnt increases for the namespace.
 func QueryNamespaceMemoryFailCount(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildNamespaceMemoryFailCountQuery(opts.Namespace, timeRange.String())
 	if err != nil {
@@ -125,7 +125,7 @@ func QueryNamespaceMemoryFailCount(ctx context.Context, timeRange time.Duration,
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries namespace memory OOM metrics
+// QueryNamespaceMemoryOOM returns OOM event increases for the namespace.
 func QueryNamespaceMemoryOOM(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildNamespaceMemoryOOMQuery(opts.Namespace, timeRange.String())
 	if err != nil {
@@ -134,7 +134,7 @@ func QueryNamespaceMemoryOOM(ctx context.Context, timeRange time.Duration, opts 
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries namespace memory pressure metrics
+// QueryNamespaceMemoryPressure returns the namespace memory pressure ratio.
 func QueryNamespaceMemoryPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildNamespaceMemoryPressureQuery(opts.Namespace, opts.RangeDuration, timeRange.String(), step.String())
 	if err != nil {
@@ -143,7 +143,7 @@ func QueryNamespaceMemoryPressure(ctx context.Context, timeRange time.Duration, 
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// Queries namespace restarts metrics
+// QueryNamespaceRestarts returns container restart increases for the namespace.
 func QueryNamespaceRestarts(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
 	query, err := BuildNamespaceRestartsQuery(opts.Namespace, timeRange.String())
 	if err != nil {

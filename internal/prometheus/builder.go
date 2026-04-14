@@ -4,7 +4,8 @@ import (
 	"fmt"
 )
 
-// Builds a container-scoped PromQL selector for a metric
+// BuildContainerMetricQuery builds a container metric selector used by cAdvisor queries.
+// It always excludes the synthetic POD container and empty container labels.
 func BuildContainerMetricQuery(metric, namespace, pod, container, rangeDuration string) string {
 	query := fmt.Sprintf(`%s{container!="POD",container!=""`, metric)
 	if namespace != "" {

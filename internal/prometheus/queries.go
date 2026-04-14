@@ -9,25 +9,24 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// Represents options for executing Prometheus queries
+// QueryOptions controls label filters and range windows for query builders.
 type QueryOptions struct {
-	// Filters queries to a specific namespace
+	// Namespace scopes queries to a Kubernetes namespace when set.
 	Namespace string
-	// Filters queries to a specific pod
+	// Pod scopes queries to a Kubernetes pod when set.
 	Pod string
-	// Filters queries to a specific container
+	// Container scopes queries to a single container when set.
 	Container string
-	// Filters queries to a specific node
+	// Node is reserved for node-scoped metrics.
 	Node string
-	// Used for rate() sliding window
+	// RangeDuration is the rate/increase lookback window (for example "5m").
 	RangeDuration string
 }
 
-// Executes a PromQL range query
+// QueryRange executes a PromQL range query given the query string, range, and options.
 func QueryRange(ctx context.Context, query string, r v1.Range, opts QueryOptions) (model.Value, v1.Warnings, error) {
-	// Execute range query
 	if API == nil {
-		return nil, nil, fmt.Errorf("Prometheus API not initialized")
+		return nil, nil, fmt.Errorf("prometheus api not initialized")
 	}
 	result, warnings, err := API.QueryRange(ctx, query, r)
 	if err != nil {
@@ -37,10 +36,10 @@ func QueryRange(ctx context.Context, query string, r v1.Range, opts QueryOptions
 	return result, warnings, nil
 }
 
-// Executes a PromQL instant query
+// Query executes a PromQL instant query given the query string and timestamp.
 func Query(ctx context.Context, query string, ts time.Time) (model.Value, v1.Warnings, error) {
 	if API == nil {
-		return nil, nil, fmt.Errorf("Prometheus API not initialized")
+		return nil, nil, fmt.Errorf("prometheus api not initialized")
 	}
 	result, warnings, err := API.Query(ctx, query, ts)
 	if err != nil {
@@ -50,7 +49,7 @@ func Query(ctx context.Context, query string, ts time.Time) (model.Value, v1.War
 	return result, warnings, nil
 }
 
-// Executes a range query and returns the result as a matrix
+// executeMatrixQuery executes a range query and enforces a matrix result type.
 func executeMatrixQuery(ctx context.Context, query string, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	result, warnings, err := QueryRange(ctx, query, r, opts)
 	if err != nil {
@@ -65,7 +64,10 @@ func executeMatrixQuery(ctx context.Context, query string, r v1.Range, opts Quer
 	return matrix, warnings, nil
 }
 
-// Helper to execute and cast a scalar query
+// executeScalarQuery executes an instant query and extracts one scalar value.
+//
+// Some PromQL expressions that are scalar in intent return a one-sample vector,
+// so this function accepts both scalar and 0/1-length vector responses.
 func executeScalarQuery(ctx context.Context, query string, ts time.Time) (float64, v1.Warnings, error) {
 	result, warnings, err := Query(ctx, query, ts)
 	if err != nil {

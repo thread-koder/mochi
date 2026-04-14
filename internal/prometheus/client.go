@@ -13,13 +13,13 @@ import (
 )
 
 var (
-	// Global Prometheus API client
+	// Client is the global Prometheus HTTP client.
 	Client api.Client
-	// Global Prometheus v1 API
+	// API is the global Prometheus v1 API handle.
 	API v1.API
 )
 
-// Initializes the Prometheus client
+// Init configures and verifies the Prometheus client connection.
 func Init(cfg *config.PrometheusConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("prometheus config is nil")
@@ -28,7 +28,6 @@ func Init(cfg *config.PrometheusConfig) error {
 	log := logger.WithComponent("prometheus")
 	log.Info().Msg("Initializing client...")
 
-	// Create HTTP transport and apply TLS config
 	transport := &http.Transport{}
 	tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
 	if err != nil {
@@ -36,7 +35,6 @@ func Init(cfg *config.PrometheusConfig) error {
 	}
 	transport.TLSClientConfig = tlsConfig
 
-	// Create Prometheus API client configuration
 	clientConfig := api.Config{
 		Address: cfg.URL,
 		Client: &http.Client{
@@ -45,22 +43,21 @@ func Init(cfg *config.PrometheusConfig) error {
 		},
 	}
 
-	// Create the API client
 	client, err := api.NewClient(clientConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create Prometheus client: %w", err)
+		return fmt.Errorf("failed to create prometheus client: %w", err)
 	}
 
 	Client = client
 	API = v1.NewAPI(client)
 
-	// Test connection by querying Prometheus build info
+	// Buildinfo is a cheap endpoint that proves the API is reachable.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	_, err = API.Buildinfo(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to connect to Prometheus server: %w", err)
+		return fmt.Errorf("failed to connect to prometheus server: %w", err)
 	}
 
 	log.Info().
@@ -71,16 +68,15 @@ func Init(cfg *config.PrometheusConfig) error {
 	return nil
 }
 
-// Performs a health check on the Prometheus connection
+// HealthCheck verifies the API reachability with a Buildinfo call.
 func HealthCheck(ctx context.Context) error {
 	if Client == nil {
-		return fmt.Errorf("Prometheus client not initialized")
+		return fmt.Errorf("prometheus client not initialized")
 	}
 
-	// Try to get build info as a health check
 	_, err := API.Buildinfo(ctx)
 	if err != nil {
-		return fmt.Errorf("Prometheus health check failed: %w", err)
+		return fmt.Errorf("prometheus health check failed: %w", err)
 	}
 
 	return nil

@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// Builds a PromQL query for pod disk read bytes (bytes/sec)
+// BuildPodDiskReadBytesQuery builds the pod disk read byte rate query.
 func BuildPodDiskReadBytesQuery(namespace, pod, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -20,7 +20,7 @@ func BuildPodDiskReadBytesQuery(namespace, pod, container string, rangeDuration 
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for pod disk write bytes (bytes/sec)
+// BuildPodDiskWriteBytesQuery builds the pod disk write byte rate query.
 func BuildPodDiskWriteBytesQuery(namespace, pod, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -36,7 +36,7 @@ func BuildPodDiskWriteBytesQuery(namespace, pod, container string, rangeDuration
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for pod disk read operations (IOPS)
+// BuildPodDiskReadOpsQuery builds the pod disk read operations rate query.
 func BuildPodDiskReadOpsQuery(namespace, pod, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -52,7 +52,7 @@ func BuildPodDiskReadOpsQuery(namespace, pod, container string, rangeDuration st
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for pod disk write operations (IOPS)
+// BuildPodDiskWriteOpsQuery builds the pod disk write operations rate query.
 func BuildPodDiskWriteOpsQuery(namespace, pod, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -68,7 +68,7 @@ func BuildPodDiskWriteOpsQuery(namespace, pod, container string, rangeDuration s
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for namespace disk read bytes (bytes/sec)
+// BuildNamespaceDiskReadBytesQuery builds the namespace disk read byte rate query.
 func BuildNamespaceDiskReadBytesQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -80,7 +80,7 @@ func BuildNamespaceDiskReadBytesQuery(namespace string, rangeDuration string) (s
 	return fmt.Sprintf(`sum(rate(container_fs_reads_bytes_total{container!="POD",container!="",namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
-// Builds a PromQL query for namespace disk write bytes (bytes/sec)
+// BuildNamespaceDiskWriteBytesQuery builds the namespace disk write byte rate query.
 func BuildNamespaceDiskWriteBytesQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -92,7 +92,7 @@ func BuildNamespaceDiskWriteBytesQuery(namespace string, rangeDuration string) (
 	return fmt.Sprintf(`sum(rate(container_fs_writes_bytes_total{container!="POD",container!="",namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
-// Builds a PromQL query for namespace disk read operations (IOPS)
+// BuildNamespaceDiskReadOpsQuery builds the namespace disk read operations rate query.
 func BuildNamespaceDiskReadOpsQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -104,7 +104,7 @@ func BuildNamespaceDiskReadOpsQuery(namespace string, rangeDuration string) (str
 	return fmt.Sprintf(`sum(rate(container_fs_reads_total{container!="POD",container!="",namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
-// Builds a PromQL query for namespace disk write operations (IOPS)
+// BuildNamespaceDiskWriteOpsQuery builds the namespace disk write operations rate query.
 func BuildNamespaceDiskWriteOpsQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")

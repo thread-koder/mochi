@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// Builds a network interface-scoped PromQL selector for a metric.
+// BuildNetworkMetricQuery builds a network metric selector for pod/interface scope.
 func BuildNetworkMetricQuery(metric, namespace, pod, iface, rangeDuration string) string {
 	query := fmt.Sprintf(`%s{`, metric)
 	needsComma := false
@@ -33,7 +33,7 @@ func BuildNetworkMetricQuery(metric, namespace, pod, iface, rangeDuration string
 	return query
 }
 
-// Builds a PromQL query for pod network receive bytes (bytes/sec)
+// BuildPodNetworkReceiveBytesQuery builds the pod network receive rate query.
 func BuildPodNetworkReceiveBytesQuery(namespace, pod string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -49,7 +49,7 @@ func BuildPodNetworkReceiveBytesQuery(namespace, pod string, rangeDuration strin
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for pod network transmit bytes (bytes/sec)
+// BuildPodNetworkTransmitBytesQuery builds the pod network transmit rate query.
 func BuildPodNetworkTransmitBytesQuery(namespace, pod string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -65,7 +65,7 @@ func BuildPodNetworkTransmitBytesQuery(namespace, pod string, rangeDuration stri
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for pod network receive errors (errors/sec)
+// BuildPodNetworkReceiveErrorsQuery builds the pod network receive error rate query.
 func BuildPodNetworkReceiveErrorsQuery(namespace, pod string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -81,7 +81,7 @@ func BuildPodNetworkReceiveErrorsQuery(namespace, pod string, rangeDuration stri
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for pod network transmit errors (errors/sec)
+// BuildPodNetworkTransmitErrorsQuery builds the pod network transmit error rate query.
 func BuildPodNetworkTransmitErrorsQuery(namespace, pod string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -97,7 +97,7 @@ func BuildPodNetworkTransmitErrorsQuery(namespace, pod string, rangeDuration str
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for pod network receive packets dropped (packets/sec)
+// BuildPodNetworkReceiveDroppedQuery builds the pod dropped receive packet rate query.
 func BuildPodNetworkReceiveDroppedQuery(namespace, pod string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -113,7 +113,7 @@ func BuildPodNetworkReceiveDroppedQuery(namespace, pod string, rangeDuration str
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for pod network transmit packets dropped (packets/sec)
+// BuildPodNetworkTransmitDroppedQuery builds the pod dropped transmit packet rate query.
 func BuildPodNetworkTransmitDroppedQuery(namespace, pod string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -129,7 +129,7 @@ func BuildPodNetworkTransmitDroppedQuery(namespace, pod string, rangeDuration st
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for namespace network receive bytes (bytes/sec)
+// BuildNamespaceNetworkReceiveBytesQuery builds the namespace network receive rate query.
 func BuildNamespaceNetworkReceiveBytesQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -141,7 +141,7 @@ func BuildNamespaceNetworkReceiveBytesQuery(namespace string, rangeDuration stri
 	return fmt.Sprintf(`sum(rate(container_network_receive_bytes_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
-// Builds a PromQL query for namespace network transmit bytes (bytes/sec)
+// BuildNamespaceNetworkTransmitBytesQuery builds the namespace network transmit rate query.
 func BuildNamespaceNetworkTransmitBytesQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -153,7 +153,7 @@ func BuildNamespaceNetworkTransmitBytesQuery(namespace string, rangeDuration str
 	return fmt.Sprintf(`sum(rate(container_network_transmit_bytes_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
-// Builds a PromQL query for namespace network receive errors (errors/sec)
+// BuildNamespaceNetworkReceiveErrorsQuery builds the namespace receive error rate query.
 func BuildNamespaceNetworkReceiveErrorsQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -165,7 +165,7 @@ func BuildNamespaceNetworkReceiveErrorsQuery(namespace string, rangeDuration str
 	return fmt.Sprintf(`sum(rate(container_network_receive_errors_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
-// Builds a PromQL query for namespace network transmit errors (errors/sec)
+// BuildNamespaceNetworkTransmitErrorsQuery builds the namespace transmit error rate query.
 func BuildNamespaceNetworkTransmitErrorsQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -177,7 +177,7 @@ func BuildNamespaceNetworkTransmitErrorsQuery(namespace string, rangeDuration st
 	return fmt.Sprintf(`sum(rate(container_network_transmit_errors_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
-// Builds a PromQL query for namespace network receive packets dropped (packets/sec)
+// BuildNamespaceNetworkReceiveDroppedQuery builds the namespace dropped receive packet rate query.
 func BuildNamespaceNetworkReceiveDroppedQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -189,7 +189,7 @@ func BuildNamespaceNetworkReceiveDroppedQuery(namespace string, rangeDuration st
 	return fmt.Sprintf(`sum(rate(container_network_receive_packets_dropped_total{namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
-// Builds a PromQL query for namespace network transmit packets dropped (packets/sec)
+// BuildNamespaceNetworkTransmitDroppedQuery builds the namespace dropped transmit packet rate query.
 func BuildNamespaceNetworkTransmitDroppedQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")

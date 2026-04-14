@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// Queries pod network receive bytes metrics over a time range (bytes/sec)
+// QueryPodNetworkReceiveBytesRange returns pod network receive rate over the requested range.
 func QueryPodNetworkReceiveBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodNetworkReceiveBytesQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
 	if err != nil {
@@ -16,7 +16,7 @@ func QueryPodNetworkReceiveBytesRange(ctx context.Context, r v1.Range, opts Quer
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries pod network transmit bytes metrics over a time range (bytes/sec)
+// QueryPodNetworkTransmitBytesRange returns pod network transmit rate over the requested range.
 func QueryPodNetworkTransmitBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodNetworkTransmitBytesQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
 	if err != nil {
@@ -25,7 +25,7 @@ func QueryPodNetworkTransmitBytesRange(ctx context.Context, r v1.Range, opts Que
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries pod network receive errors metrics over a time range (errors/sec)
+// QueryPodNetworkReceiveErrorsRange returns pod receive error rate over the requested range.
 func QueryPodNetworkReceiveErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodNetworkReceiveErrorsQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
 	if err != nil {
@@ -34,7 +34,7 @@ func QueryPodNetworkReceiveErrorsRange(ctx context.Context, r v1.Range, opts Que
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries pod network transmit errors metrics over a time range (errors/sec)
+// QueryPodNetworkTransmitErrorsRange returns pod transmit error rate over the requested range.
 func QueryPodNetworkTransmitErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodNetworkTransmitErrorsQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
 	if err != nil {
@@ -43,7 +43,7 @@ func QueryPodNetworkTransmitErrorsRange(ctx context.Context, r v1.Range, opts Qu
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries pod network receive dropped packets metrics over a time range (packets/sec)
+// QueryPodNetworkReceiveDroppedRange returns dropped receive packet rate over the requested range.
 func QueryPodNetworkReceiveDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodNetworkReceiveDroppedQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
 	if err != nil {
@@ -52,7 +52,7 @@ func QueryPodNetworkReceiveDroppedRange(ctx context.Context, r v1.Range, opts Qu
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries pod network transmit dropped packets metrics over a time range (packets/sec)
+// QueryPodNetworkTransmitDroppedRange returns dropped transmit packet rate over the requested range.
 func QueryPodNetworkTransmitDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildPodNetworkTransmitDroppedQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
 	if err != nil {
@@ -61,7 +61,7 @@ func QueryPodNetworkTransmitDroppedRange(ctx context.Context, r v1.Range, opts Q
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace network receive bytes metrics over a time range (bytes/sec)
+// QueryNamespaceNetworkReceiveBytesRange returns namespace network receive rate over the requested range.
 func QueryNamespaceNetworkReceiveBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkReceiveBytesQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
@@ -70,7 +70,7 @@ func QueryNamespaceNetworkReceiveBytesRange(ctx context.Context, r v1.Range, opt
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace network transmit bytes metrics over a time range (bytes/sec)
+// QueryNamespaceNetworkTransmitBytesRange returns namespace network transmit rate over the requested range.
 func QueryNamespaceNetworkTransmitBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkTransmitBytesQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
@@ -79,7 +79,7 @@ func QueryNamespaceNetworkTransmitBytesRange(ctx context.Context, r v1.Range, op
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace network receive errors metrics over a time range (errors/sec)
+// QueryNamespaceNetworkReceiveErrorsRange returns namespace receive error rate over the requested range.
 func QueryNamespaceNetworkReceiveErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkReceiveErrorsQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
@@ -88,7 +88,7 @@ func QueryNamespaceNetworkReceiveErrorsRange(ctx context.Context, r v1.Range, op
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace network transmit errors metrics over a time range (errors/sec)
+// QueryNamespaceNetworkTransmitErrorsRange returns namespace transmit error rate over the requested range.
 func QueryNamespaceNetworkTransmitErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkTransmitErrorsQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
@@ -97,7 +97,7 @@ func QueryNamespaceNetworkTransmitErrorsRange(ctx context.Context, r v1.Range, o
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace network receive dropped packets metrics over a time range (packets/sec)
+// QueryNamespaceNetworkReceiveDroppedRange returns dropped receive packet rate over the requested range.
 func QueryNamespaceNetworkReceiveDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkReceiveDroppedQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
@@ -106,7 +106,7 @@ func QueryNamespaceNetworkReceiveDroppedRange(ctx context.Context, r v1.Range, o
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// Queries namespace network transmit dropped packets metrics over a time range (packets/sec)
+// QueryNamespaceNetworkTransmitDroppedRange returns dropped transmit packet rate over the requested range.
 func QueryNamespaceNetworkTransmitDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkTransmitDroppedQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {

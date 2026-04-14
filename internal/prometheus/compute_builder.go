@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// Builds a PromQL query for pod CPU usage
+// BuildPodCPUQuery builds the pod CPU usage query.
 func BuildPodCPUQuery(namespace, pod, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -20,7 +20,7 @@ func BuildPodCPUQuery(namespace, pod, container string, rangeDuration string) (s
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// Builds a PromQL query for pod memory usage
+// BuildPodMemoryQuery builds the pod memory working set query.
 func BuildPodMemoryQuery(namespace, pod, container string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -33,7 +33,7 @@ func BuildPodMemoryQuery(namespace, pod, container string) (string, error) {
 	return fmt.Sprintf("sum(%s)", base), nil
 }
 
-// Builds a PromQL query for pod CPU throttling (CFS)
+// BuildPodCPUThrottlingQuery builds the pod CFS throttling ratio query.
 func BuildPodCPUThrottlingQuery(namespace, pod, container string, rangeDuration string, timeRange string, step string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -45,6 +45,7 @@ func BuildPodCPUThrottlingQuery(namespace, pod, container string, rangeDuration 
 		rangeDuration = "5m"
 	}
 	if step == "" {
+		// Use a coarse default to avoid noisy short-window spikes.
 		step = "5m"
 	}
 
@@ -52,11 +53,12 @@ func BuildPodCPUThrottlingQuery(namespace, pod, container string, rangeDuration 
 	totalMetric := BuildContainerMetricQuery("container_cpu_cfs_periods_total", namespace, pod, container, "")
 	throttledRate := fmt.Sprintf("sum(rate(%s[%s]))", throttledMetric, rangeDuration)
 	totalRate := fmt.Sprintf("sum(rate(%s[%s]))", totalMetric, rangeDuration)
+	// Guard against zero denominator, so the ratio is bounded at 0+.
 	ratioQuery := fmt.Sprintf("clamp_min(%s / clamp_min(%s, 0.0001), 0)", throttledRate, totalRate)
 	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", ratioQuery, timeRange, step), nil
 }
 
-// Builds a PromQL query for pod CPU pressure (stalled)
+// BuildPodCPUPressureQuery builds the pod CPU pressure query.
 func BuildPodCPUPressureQuery(namespace, pod, container string, rangeDuration string, timeRange string, step string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -68,6 +70,7 @@ func BuildPodCPUPressureQuery(namespace, pod, container string, rangeDuration st
 		rangeDuration = "5m"
 	}
 	if step == "" {
+		// Match range defaults so the averages are stable across callers.
 		step = "5m"
 	}
 
@@ -85,7 +88,7 @@ func BuildPodCPUPressureQuery(namespace, pod, container string, rangeDuration st
 	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", aggRate, timeRange, step), nil
 }
 
-// Builds a PromQL query for pod memory fail count
+// BuildPodMemoryFailCountQuery builds the pod memory failcnt increase query.
 func BuildPodMemoryFailCountQuery(namespace, pod, container string, timeRange string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -101,7 +104,7 @@ func BuildPodMemoryFailCountQuery(namespace, pod, container string, timeRange st
 	return fmt.Sprintf("sum(increase(%s))", base), nil
 }
 
-// Builds a PromQL query for pod memory OOM events
+// BuildPodMemoryOOMQuery builds the pod OOM event increase query.
 func BuildPodMemoryOOMQuery(namespace, pod, container string, timeRange string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -117,7 +120,7 @@ func BuildPodMemoryOOMQuery(namespace, pod, container string, timeRange string) 
 	return fmt.Sprintf("sum(increase(%s))", base), nil
 }
 
-// Builds a PromQL query for pod memory pressure (stalled)
+// BuildPodMemoryPressureQuery builds the pod memory pressure query.
 func BuildPodMemoryPressureQuery(namespace, pod, container string, rangeDuration string, timeRange string, step string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -129,6 +132,7 @@ func BuildPodMemoryPressureQuery(namespace, pod, container string, rangeDuration
 		rangeDuration = "5m"
 	}
 	if step == "" {
+		// Match range defaults so the averages are stable across callers.
 		step = "5m"
 	}
 
@@ -146,7 +150,7 @@ func BuildPodMemoryPressureQuery(namespace, pod, container string, rangeDuration
 	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", aggRate, timeRange, step), nil
 }
 
-// Builds a PromQL query for pod restarts
+// BuildPodRestartsQuery builds the pod/container restart increase query.
 func BuildPodRestartsQuery(namespace, pod, container string, timeRange string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -169,7 +173,7 @@ func BuildPodRestartsQuery(namespace, pod, container string, timeRange string) (
 	return fmt.Sprintf("sum(increase(%s[%s]))", query, timeRange), nil
 }
 
-// Builds a PromQL query for namespace CPU usage
+// BuildNamespaceCPUQuery builds the namespace CPU usage query.
 func BuildNamespaceCPUQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -181,7 +185,7 @@ func BuildNamespaceCPUQuery(namespace string, rangeDuration string) (string, err
 	return fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{container!="POD",container!="",namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
-// Builds a PromQL query for namespace memory usage
+// BuildNamespaceMemoryQuery builds the namespace memory working set query.
 func BuildNamespaceMemoryQuery(namespace string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -190,7 +194,7 @@ func BuildNamespaceMemoryQuery(namespace string) (string, error) {
 	return fmt.Sprintf(`sum(container_memory_working_set_bytes{container!="POD",container!="",namespace="%s"})`, namespace), nil
 }
 
-// Builds a PromQL query for namespace CPU throttling (CFS)
+// BuildNamespaceCPUThrottlingQuery builds the namespace CFS throttling ratio query.
 func BuildNamespaceCPUThrottlingQuery(namespace string, rangeDuration string, timeRange string, step string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -199,6 +203,7 @@ func BuildNamespaceCPUThrottlingQuery(namespace string, rangeDuration string, ti
 		rangeDuration = "5m"
 	}
 	if step == "" {
+		// Use a coarse default to avoid noisy short-window spikes.
 		step = "5m"
 	}
 
@@ -206,11 +211,12 @@ func BuildNamespaceCPUThrottlingQuery(namespace string, rangeDuration string, ti
 	throttledRate := fmt.Sprintf("sum(rate(%s[%s]))", base, rangeDuration)
 	baseTotal := fmt.Sprintf(`container_cpu_cfs_periods_total{container!="POD",container!="",namespace="%s"}`, namespace)
 	totalRate := fmt.Sprintf("sum(rate(%s[%s]))", baseTotal, rangeDuration)
+	// Guard against zero denominator, so the ratio is bounded at 0+.
 	ratioQuery := fmt.Sprintf("clamp_min(%s / clamp_min(%s, 0.0001), 0)", throttledRate, totalRate)
 	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", ratioQuery, timeRange, step), nil
 }
 
-// Builds a PromQL query for namespace CPU pressure (stalled)
+// BuildNamespaceCPUPressureQuery builds the namespace CPU pressure query.
 func BuildNamespaceCPUPressureQuery(namespace string, rangeDuration string, timeRange string, step string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -228,7 +234,7 @@ func BuildNamespaceCPUPressureQuery(namespace string, rangeDuration string, time
 	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step), nil
 }
 
-// Builds a PromQL query for namespace memory fail count
+// BuildNamespaceMemoryFailCountQuery builds the namespace memory failcnt increase query.
 func BuildNamespaceMemoryFailCountQuery(namespace string, timeRange string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -238,7 +244,7 @@ func BuildNamespaceMemoryFailCountQuery(namespace string, timeRange string) (str
 	return fmt.Sprintf("sum(increase(%s[%s]))", base, timeRange), nil
 }
 
-// Builds a PromQL query for namespace memory OOM events
+// BuildNamespaceMemoryOOMQuery builds the namespace OOM event increase query.
 func BuildNamespaceMemoryOOMQuery(namespace string, timeRange string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -248,7 +254,7 @@ func BuildNamespaceMemoryOOMQuery(namespace string, timeRange string) (string, e
 	return fmt.Sprintf("sum(increase(%s[%s]))", base, timeRange), nil
 }
 
-// Builds a PromQL query for namespace memory pressure (stalled)
+// BuildNamespaceMemoryPressureQuery builds the namespace memory pressure query.
 func BuildNamespaceMemoryPressureQuery(namespace string, rangeDuration string, timeRange string, step string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
@@ -266,7 +272,7 @@ func BuildNamespaceMemoryPressureQuery(namespace string, rangeDuration string, t
 	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step), nil
 }
 
-// Builds a PromQL query for namespace container restarts
+// BuildNamespaceRestartsQuery builds the namespace container restart increase query.
 func BuildNamespaceRestartsQuery(namespace string, timeRange string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
