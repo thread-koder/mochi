@@ -19,20 +19,29 @@ import (
 )
 
 var (
-	Version   = "dev"
+	// Version is the build version.
+	// Release builds set it with -ldflags "-X main.Version=...".
+	// The default is "dev".
+	Version = "dev"
+
+	// BuildTime is when the binary was built.
+	// Release builds set it with -ldflags "-X main.BuildTime=...".
+	// The default is "unknown".
 	BuildTime = "unknown"
+
+	// GitCommit is the source revision at build time.
+	// Release builds set it with -ldflags "-X main.GitCommit=...".
+	// The default is "unknown".
 	GitCommit = "unknown"
 )
 
 func main() {
-	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load configuration: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Initialize logger
 	logger.Init(cfg.Log.Level, cfg.Log.Format)
 
 	log := logger.WithComponent("main")
@@ -43,63 +52,54 @@ func main() {
 		Msg("Mochi - Kubernetes Resource Optimization Platform")
 
 	log.Info().Msg("Initializing components...")
-	// Initialize database
 	if err := database.Init(&cfg.Database); err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize database")
 	}
 	defer database.Close()
 
-	// Run database migrations
 	if err := database.Migrate(&cfg.Database); err != nil {
 		log.Fatal().Err(err).Msg("Failed to run database migrations")
 	}
 
-	// Initialize Kubernetes client
 	if err := kubernetes.Init(&cfg.Kubernetes); err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize Kubernetes client")
 	}
 
-	// Initialize Prometheus client
 	if err := prometheus.Init(&cfg.Prometheus); err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize Prometheus client")
 	}
 
-	// Initialize Redis client
 	if err := redis.Init(&cfg.Redis); err != nil {
 		log.Fatal().Err(err).Msg("Failed to initialize Redis client")
 	}
 	defer redis.Close()
 
-	// Create the worker pool
 	workerPool, err := workers.NewWorkerPool(&cfg.Workers)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create worker pool")
 	}
 
-	// Create the API server
 	server, err := api.NewServer(&cfg.API)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create API server")
 	}
 	log.Info().Msg("Components initialized")
 
-	// Start server
 	go func() {
 		if err := server.Start(); err != nil {
 			log.Fatal().Err(err).Msg("Failed to start API server")
 		}
 	}()
 
-	// Start the worker pool
 	workerPool.Start()
 	defer workerPool.Stop()
 
-	// Wait for interrupt signal for graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	// Graceful shutdown
+	// Bound shutdown so SIGTERM/SIGINT can't leave the process stuck
+	// if Close or in-flight work never completes.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -109,5 +109,4 @@ func main() {
 	}
 
 	log.Info().Msg("Server shutdown")
-	os.Exit(0)
 }
