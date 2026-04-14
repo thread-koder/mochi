@@ -12,16 +12,15 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Manages all background workers
+// WorkerPool owns long-running background workers and their shared shutdown context.
 type WorkerPool struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
 	resourceSync *ResourceSyncWorker
-	syncInterval time.Duration
 }
 
-// Creates a new worker pool
+// NewWorkerPool builds background workers based on the provided config.
 func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("worker config is nil")
@@ -35,16 +34,14 @@ func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
 		ctx:          ctx,
 		cancel:       cancel,
 		resourceSync: NewResourceSyncWorker(ctx, syncInterval, retentionPeriod),
-		syncInterval: syncInterval,
 	}, nil
 }
 
-// Starts all workers
+// Start launches managed workers in background goroutines.
 func (wp *WorkerPool) Start() {
 	log := logger.WithComponent("workers")
 	log.Info().Msg("Starting worker pool...")
 
-	// Start resource sync worker
 	wp.wg.Go(func() {
 		wp.resourceSync.Run()
 	})
@@ -52,7 +49,7 @@ func (wp *WorkerPool) Start() {
 	log.Info().Msg("Worker pool started")
 }
 
-// Stops all workers gracefully
+// Stop cancels the shared context and waits until all workers exit.
 func (wp *WorkerPool) Stop() {
 	log := logger.WithComponent("workers")
 	log.Info().Msg("Stopping worker pool")
@@ -63,14 +60,14 @@ func (wp *WorkerPool) Stop() {
 	log.Info().Msg("Worker pool stopped")
 }
 
-// Worker for syncing Kubernetes resources to PostgreSQL
+// ResourceSyncWorker periodically syncs Kubernetes resources into the database.
 type ResourceSyncWorker struct {
 	ctx             context.Context
 	interval        time.Duration
 	retentionPeriod time.Duration
 }
 
-// Creates a new resource sync worker
+// NewResourceSyncWorker returns a worker that syncs resources and runs cleanup tasks.
 func NewResourceSyncWorker(ctx context.Context, interval time.Duration, retentionPeriod time.Duration) *ResourceSyncWorker {
 	return &ResourceSyncWorker{
 		ctx:             ctx,
@@ -79,18 +76,18 @@ func NewResourceSyncWorker(ctx context.Context, interval time.Duration, retentio
 	}
 }
 
-// Runs the resource sync worker
+// Run executes one sync immediately, then repeats on the configured interval.
 func (w *ResourceSyncWorker) Run() {
 	log := logger.WithComponent("sync-worker")
 	log.Info().
 		Str("interval", fmt.Sprintf("%ds", int(w.interval.Seconds()))).
 		Str("retention", fmt.Sprintf("%dd", int(w.retentionPeriod.Hours()/24))).
-		Msg("Starting resources sync worker...")
+		Msg("Starting resource sync worker...")
 
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
 
-	// Run immediately on start
+	// Run one pass on startup so data is available before the first ticker interval.
 	w.sync()
 
 	for {
@@ -104,29 +101,27 @@ func (w *ResourceSyncWorker) Run() {
 	}
 }
 
-// Performs the actual sync operation
+// sync runs one resource refresh pass and then cleanup.
 func (w *ResourceSyncWorker) sync() {
 	log := logger.WithComponent("sync-worker")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	// Bound each pass so slow external calls do not block the next schedule forever.
+	syncCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	log.Info().Msg("Syncing resources...")
-	// Sync all resources
-	if err := kubernetes.SyncResources(ctx); err != nil {
+	if err := kubernetes.SyncResources(syncCtx); err != nil {
 		log.Warn().Err(err).Msg("Failed to sync resources")
 	} else {
 		log.Info().Msg("Resources sync completed")
 	}
 
-	// Run cleanup
-	w.cleanup(ctx)
+	w.cleanup(syncCtx)
 }
 
-// Performs cleanup operations
+// cleanup deletes stale recommendations after each sync pass.
 func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	log := logger.WithComponent("sync-worker")
-	// Calculate the since time from the retention period
 	since := time.Now().Add(-w.retentionPeriod)
 
 	log.Info().Msg("Cleaning up records...")
