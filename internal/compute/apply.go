@@ -18,7 +18,7 @@ import (
 	"github.com/thread_koder/mochi/internal/logger"
 )
 
-// Mochi annotation keys
+// Annotation keys written when applying recommendations so operators can trace origin and mode.
 const (
 	AnnotationManagedBy          = "mochi.io/managed-by"
 	AnnotationRecommendationID   = "mochi.io/recommendation-id"
@@ -26,7 +26,8 @@ const (
 	AnnotationLastApplied        = "mochi.io/last-applied"
 )
 
-// Applies a compute recommendation to the target workload
+// ApplyRecommendation patches Deployment, StatefulSet, or DaemonSet pod templates with recommended
+// requests/limits via server-side apply. Standalone Pods return an error because their spec is immutable.
 func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendation) error {
 	log := logger.WithComponent("compute")
 	log.Info().
@@ -36,7 +37,6 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 		Str("namespace", rec.Namespace).
 		Msg("Applying compute recommendation")
 
-	// Parse recommendations from JSON
 	var containerRecs []ContainerRecommendation
 	if err := json.Unmarshal(rec.Recommendations, &containerRecs); err != nil {
 		return fmt.Errorf("failed to parse recommendations: %w", err)
@@ -60,13 +60,11 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 	}
 }
 
-// Applies recommendations to a deployment
 func applyToDeployment(ctx context.Context, rec *database.ComputeRecommendation, containerRecs []ContainerRecommendation) error {
 	if kubernetes.Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	// Check if deployment exists
 	_, err := kubernetes.Clientset.AppsV1().Deployments(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -75,20 +73,13 @@ func applyToDeployment(ctx context.Context, rec *database.ComputeRecommendation,
 		return fmt.Errorf("failed to get deployment: %w", err)
 	}
 
-	// Build apply configurations
 	depApplyConfig := applyappsv1.Deployment(rec.WorkloadName, rec.Namespace)
 	depApplyConfig.WithAnnotations(getMochiAnnotations(rec))
-
-	// Build pod spec configuration
 	podSpecConfig := buildPodSpecConfig(containerRecs)
-
-	// Build deployment spec configuration
 	depSpecConfig := applyappsv1.DeploymentSpec().WithTemplate(applycorev1.PodTemplateSpec().WithSpec(podSpecConfig))
-
-	// Apply deployment spec configuration
 	depApplyConfig.WithSpec(depSpecConfig)
 
-	// Apply recommendation
+	// Force lets this field manager take ownership of conflicting container resource keys on re-apply.
 	_, err = kubernetes.Clientset.AppsV1().Deployments(rec.Namespace).Apply(
 		ctx,
 		depApplyConfig,
@@ -105,13 +96,11 @@ func applyToDeployment(ctx context.Context, rec *database.ComputeRecommendation,
 	return nil
 }
 
-// Applies recommendations to a statefulset
 func applyToStatefulSet(ctx context.Context, rec *database.ComputeRecommendation, containerRecs []ContainerRecommendation) error {
 	if kubernetes.Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	// Check if statefulset exists
 	_, err := kubernetes.Clientset.AppsV1().StatefulSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -120,20 +109,12 @@ func applyToStatefulSet(ctx context.Context, rec *database.ComputeRecommendation
 		return fmt.Errorf("failed to get statefulset: %w", err)
 	}
 
-	// Build apply configuration
 	stsApplyConfig := applyappsv1.StatefulSet(rec.WorkloadName, rec.Namespace)
 	stsApplyConfig.WithAnnotations(getMochiAnnotations(rec))
-
-	// Build pod spec configuration
 	podSpecConfig := buildPodSpecConfig(containerRecs)
-
-	// Build statefulset spec configuration
 	stsSpecConfig := applyappsv1.StatefulSetSpec().WithTemplate(applycorev1.PodTemplateSpec().WithSpec(podSpecConfig))
-
-	// Apply statefulset spec configuration
 	stsApplyConfig.WithSpec(stsSpecConfig)
 
-	// Apply recommendation
 	_, err = kubernetes.Clientset.AppsV1().StatefulSets(rec.Namespace).Apply(
 		ctx,
 		stsApplyConfig,
@@ -150,13 +131,11 @@ func applyToStatefulSet(ctx context.Context, rec *database.ComputeRecommendation
 	return nil
 }
 
-// Applies recommendations to a daemonset
 func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, containerRecs []ContainerRecommendation) error {
 	if kubernetes.Clientset == nil {
 		return fmt.Errorf("Kubernetes client not initialized")
 	}
 
-	// Check if daemonset exists
 	_, err := kubernetes.Clientset.AppsV1().DaemonSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -165,20 +144,12 @@ func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, 
 		return fmt.Errorf("failed to get daemonset: %w", err)
 	}
 
-	// Build apply configuration
 	dsApplyConfig := applyappsv1.DaemonSet(rec.WorkloadName, rec.Namespace)
 	dsApplyConfig.WithAnnotations(getMochiAnnotations(rec))
-
-	// Build pod spec configuration
 	podSpecConfig := buildPodSpecConfig(containerRecs)
-
-	// Build daemonset spec configuration
 	dsSpecConfig := applyappsv1.DaemonSetSpec().WithTemplate(applycorev1.PodTemplateSpec().WithSpec(podSpecConfig))
-
-	// Apply daemonset spec configuration
 	dsApplyConfig.WithSpec(dsSpecConfig)
 
-	// Apply recommendation
 	_, err = kubernetes.Clientset.AppsV1().DaemonSets(rec.Namespace).Apply(
 		ctx,
 		dsApplyConfig,
@@ -195,8 +166,6 @@ func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, 
 	return nil
 }
 
-// Handles pod recommendation application
-// Pods are immutable, return an error explaining the limitation
 func applyToPod() error {
 	return fmt.Errorf("cannot apply recommendations to standalone pod: pods are immutable. Resource changes require pod recreation or management via Deployment/StatefulSet/DaemonSet")
 }
@@ -216,7 +185,6 @@ func buildPodSpecConfig(containerRecs []ContainerRecommendation) *applycorev1.Po
 		requests := corev1.ResourceList{}
 		limits := corev1.ResourceList{}
 
-		// Accumulate all CPU/Mem in the maps
 		if containerRec.CPU.RecommendedRequest != nil {
 			requests[corev1.ResourceCPU] = resource.MustParse(*containerRec.CPU.RecommendedRequest)
 		}

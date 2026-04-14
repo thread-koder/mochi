@@ -13,7 +13,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Represents resource metrics (raw data)
+// ResourceMetrics holds CPU and memory series from Prometheus range queries plus stability-related
+// signals. Range queries populate CPU and Memory. Throttling, PSI, OOM, fail counts, and restarts come
+// from instant queries and are stored as single-point slices so AnalyzeStability can treat
+// every field uniformly.
 type ResourceMetrics struct {
 	CPU            []timeseries.DataPoint `json:"cpu"`
 	Memory         []timeseries.DataPoint `json:"memory"`
@@ -25,9 +28,7 @@ type ResourceMetrics struct {
 	Restarts       []timeseries.DataPoint `json:"restarts,omitempty"`
 }
 
-// Fetches container metrics
 func fetchContainerMetrics(ctx context.Context, container *database.Container, opts AnalysisOptions) (ResourceMetrics, error) {
-	// Set up time range
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)
 	r := v1.Range{
@@ -54,10 +55,8 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		restarts      float64
 	)
 
-	// Execute all queries in parallel
 	g, gctx := errgroup.WithContext(ctx)
 
-	// Query CPU metrics
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryPodCPURange(gctx, r, queryOpts)
 		if err != nil {
@@ -67,7 +66,6 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		return nil
 	})
 
-	// Query memory metrics
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryPodMemoryRange(gctx, r, queryOpts)
 		if err != nil {
@@ -77,7 +75,6 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		return nil
 	})
 
-	// Query CPU throttling metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodCPUThrottling(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
 		if err != nil {
@@ -87,7 +84,6 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		return nil
 	})
 
-	// Query CPU pressure metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodCPUPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
 		if err != nil {
@@ -97,7 +93,6 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		return nil
 	})
 
-	// Query memory fail count metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodMemoryFailCount(gctx, opts.TimeRange, queryOpts)
 		if err != nil {
@@ -107,7 +102,6 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		return nil
 	})
 
-	// Query memory OOM metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodMemoryOOM(gctx, opts.TimeRange, queryOpts)
 		if err != nil {
@@ -117,7 +111,6 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		return nil
 	})
 
-	// Query memory pressure metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodMemoryPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
 		if err != nil {
@@ -127,7 +120,6 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		return nil
 	})
 
-	// Query restarts metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodRestarts(gctx, opts.TimeRange, queryOpts)
 		if err != nil {
@@ -137,7 +129,6 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 		return nil
 	})
 
-	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return ResourceMetrics{}, err
 	}
@@ -154,9 +145,7 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 	}, nil
 }
 
-// Aggregates metrics from all containers in a pod
 func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOptions) (ResourceMetrics, error) {
-	// Set up time range
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)
 	r := v1.Range{
@@ -182,10 +171,8 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		restarts      float64
 	)
 
-	// Execute queries in parallel
 	g, gctx := errgroup.WithContext(ctx)
 
-	// Query CPU metrics
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryPodCPURange(gctx, r, queryOpts)
 		if err != nil {
@@ -195,7 +182,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Query memory metrics
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryPodMemoryRange(gctx, r, queryOpts)
 		if err != nil {
@@ -205,7 +191,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Query CPU throttling metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodCPUThrottling(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
 		if err != nil {
@@ -215,7 +200,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Query CPU pressure metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodCPUPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
 		if err != nil {
@@ -225,7 +209,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Query memory fail count metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodMemoryFailCount(gctx, opts.TimeRange, queryOpts)
 		if err != nil {
@@ -235,7 +218,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Query memory OOM metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodMemoryOOM(gctx, opts.TimeRange, queryOpts)
 		if err != nil {
@@ -245,7 +227,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Query memory pressure metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodMemoryPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
 		if err != nil {
@@ -255,7 +236,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Query restarts metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryPodRestarts(gctx, opts.TimeRange, queryOpts)
 		if err != nil {
@@ -265,7 +245,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 		return nil
 	})
 
-	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return ResourceMetrics{}, err
 	}
@@ -282,13 +261,14 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	}, nil
 }
 
-// Aggregates metrics from all pods in a workload
+// fetchWorkloadMetrics queries each pod in parallel, merges CPU and memory series by timestamp, then
+// combines scalar stability signals: throttling and PSI percentages are averaged across pods,
+// OOMs, fail counts, and restarts are summed.
 func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts AnalysisOptions) (ResourceMetrics, error) {
 	if len(pods) == 0 {
 		return ResourceMetrics{}, fmt.Errorf("no pods found for workload")
 	}
 
-	// Set up time range
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)
 	r := v1.Range{
@@ -297,7 +277,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		Step:  opts.RangeStep,
 	}
 
-	// Per-pod results: each goroutine writes to its index
 	type podMetrics struct {
 		CPU            []timeseries.DataPoint
 		Memory         []timeseries.DataPoint
@@ -310,7 +289,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	}
 	results := make([]podMetrics, len(pods))
 
-	// Query all pods in parallel
 	g, gctx := errgroup.WithContext(ctx)
 
 	for i, pod := range pods {
@@ -332,10 +310,8 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				restarts      float64
 			)
 
-			// Create a new error group for this pod
 			podG, podCtx := errgroup.WithContext(gctx)
 
-			// Query CPU metrics
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodCPURange(podCtx, r, queryOpts)
 				if err != nil {
@@ -345,7 +321,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Query memory metrics
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodMemoryRange(podCtx, r, queryOpts)
 				if err != nil {
@@ -355,7 +330,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Query CPU throttling metrics
 			podG.Go(func() error {
 				value, _, err := prometheus.QueryPodCPUThrottling(podCtx, opts.TimeRange, opts.RangeStep, queryOpts)
 				if err != nil {
@@ -365,7 +339,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Query CPU pressure metrics
 			podG.Go(func() error {
 				value, _, err := prometheus.QueryPodCPUPressure(podCtx, opts.TimeRange, opts.RangeStep, queryOpts)
 				if err != nil {
@@ -375,7 +348,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Query memory fail count metrics
 			podG.Go(func() error {
 				value, _, err := prometheus.QueryPodMemoryFailCount(podCtx, opts.TimeRange, queryOpts)
 				if err != nil {
@@ -385,7 +357,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Query memory OOM metrics
 			podG.Go(func() error {
 				value, _, err := prometheus.QueryPodMemoryOOM(podCtx, opts.TimeRange, queryOpts)
 				if err != nil {
@@ -395,7 +366,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Query memory pressure metrics
 			podG.Go(func() error {
 				value, _, err := prometheus.QueryPodMemoryPressure(podCtx, opts.TimeRange, opts.RangeStep, queryOpts)
 				if err != nil {
@@ -405,7 +375,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Query restarts metrics
 			podG.Go(func() error {
 				value, _, err := prometheus.QueryPodRestarts(podCtx, opts.TimeRange, queryOpts)
 				if err != nil {
@@ -415,7 +384,6 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 				return nil
 			})
 
-			// Wait for all queries to be completed and check for errors
 			if err := podG.Wait(); err != nil {
 				return err
 			}
@@ -434,12 +402,10 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		})
 	}
 
-	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return ResourceMetrics{}, err
 	}
 
-	// Aggregate metrics across pods
 	var cpu, memory []timeseries.DataPoint
 	var sumThrottling, sumPressure, sumMemPressure float64
 	var sumFailCnt, sumOOM, sumRestarts float64
@@ -467,9 +433,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	}, nil
 }
 
-// Fetches namespace metrics
 func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisOptions) (ResourceMetrics, error) {
-	// Set up time range
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)
 	r := v1.Range{
@@ -494,10 +458,8 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		restarts      float64
 	)
 
-	// Execute queries in parallel
 	g, gctx := errgroup.WithContext(ctx)
 
-	// Query namespace CPU metrics
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryNamespaceCPURange(gctx, r, queryOpts)
 		if err != nil {
@@ -507,7 +469,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Query namespace memory metrics
 	g.Go(func() error {
 		matrix, _, err := prometheus.QueryNamespaceMemoryRange(gctx, r, queryOpts)
 		if err != nil {
@@ -517,7 +478,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Query CPU throttling metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryNamespaceCPUThrottling(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
 		if err != nil {
@@ -527,7 +487,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Query CPU pressure metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryNamespaceCPUPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
 		if err != nil {
@@ -537,7 +496,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Query memory fail count metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryNamespaceMemoryFailCount(gctx, opts.TimeRange, queryOpts)
 		if err != nil {
@@ -547,7 +505,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Query memory OOM metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryNamespaceMemoryOOM(gctx, opts.TimeRange, queryOpts)
 		if err != nil {
@@ -557,7 +514,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Query memory pressure metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryNamespaceMemoryPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
 		if err != nil {
@@ -567,7 +523,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Query restarts metrics
 	g.Go(func() error {
 		value, _, err := prometheus.QueryNamespaceRestarts(gctx, opts.TimeRange, queryOpts)
 		if err != nil {
@@ -577,7 +532,6 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 		return nil
 	})
 
-	// Wait for all queries to be completed and check for errors
 	if err := g.Wait(); err != nil {
 		return ResourceMetrics{}, err
 	}

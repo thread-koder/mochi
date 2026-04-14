@@ -4,88 +4,82 @@ import (
 	"fmt"
 )
 
-// Represents resource specifications (requests and limits)
+// ResourceSpecs is parsed Kubernetes CPU (cores) and memory (bytes) requests and limits.
 type ResourceSpecs struct {
-	CPURequest    *float64 `json:"cpu_request"`    // CPU cores (e.g., 0.1 for "100m")
-	CPULimit      *float64 `json:"cpu_limit"`      // CPU cores
-	MemoryRequest *float64 `json:"memory_request"` // Memory in bytes
-	MemoryLimit   *float64 `json:"memory_limit"`   // Memory in bytes
+	CPURequest    *float64 `json:"cpu_request"`
+	CPULimit      *float64 `json:"cpu_limit"`
+	MemoryRequest *float64 `json:"memory_request"`
+	MemoryLimit   *float64 `json:"memory_limit"`
 }
 
-// Represents CPU provisioning analysis results
+// CPUProvisioning compares observed usage to requests and limits, flags over/under provisioning,
+// and scores efficiency and confidence (coefficient-of-variation based).
 type CPUProvisioning struct {
-	RequestUtilization float64  `json:"request_utilization"` // usage / request (0-1+)
-	LimitUtilization   float64  `json:"limit_utilization"`   // usage / limit (0-1+)
+	RequestUtilization float64  `json:"request_utilization"`
+	LimitUtilization   float64  `json:"limit_utilization"`
 	CurrentRequest     *float64 `json:"current_request,omitempty"`
 	CurrentLimit       *float64 `json:"current_limit,omitempty"`
 	IsOverProvisioned  bool     `json:"is_over_provisioned"`
 	IsUnderProvisioned bool     `json:"is_under_provisioned"`
-	Efficiency         float64  `json:"efficiency"` // 0-1 score (higher is better)
-	Confidence         float64  `json:"confidence"` // 0-1 score based on data quality
+	Efficiency         float64  `json:"efficiency"`
+	Confidence         float64  `json:"confidence"`
 }
 
-// Represents memory provisioning analysis results
+// MemoryProvisioning compares observed usage to requests and limits, flags over/under provisioning,
+// and scores efficiency and confidence (coefficient-of-variation based).
 type MemoryProvisioning struct {
-	RequestUtilization float64  `json:"request_utilization"` // usage / request (0-1+)
-	LimitUtilization   float64  `json:"limit_utilization"`   // usage / limit (0-1+)
+	RequestUtilization float64  `json:"request_utilization"`
+	LimitUtilization   float64  `json:"limit_utilization"`
 	CurrentRequest     *float64 `json:"current_request,omitempty"`
 	CurrentLimit       *float64 `json:"current_limit,omitempty"`
 	IsOverProvisioned  bool     `json:"is_over_provisioned"`
 	IsUnderProvisioned bool     `json:"is_under_provisioned"`
-	Efficiency         float64  `json:"efficiency"` // 0-1 score (higher is better)
-	Confidence         float64  `json:"confidence"` // 0-1 score based on data quality
+	Efficiency         float64  `json:"efficiency"`
+	Confidence         float64  `json:"confidence"`
 }
 
-// Represents overall provisioning analysis results
+// ProvisioningResult is CPU and memory provisioning side by side plus a single combined efficiency.
 type ProvisioningResult struct {
 	CPU        CPUProvisioning    `json:"cpu"`
 	Memory     MemoryProvisioning `json:"memory"`
-	Efficiency float64            `json:"efficiency"` // Overall efficiency score (0-1)
+	Efficiency float64            `json:"efficiency"`
 }
 
-// Thresholds for provisioning detection
+// Thresholds and floors shared by CPU and memory provisioning.
 const (
-	// Optimal utilization range for requests
-	OptimalUtilizationMin = 0.4 // 40%
-	OptimalUtilizationMax = 0.7 // 70%
+	OptimalUtilizationMin = 0.4
+	OptimalUtilizationMax = 0.7
 
-	// Headroom for limits (peak should stay below this percentage of limit)
-	CPUHeadroom    = 0.2 // 20% headroom (80% utilization)
-	MemoryHeadroom = 0.2 // 20% headroom (80% utilization)
+	CPUHeadroom    = 0.2
+	MemoryHeadroom = 0.2
 
-	// Minimum request floors (at or below these cannot be over-provisioned)
-	MinCPURequestCores    = 0.01             // 10m
-	MinMemoryRequestBytes = 64 * 1024 * 1024 // 64Mi
+	MinCPURequestCores    = 0.01
+	MinMemoryRequestBytes = 64 * 1024 * 1024
 
-	// Stability context thresholds
-	ThrottlingThreshold = 0.05 // 5% (throttling above this is under-provisioned)
-	PressureThreshold   = 0.1  // 10% (pressure above this is under-provisioned)
+	ThrottlingThreshold = 0.05
+	PressureThreshold   = 0.1
 
-	// Bounds for dynamic minimum request utilization
-	BurstEffectiveMinFloor = 0.05 // Lower bound for dynamic min (5%)
-	BurstEffectiveMinCeil  = 0.4  // Upper bound for dynamic min (40%)
+	BurstEffectiveMinFloor = 0.05
+	BurstEffectiveMinCeil  = 0.4
 )
 
-// Analyzes CPU provisioning based on specs, utilization, and stability
+// AnalyzeCPUProvisioning scores request/limit fit using P95 vs request, peak vs limit, and stability
+// signals. Missing request or limit is treated as under-provisioned, tiny requests at the cluster floor
+// skip "over provisioned" flags so we do not nag on minimum CPU.
 func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, stability StabilityResult) (CPUProvisioning, error) {
 	result := CPUProvisioning{
 		IsOverProvisioned:  false,
 		IsUnderProvisioned: false,
-		Efficiency:         1.0, // Start at optimal then penalize
+		Efficiency:         1.0,
 		Confidence:         0.0,
 	}
 
-	// Calculate confidence
-	// More data points and lower variance = higher confidence
 	if utilization.Stats.Mean == 0 {
-		// If mean is zero, we can't calculate confidence reliably
 		result.Confidence = 0.0
 	} else if utilization.Stats.StdDev > 0 {
-		// Calculate confidence based on coefficient of variation
 		cv := utilization.Stats.StdDev / utilization.Stats.Mean
 		result.Confidence = min(1.0, 1.0/(1.0+cv))
 	} else {
-		// Zero variance (all values are the same)
 		result.Confidence = 1.0
 	}
 
@@ -95,18 +89,15 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 	result.CurrentRequest = specs.CPURequest
 	result.CurrentLimit = specs.CPULimit
 
-	// If either request or limit is missing, treat as under-provisioned
 	if !hasRequest || !hasLimit {
 		result.IsUnderProvisioned = true
 	}
 
-	// If both request and limit are missing, treat as completely inefficient
 	if !hasRequest && !hasLimit {
 		result.Efficiency = 0.0
 		return result, nil
 	}
 
-	// Force under-provisioned when throttling or pressure metrics are above thresholds
 	if stability.CPUThrottling > ThrottlingThreshold {
 		result.IsUnderProvisioned = true
 		penalty := (stability.CPUThrottling - ThrottlingThreshold) * 3.0
@@ -118,7 +109,6 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 
-	// Analyze request utilization
 	if hasRequest {
 		result.RequestUtilization = utilization.Stats.Percentile.P95 / *specs.CPURequest
 
@@ -131,23 +121,19 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 		lowThrottling := stability.CPUThrottling > 0 && stability.CPUThrottling <= ThrottlingThreshold
 		underProvisionedDueToStability := stability.CPUThrottling > ThrottlingThreshold || stability.CPUPressure > PressureThreshold
 
-		// Check for over-provisioning (P95 usage below optimal range)
-		// Do not mark over-provisioned when at floor, low throttling or under-provisioned due to throttling/pressure
+		// Skip "over provisioned" when we're at min request, only slightly throttled, or stability already says under.
 		if result.RequestUtilization < minThreshold && !atFloor && !lowThrottling && !underProvisionedDueToStability {
 			result.IsOverProvisioned = true
 		}
 
-		// Check for under-provisioning on requests (P95 exceeds optimal range)
 		if result.RequestUtilization > OptimalUtilizationMax {
 			result.IsUnderProvisioned = true
 		}
 
-		// Calculate request-based efficiency
 		var requestEfficiency float64
 		if result.RequestUtilization >= minThreshold && result.RequestUtilization <= OptimalUtilizationMax {
 			requestEfficiency = 1.0
 		} else if atFloor || lowThrottling {
-			// Treat as optimal when at floor or low throttling
 			requestEfficiency = 1.0
 		} else if result.RequestUtilization < minThreshold {
 			requestEfficiency = result.RequestUtilization / minThreshold
@@ -161,14 +147,11 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 		result.Efficiency = min(result.Efficiency, requestEfficiency)
 	}
 
-	// Analyze limit utilization
 	if hasLimit {
 		result.LimitUtilization = utilization.Stats.Max / *specs.CPULimit
 
-		// Check for under-provisioning on limits (peak too close to limit, needs headroom)
 		if result.LimitUtilization > (1.0 - CPUHeadroom) {
 			result.IsUnderProvisioned = true
-			// Penalize efficiency for approaching limits
 			limitPenalty := 1.0
 			if result.LimitUtilization > 1.0 {
 				limitPenalty = 0.0
@@ -179,36 +162,31 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 		}
 	}
 
-	// If exactly one of request or limit is missing, treat as partially inefficient
 	if (hasRequest && !hasLimit) || (!hasRequest && hasLimit) {
 		result.Efficiency = min(result.Efficiency, 0.5)
 	}
 
-	// Clamp efficiency to 0-1
 	result.Efficiency = max(0.0, min(1.0, result.Efficiency))
 
 	return result, nil
 }
 
-// Analyzes memory provisioning based on specs, utilization, and stability
+// AnalyzeMemoryProvisioning mirrors AnalyzeCPUProvisioning for memory, using OptimalUtilizationMin
+// as the low bound (CPU uses a burst-aware dynamic min) and memory stability signals (OOM, failcnt, PSI).
 func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilization, stability StabilityResult) (MemoryProvisioning, error) {
 	result := MemoryProvisioning{
 		IsOverProvisioned:  false,
 		IsUnderProvisioned: false,
-		Efficiency:         1.0, // Start at optimal then penalize
+		Efficiency:         1.0,
 		Confidence:         0.0,
 	}
 
-	// Calculate confidence based on data quality
 	if utilization.Stats.Mean == 0 {
-		// If mean is zero, we can't calculate confidence reliably
 		result.Confidence = 0.0
 	} else if utilization.Stats.StdDev > 0 {
-		// Calculate confidence based on coefficient of variation
 		cv := utilization.Stats.StdDev / utilization.Stats.Mean
 		result.Confidence = min(1.0, 1.0/(1.0+cv))
 	} else {
-		// Zero variance (all values are the same)
 		result.Confidence = 1.0
 	}
 
@@ -218,18 +196,15 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 	result.CurrentRequest = specs.MemoryRequest
 	result.CurrentLimit = specs.MemoryLimit
 
-	// If either request or limit is missing, treat as under-provisioned
 	if !hasRequest || !hasLimit {
 		result.IsUnderProvisioned = true
 	}
 
-	// If both request and limit are missing, treat as completely inefficient
 	if !hasRequest && !hasLimit {
 		result.Efficiency = 0.0
 		return result, nil
 	}
 
-	// Force under-provisioned when OOM, failcnt, or pressure are above threshold
 	if stability.MemoryOOM > 0 {
 		result.IsUnderProvisioned = true
 		penalty := min(stability.MemoryOOM*0.5, 0.35)
@@ -246,7 +221,6 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 
-	// Analyze request utilization
 	if hasRequest {
 		result.RequestUtilization = utilization.Stats.Percentile.P95 / *specs.MemoryRequest
 
@@ -254,23 +228,18 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 		lowMemoryPressure := stability.MemoryPressure > 0 && stability.MemoryPressure <= PressureThreshold
 		underProvisionedDueToStability := stability.MemoryOOM > 0 || stability.MemoryFailCnt > 0 || stability.MemoryPressure > PressureThreshold
 
-		// Check for over-provisioning (P95 usage below optimal range)
-		// Do not mark over-provisioned when at floor, low memory pressure or under-provisioned due to OOM/failcnt/pressure
 		if result.RequestUtilization < OptimalUtilizationMin && !atFloor && !lowMemoryPressure && !underProvisionedDueToStability {
 			result.IsOverProvisioned = true
 		}
 
-		// Check for under-provisioning on requests (P95 exceeds optimal range)
 		if result.RequestUtilization > OptimalUtilizationMax {
 			result.IsUnderProvisioned = true
 		}
 
-		// Calculate request-based efficiency
 		var requestEfficiency float64
 		if result.RequestUtilization >= OptimalUtilizationMin && result.RequestUtilization <= OptimalUtilizationMax {
 			requestEfficiency = 1.0
 		} else if atFloor || lowMemoryPressure {
-			// Treat as optimal when at floor or low memory pressure
 			requestEfficiency = 1.0
 		} else if result.RequestUtilization < OptimalUtilizationMin {
 			requestEfficiency = result.RequestUtilization / OptimalUtilizationMin
@@ -284,14 +253,11 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 		result.Efficiency = min(result.Efficiency, requestEfficiency)
 	}
 
-	// Analyze limit utilization
 	if hasLimit {
 		result.LimitUtilization = utilization.Stats.Max / *specs.MemoryLimit
 
-		// Check for under-provisioning on limits (peak too close to limit, needs headroom)
 		if result.LimitUtilization > (1.0 - MemoryHeadroom) {
 			result.IsUnderProvisioned = true
-			// Penalize efficiency for approaching limits
 			limitPenalty := 1.0
 			if result.LimitUtilization > 1.0 {
 				limitPenalty = 0.0
@@ -302,55 +268,47 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 		}
 	}
 
-	// If exactly one of request or limit is missing, treat as partially inefficient
 	if (hasRequest && !hasLimit) || (!hasRequest && hasLimit) {
 		result.Efficiency = min(result.Efficiency, 0.5)
 	}
 
-	// Clamp efficiency to 0-1
 	result.Efficiency = max(0.0, min(1.0, result.Efficiency))
 
 	return result, nil
 }
 
-// Analyzes resource provisioning from specs, utilization, and stability
+// AnalyzeProvisioning runs CPU and memory provisioning and combines efficiency as 30% CPU / 70% memory
+// so memory pressure weighs more in a single headline score.
 func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, stability StabilityResult) (ProvisioningResult, error) {
 	var result ProvisioningResult
 	var err error
 
-	// Analyze CPU provisioning
 	result.CPU, err = AnalyzeCPUProvisioning(specs, utilization.CPU, stability)
 	if err != nil {
 		return ProvisioningResult{}, fmt.Errorf("failed to analyze CPU provisioning: %w", err)
 	}
 
-	// Analyze memory provisioning
 	result.Memory, err = AnalyzeMemoryProvisioning(specs, utilization.Memory, stability)
 	if err != nil {
 		return ProvisioningResult{}, fmt.Errorf("failed to analyze memory provisioning: %w", err)
 	}
 
-	// Calculate overall efficiency (weighted average)
-	// Memory is more critical
-	cpuWeight := 0.3
-	memoryWeight := 0.7
+	const cpuWeight = 0.3
+	const memoryWeight = 0.7
 	result.Efficiency = (result.CPU.Efficiency * cpuWeight) + (result.Memory.Efficiency * memoryWeight)
 
 	return result, nil
 }
 
-// Returns dynamic minimum request utilization from usage pattern
+// effectiveMinFromBurstiness lowers the minimum "healthy" request utilization when mean, P95, and peak
+// show burstiness, so bursty CPU workloads are not marked over-provisioned for sitting near idle between spikes.
 func effectiveMinFromBurstiness(mean, p95, peak float64) float64 {
 	if mean <= 0 {
 		return BurstEffectiveMinCeil
 	}
-	// Burstiness score from P95/mean and peak/mean (higher ratio = more bursty)
 	burstScore := (p95/mean + peak/mean) / 2.0
-	// Clamp burst score to 1.0
 	burstScore = max(burstScore, 1.0)
-	// Effective min decreases as burstiness increases (allow lower util for bursty workloads)
 	effectiveMin := BurstEffectiveMinCeil - (burstScore-1.0)*0.1
-	// Clamp effective min to the floor and ceil
 	effectiveMin = max(effectiveMin, BurstEffectiveMinFloor)
 	effectiveMin = min(effectiveMin, BurstEffectiveMinCeil)
 	return effectiveMin

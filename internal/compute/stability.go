@@ -1,36 +1,40 @@
 package compute
 
-// Max penalty per factor
+// Per-signal caps on how much each factor can reduce StabilityScore. Without caps, a single noisy
+// counter could drive the score to zero.
 const (
-	maxPenaltyCPUThrottling  = 0.25 // 25% max penalty
-	maxPenaltyCPUPressure    = 0.15 // 15% max penalty
-	maxPenaltyMemoryFailCnt  = 0.25 // 25% max penalty
-	maxPenaltyMemoryPressure = 0.15 // 15% max penalty
-	maxPenaltyOOM            = 0.35 // 35% max penalty
-	maxPenaltyRestarts       = 0.35 // 35% max penalty
+	maxPenaltyCPUThrottling  = 0.25
+	maxPenaltyCPUPressure    = 0.15
+	maxPenaltyMemoryFailCnt  = 0.25
+	maxPenaltyMemoryPressure = 0.15
+	maxPenaltyOOM            = 0.35
+	maxPenaltyRestarts       = 0.35
 )
 
-// Noise threshold (0.1%): values below this are treated as zero to avoid metrics noise
+// stabilityNoiseThreshold treats PSI and throttling values below 0.1% as zero so scrape jitter
+// does not look like real pressure.
 const stabilityNoiseThreshold = 0.001
 
-// Represents stability analysis results for a container
+// StabilityResult holds raw stability signals (as fractions or event counts from Prometheus) and
+// a combined StabilityScore in [0,1].
 type StabilityResult struct {
-	CPUThrottling  float64 `json:"cpu_throttling"`  // CPU throttling percentage (0-1, where 1.0 = 100% throttling)
-	CPUPressure    float64 `json:"cpu_pressure"`    // CPU pressure percentage (0-1, where 1.0 = 100% stalled)
-	MemoryFailCnt  float64 `json:"memory_fail_cnt"` // Total memory allocation failures in period
-	MemoryOOM      float64 `json:"memory_oom"`      // Total OOM events in period
-	MemoryPressure float64 `json:"memory_pressure"` // Memory pressure percentage (0-1, where 1.0 = 100% stalled)
-	Restarts       float64 `json:"restarts"`        // Total restarts in period
-	StabilityScore float64 `json:"stability_score"` // Overall stability score (0-1)
+	CPUThrottling  float64 `json:"cpu_throttling"`
+	CPUPressure    float64 `json:"cpu_pressure"`
+	MemoryFailCnt  float64 `json:"memory_fail_cnt"`
+	MemoryOOM      float64 `json:"memory_oom"`
+	MemoryPressure float64 `json:"memory_pressure"`
+	Restarts       float64 `json:"restarts"`
+	StabilityScore float64 `json:"stability_score"`
 }
 
-// Analyzes stability from metrics
+// AnalyzeStability reads the first sample in each scalar slice (see ResourceMetrics), applies
+// filterNoise to percentage fields, and subtracts capped penalties from 1.0 for OOMs, allocation
+// failures, restarts, throttling above 5%, and CPU/memory pressure above 10%.
 func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
 	result := StabilityResult{
-		StabilityScore: 1.0, // Start at optimal then penalize
+		StabilityScore: 1.0,
 	}
 
-	// 1. Extract values
 	if len(metrics.CPUThrottling) > 0 {
 		result.CPUThrottling = metrics.CPUThrottling[0].Value
 	}
@@ -50,30 +54,21 @@ func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
 		result.Restarts = metrics.Restarts[0].Value
 	}
 
-	// 2. Filter noise from metrics
 	result.CPUThrottling = filterNoise(result.CPUThrottling)
 	result.CPUPressure = filterNoise(result.CPUPressure)
 	result.MemoryPressure = filterNoise(result.MemoryPressure)
 
-	// 3. Calculate Stability Score (0-1)
 	var totalPenalty float64
 
-	// OOMs: critical
 	totalPenalty += min(result.MemoryOOM*0.5, maxPenaltyOOM)
-
-	// Memory allocation failures: pre-OOM signal
 	totalPenalty += min(result.MemoryFailCnt*0.2, maxPenaltyMemoryFailCnt)
-
-	// Restarts: critical
 	totalPenalty += min(result.Restarts*0.3, maxPenaltyRestarts)
 
-	// Throttling: penalize if > 5%
 	if result.CPUThrottling > 0.05 {
 		penalty := (result.CPUThrottling - 0.05) * 2.0
 		totalPenalty += min(penalty, maxPenaltyCPUThrottling)
 	}
 
-	// Pressure: penalize if > 10% stalled
 	if result.CPUPressure > 0.1 {
 		penalty := (result.CPUPressure - 0.1) * 0.5
 		totalPenalty += min(penalty, maxPenaltyCPUPressure)
@@ -88,7 +83,7 @@ func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
 	return result, nil
 }
 
-// Returns 0 if value is below the noise threshold, otherwise returns value.
+// filterNoise returns zero when value is below stabilityNoiseThreshold, otherwise returns value.
 func filterNoise(value float64) float64 {
 	if value < stabilityNoiseThreshold {
 		return 0

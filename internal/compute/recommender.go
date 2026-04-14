@@ -11,17 +11,18 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// Represents compute resource recommendations for a workload
+// Recommendation is a workload-level response: mode, per-container suggested quantities as Kubernetes
+// quantity strings, and the analysis window used.
 type Recommendation struct {
-	WorkloadType       string                    `json:"workload_type"` // Deployment, StatefulSet, DaemonSet, Pod
+	WorkloadType       string                    `json:"workload_type"`
 	WorkloadName       string                    `json:"workload_name"`
 	Namespace          string                    `json:"namespace"`
-	RecommendationMode RecommendationMode        `json:"recommendation_mode"` // "cost_optimized", "burstable", or "guaranteed"
+	RecommendationMode RecommendationMode        `json:"recommendation_mode"`
 	Recommendations    []ContainerRecommendation `json:"recommendations"`
 	AnalysisTimeRange  string                    `json:"analysis_time_range"`
 }
 
-// Represents a container recommendation
+// ContainerRecommendation is one container’s suggested CPU and memory requests/limits plus a confidence score.
 type ContainerRecommendation struct {
 	ContainerName   string               `json:"container_name"`
 	CPU             CPURecommendation    `json:"cpu"`
@@ -29,27 +30,30 @@ type ContainerRecommendation struct {
 	ConfidenceScore float64              `json:"confidence_score"`
 }
 
-// Represents CPU resource recommendations
+// CPURecommendation holds current and recommended CPU request/limit strings and percent deltas (one decimal).
 type CPURecommendation struct {
 	CurrentRequest       *string  `json:"current_request"`
 	RecommendedRequest   *string  `json:"recommended_request"`
-	RequestChangePercent *float64 `json:"request_change_percent"` // Rounded to 1 decimal
+	RequestChangePercent *float64 `json:"request_change_percent"`
 	CurrentLimit         *string  `json:"current_limit"`
 	RecommendedLimit     *string  `json:"recommended_limit"`
-	LimitChangePercent   *float64 `json:"limit_change_percent"` // Rounded to 1 decimal
+	LimitChangePercent   *float64 `json:"limit_change_percent"`
 }
 
-// Represents memory resource recommendations
+// MemoryRecommendation holds current and recommended memory request/limit strings and percent deltas (one decimal).
 type MemoryRecommendation struct {
 	CurrentRequest       *string  `json:"current_request"`
 	RecommendedRequest   *string  `json:"recommended_request"`
-	RequestChangePercent *float64 `json:"request_change_percent"` // Rounded to 1 decimal
+	RequestChangePercent *float64 `json:"request_change_percent"`
 	CurrentLimit         *string  `json:"current_limit"`
 	RecommendedLimit     *string  `json:"recommended_limit"`
-	LimitChangePercent   *float64 `json:"limit_change_percent"` // Rounded to 1 decimal
+	LimitChangePercent   *float64 `json:"limit_change_percent"`
 }
 
-// Generates a resource recommendation for a container based on analysis results
+// GenerateContainerRecommendation turns analysis output into a recommendation, applies mode rules
+// via finalizeResourceRecommendations, and returns nil when there is nothing to suggest or confidence is
+// below MinConfidenceThreshold. When only one of CPU or memory recommends a change, the other resource
+// is filled from current specs so the payload stays complete for apply.
 func GenerateContainerRecommendation(
 	ctx context.Context,
 	container *database.Container,
@@ -57,23 +61,19 @@ func GenerateContainerRecommendation(
 	config RecommendationConfig,
 	analysisWindow time.Duration,
 ) (*ContainerRecommendation, error) {
-	// Validate inputs
 	if container == nil {
 		return nil, fmt.Errorf("container cannot be nil")
 	}
 
-	// Validate config
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid recommendation config: %w", err)
 	}
 
-	// Parse current resource specs
 	specs, err := ParseContainerSpecs(container)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse container specs: %w", err)
 	}
 
-	// Calculate CPU request recommendation
 	cpuRequestRecValue, err := CalculateCPURequestRecommendation(
 		specs.CPURequest,
 		containerAnalysis.Utilization.CPU,
@@ -85,7 +85,6 @@ func GenerateContainerRecommendation(
 		return nil, fmt.Errorf("failed to calculate CPU request recommendation: %w", err)
 	}
 
-	// Calculate CPU limit recommendation
 	cpuLimitRecValue, err := CalculateCPULimitRecommendation(
 		specs.CPULimit,
 		containerAnalysis.Utilization.CPU,
@@ -99,7 +98,6 @@ func GenerateContainerRecommendation(
 		return nil, fmt.Errorf("failed to calculate CPU limit recommendation: %w", err)
 	}
 
-	// Calculate memory request recommendation
 	memoryRequestRecValue, err := CalculateMemoryRequestRecommendation(
 		specs.MemoryRequest,
 		containerAnalysis.Utilization.Memory,
@@ -112,7 +110,6 @@ func GenerateContainerRecommendation(
 		return nil, fmt.Errorf("failed to calculate memory request recommendation: %w", err)
 	}
 
-	// Calculate memory limit recommendation
 	memoryLimitRecValue, err := CalculateMemoryLimitRecommendation(
 		specs.MemoryLimit,
 		containerAnalysis.Utilization.Memory,
@@ -137,12 +134,10 @@ func GenerateContainerRecommendation(
 
 	hasCPURecommendation := cpuRequestRecValue != nil || cpuLimitRecValue != nil
 	hasMemoryRecommendation := memoryRequestRecValue != nil || memoryLimitRecValue != nil
-	// Only create recommendation if we have at least one recommendation
 	if !hasCPURecommendation && !hasMemoryRecommendation {
 		return nil, nil
 	}
 
-	// Calculate overall confidence
 	overallConfidence := calculateOverallConfidence(
 		containerAnalysis.Provisioning.CPU,
 		containerAnalysis.Provisioning.Memory,
@@ -150,14 +145,11 @@ func GenerateContainerRecommendation(
 		hasMemoryRecommendation,
 	)
 
-	// Only create recommendation if confidence is above threshold
 	if overallConfidence < config.MinConfidenceThreshold {
 		return nil, nil
 	}
 
-	// Preserve current values for resources that don't have recommendations
 	if hasCPURecommendation && !hasMemoryRecommendation {
-		// Preserve current memory values
 		if specs.MemoryRequest != nil {
 			memoryRequestRecValue = specs.MemoryRequest
 		}
@@ -165,7 +157,6 @@ func GenerateContainerRecommendation(
 			memoryLimitRecValue = specs.MemoryLimit
 		}
 	} else if hasMemoryRecommendation && !hasCPURecommendation {
-		// Preserve current CPU values
 		if specs.CPURequest != nil {
 			cpuRequestRecValue = specs.CPURequest
 		}
@@ -174,13 +165,11 @@ func GenerateContainerRecommendation(
 		}
 	}
 
-	// Calculate change percentages
 	cpuRequestChangePercent := calculateChangePercent(specs.CPURequest, cpuRequestRecValue)
 	cpuLimitChangePercent := calculateChangePercent(specs.CPULimit, cpuLimitRecValue)
 	memoryRequestChangePercent := calculateChangePercent(specs.MemoryRequest, memoryRequestRecValue)
 	memoryLimitChangePercent := calculateChangePercent(specs.MemoryLimit, memoryLimitRecValue)
 
-	// Format recommendations to Kubernetes resource quantity strings
 	var cpuRequestRec, cpuLimitRec, memoryRequestRec, memoryLimitRec *string
 	if cpuRequestRecValue != nil {
 		cpuRequestRec = new(formatCPUQuantity(*cpuRequestRecValue))
@@ -195,7 +184,6 @@ func GenerateContainerRecommendation(
 		memoryLimitRec = new(formatMemoryQuantity(int64(*memoryLimitRecValue)))
 	}
 
-	// Build recommendation response
 	recommendation := &ContainerRecommendation{
 		ContainerName: container.Name,
 		CPU: CPURecommendation{
@@ -220,9 +208,10 @@ func GenerateContainerRecommendation(
 	return recommendation, nil
 }
 
-// Generates recommendations for a workload
-// For workloads with multiple replicas, analyzes all instances
-// and takes the recommendation with the maximum recommended values per unique container name
+// GenerateWorkloadRecommendations analyzes every pod in the workload, generates a container recommendation
+// per pod instance, then merges by container name: for each resource, the larger recommended quantity wins
+// (so replicas that need more headroom drive the suggestion). Confidence is the max across instances,
+// change percents are recomputed after merging.
 func GenerateWorkloadRecommendations(
 	ctx context.Context,
 	workloadType string,
@@ -232,7 +221,6 @@ func GenerateWorkloadRecommendations(
 	config RecommendationConfig,
 	analysisOpts AnalysisOptions,
 ) (Recommendation, error) {
-	// Validate inputs
 	if len(pods) == 0 {
 		return Recommendation{}, fmt.Errorf("no pods provided for workload %s/%s", namespace, workloadName)
 	}
@@ -245,26 +233,20 @@ func GenerateWorkloadRecommendations(
 		return Recommendation{}, fmt.Errorf("invalid analysis options: %w", err)
 	}
 
-	// Key: container name, Value: ContainerRecommendation
 	containerRecsMap := make(map[string]*ContainerRecommendation)
 
-	// Analyze each pod and its containers
 	for _, pod := range pods {
-		// Get containers for this pod
 		containers, err := database.GetContainersByPodUID(ctx, pod.UID)
 		if err != nil {
 			return Recommendation{}, fmt.Errorf("failed to fetch containers for pod %s: %w", pod.Name, err)
 		}
 
-		// Analyze each container
 		for _, container := range containers {
-			// Analyze container
 			containerAnalysis, err := AnalyzeContainer(ctx, container, analysisOpts)
 			if err != nil {
 				return Recommendation{}, fmt.Errorf("failed to analyze container %s: %w", container.Name, err)
 			}
 
-			// Generate recommendation for this container instance
 			rec, err := GenerateContainerRecommendation(
 				ctx,
 				container,
@@ -276,32 +258,23 @@ func GenerateWorkloadRecommendations(
 				return Recommendation{}, fmt.Errorf("failed to generate container recommendation for %s: %w", container.Name, err)
 			}
 
-			// Skip if no recommendation generated
 			if rec == nil {
 				continue
 			}
 
-			// For each unique container name, take the Maximum recommended values across all replicas
 			existingRec, exists := containerRecsMap[container.Name]
 			if !exists {
-				// First instance of this container name
 				containerRecsMap[container.Name] = rec
 			} else {
-				// Max CPU Request
 				updateMaxQuantity(&existingRec.CPU.RecommendedRequest, rec.CPU.RecommendedRequest)
-				// Max CPU Limit
 				updateMaxQuantity(&existingRec.CPU.RecommendedLimit, rec.CPU.RecommendedLimit)
-				// Max Memory Request
 				updateMaxQuantity(&existingRec.Memory.RecommendedRequest, rec.Memory.RecommendedRequest)
-				// Max Memory Limit
 				updateMaxQuantity(&existingRec.Memory.RecommendedLimit, rec.Memory.RecommendedLimit)
 
-				// Keep highest confidence score
 				if rec.ConfidenceScore > existingRec.ConfidenceScore {
 					existingRec.ConfidenceScore = rec.ConfidenceScore
 				}
 
-				// Recalculate change percentages based on new max values
 				existingRec.CPU.RequestChangePercent = calculateChangePercentFromStrings(existingRec.CPU.CurrentRequest, existingRec.CPU.RecommendedRequest)
 				existingRec.CPU.LimitChangePercent = calculateChangePercentFromStrings(existingRec.CPU.CurrentLimit, existingRec.CPU.RecommendedLimit)
 				existingRec.Memory.RequestChangePercent = calculateChangePercentFromStrings(existingRec.Memory.CurrentRequest, existingRec.Memory.RecommendedRequest)
@@ -310,7 +283,6 @@ func GenerateWorkloadRecommendations(
 		}
 	}
 
-	// Convert map to slice
 	recommendations := make([]ContainerRecommendation, 0, len(containerRecsMap))
 	for _, rec := range containerRecsMap {
 		recommendations = append(recommendations, *rec)
@@ -328,7 +300,7 @@ func GenerateWorkloadRecommendations(
 	return result, nil
 }
 
-// Converts a compute Recommendation to a database ComputeRecommendation
+// ComputeRecommendationToDB maps an API Recommendation to a database row (JSON payload, pending status).
 func ComputeRecommendationToDB(rec Recommendation) (*database.ComputeRecommendation, error) {
 	recommendationsJSON, err := json.Marshal(rec.Recommendations)
 	if err != nil {
@@ -350,8 +322,6 @@ func ComputeRecommendationToDB(rec Recommendation) (*database.ComputeRecommendat
 	}, nil
 }
 
-// Calculates overall confidence score from CPU and memory provisioning
-// Only considers confidence from resources that have recommendations
 func calculateOverallConfidence(
 	cpuProvisioning CPUProvisioning,
 	memoryProvisioning MemoryProvisioning,
@@ -370,7 +340,8 @@ func calculateOverallConfidence(
 	return 0
 }
 
-// Finalizes request and limit recommendations based on mode and constraints.
+// finalizeResourceRecommendations enforces Guaranteed QoS (request equals limit), fills a missing limit
+// from request when needed, and avoids recommending a limit below an existing request.
 func finalizeResourceRecommendations(
 	recommendedRequest *float64,
 	recommendedLimit *float64,
@@ -378,7 +349,6 @@ func finalizeResourceRecommendations(
 	currentLimit *float64,
 	mode RecommendationMode,
 ) (*float64, *float64) {
-	// For Guaranteed mode, both request and limit MUST be equal
 	if mode == ModeGuaranteed {
 		var guaranteedValue float64
 		if recommendedRequest != nil {
@@ -396,48 +366,39 @@ func finalizeResourceRecommendations(
 		return &guaranteedValue, &guaranteedValue
 	}
 
-	// If no limit recommendation but we have a request
 	if recommendedLimit == nil && recommendedRequest != nil {
 		if currentLimit != nil && *currentLimit >= *recommendedRequest {
 			return recommendedRequest, currentLimit
 		}
-		// Recommend a limit equal to request
 		return recommendedRequest, recommendedRequest
 	}
 
-	// If no request but we have a limit
 	if recommendedRequest == nil && recommendedLimit != nil {
-		// If recommended limit is less than current request, adjust limit
 		if currentRequest != nil && *recommendedLimit < *currentRequest {
 			return currentRequest, currentRequest
 		}
 		if currentRequest != nil {
 			return currentRequest, recommendedLimit
 		}
-		// No current request: use recommended limit for both
 		return recommendedLimit, recommendedLimit
 	}
 
 	return recommendedRequest, recommendedLimit
 }
 
-// Formats CPU cores as Kubernetes resource quantity string
+// formatCPUQuantity renders cores as a Kubernetes CPU string (millicores below 1 core, else three decimals).
 func formatCPUQuantity(cores float64) string {
-	// Ensure non-negative
 	cores = max(cores, 0)
 
-	// For small values (< 1 core), use millicores (m)
 	if cores < 1.0 {
 		millicores := max(int64(cores*1000), 0)
 		return fmt.Sprintf("%dm", millicores)
 	}
-	// For larger values, use cores with 3 decimal places
 	return fmt.Sprintf("%.3f", cores)
 }
 
-// Formats memory bytes as Kubernetes resource quantity string
+// formatMemoryQuantity picks Ki/Mi/Gi/Ti units rounded to a whole unit for Kubernetes quantity strings.
 func formatMemoryQuantity(bytes int64) string {
-	// Ensure non-negative
 	bytes = max(bytes, 0)
 
 	const (
@@ -447,7 +408,6 @@ func formatMemoryQuantity(bytes int64) string {
 		TiB = 1024 * GiB
 	)
 
-	// Format to nearest unit
 	switch {
 	case bytes >= TiB:
 		value := math.Round(float64(bytes) / TiB)
@@ -466,7 +426,6 @@ func formatMemoryQuantity(bytes int64) string {
 	}
 }
 
-// Updates a target quantity string if the source is larger
 func updateMaxQuantity(target **string, source *string) {
 	if source == nil {
 		return
@@ -487,7 +446,6 @@ func updateMaxQuantity(target **string, source *string) {
 	}
 }
 
-// Calculates change percent from quantity strings
 func calculateChangePercentFromStrings(currentStr, recommendedStr *string) *float64 {
 	if recommendedStr == nil {
 		return nil
@@ -510,21 +468,18 @@ func calculateChangePercentFromStrings(currentStr, recommendedStr *string) *floa
 	return calculateChangePercent(&curVal, &recVal)
 }
 
-// Calculates change percentage between current and recommended values
-// Returns 100.0 if current is nil (new resource)
+// calculateChangePercent returns nil if recommended is nil, 100% when current is missing or zero,
+// otherwise the relative percent change rounded to one decimal.
 func calculateChangePercent(current, recommended *float64) *float64 {
 	if recommended == nil {
 		return nil
 	}
 
 	if current == nil || *current == 0 {
-		// New resource or zero current, return 100.0%
 		return new(100.0)
 	}
 
-	// Calculate percentage
 	changePercent := ((*recommended - *current) / *current) * 100.0
 
-	// Round to 1 decimal place
 	return new(math.Round(changePercent*10) / 10)
 }
