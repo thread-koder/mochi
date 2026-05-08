@@ -33,4 +33,4 @@ interface NamespaceResponse {
   system_pods: StandalonePod[]
 }
 
-export type { Namespace, NamespaceResponse }
+export type { Namespace, NamespaceResponse, StandalonePod, Workload }

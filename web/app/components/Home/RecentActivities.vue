@@ -33,10 +33,10 @@
 </template>
 
 <script setup lang="ts">
-import type * as Home from '#shared/types/home'
+import type { Activity } from '#shared/types/home'
 
 defineProps<{
-  activities?: Home.HomeResponse['activities']
+  activities?: Activity[]
 }>()
 
 const activityIcon = (type: string) => {

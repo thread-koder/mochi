@@ -29,10 +29,10 @@
 </template>
 
 <script setup lang="ts">
-import type * as Home from '#shared/types/home'
+import type { HomeResponse } from '#shared/types/home'
 
 const props = defineProps<{
-  healthChecks?: Home.HomeResponse['health_checks']
+  healthChecks?: HomeResponse['health_checks']
 }>()
 
 const healthIndicators = computed(() => {

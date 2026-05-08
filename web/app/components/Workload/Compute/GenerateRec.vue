@@ -116,7 +116,7 @@
 
 <script setup lang="ts">
 import type { FetchError } from 'ofetch'
-import type * as Compute from '#shared/types/compute'
+import type { Recommendation, RecommendationMode } from '#shared/types/compute'
 
 const props = defineProps<{
   namespace: string
@@ -126,7 +126,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  generated: [recommendation: Compute.Recommendation]
+  generated: [recommendation: Recommendation]
 }>()
 
 const isOpen = defineModel<boolean>({ required: true })
@@ -154,7 +154,7 @@ const modes = [
 
 const { parseError } = useApiError()
 
-const selectedMode = ref<Compute.Recommendation['recommendation_mode']>('burstable')
+const selectedMode = ref<RecommendationMode>('burstable')
 const timeRange = ref<string | null>(props.defaultTimeRange ?? '7d')
 const generating = ref(false)
 const error = ref<FetchError | null>(null)
@@ -172,7 +172,7 @@ const generateRecommendation = async () => {
   generating.value = true
   error.value = null
   try {
-    const recommendation = await $api<Compute.Recommendation>(
+    const recommendation = await $api<Recommendation>(
       `/api/v1/compute/recommendations/generate/${props.workloadType}/${props.workloadName}?namespace=${props.namespace}&timeRange=${timeRange.value}&mode=${selectedMode.value}`,
       {
         method: 'POST',

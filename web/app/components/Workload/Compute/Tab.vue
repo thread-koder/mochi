@@ -116,7 +116,7 @@
 
 <script setup lang="ts">
 import type { FetchError } from 'ofetch'
-import type * as Compute from '#shared/types/compute'
+import type { WorkloadAnalysis, Recommendation } from '#shared/types/compute'
 
 const props = defineProps<{
   namespace: string
@@ -130,16 +130,16 @@ const { parseError } = useApiError()
 const timeRange = ref<string | null>(null)
 const analysisPending = ref(false)
 const analysisError = ref<FetchError | null>(null)
-const analysis = ref<Compute.WorkloadAnalysis | null>(null)
+const analysis = ref<WorkloadAnalysis | null>(null)
 
 const showGenerateModal = ref(false)
 const showResultModal = ref(false)
-const generatedRecommendation = ref<Compute.Recommendation | null>(null)
+const generatedRecommendation = ref<Recommendation | null>(null)
 
 const executeAnalysis = async () => {
   analysisPending.value = true
   try {
-    analysis.value = await $api<Compute.WorkloadAnalysis>(`/api/v1/compute/analyze/workloads/${props.workloadType}/${props.workloadName}?namespace=${props.namespace}&timeRange=${timeRange.value}`)
+    analysis.value = await $api<WorkloadAnalysis>(`/api/v1/compute/analyze/workloads/${props.workloadType}/${props.workloadName}?namespace=${props.namespace}&timeRange=${timeRange.value}`)
   }
   catch (error) {
     analysisError.value = error as FetchError
@@ -167,7 +167,7 @@ watch(() => props.isActive, async (isActive) => {
   }
 }, { immediate: true })
 
-const onRecommendationGenerated = (recommendation: Compute.Recommendation) => {
+const onRecommendationGenerated = (recommendation: Recommendation) => {
   generatedRecommendation.value = recommendation
   showGenerateModal.value = false
   showResultModal.value = true

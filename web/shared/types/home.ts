@@ -18,4 +18,4 @@ interface HomeResponse {
   activities: Activity[]
 }
 
-export type { HomeResponse }
+export type { HomeResponse, Activity }

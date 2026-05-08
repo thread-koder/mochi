@@ -32,4 +32,4 @@ interface WorkloadResponse {
   stats: WorkloadStats
 }
 
-export type { WorkloadResponse }
+export type { WorkloadResponse, Container, Pod }

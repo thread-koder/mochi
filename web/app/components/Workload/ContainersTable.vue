@@ -68,9 +68,9 @@
 </template>
 
 <script setup lang="ts">
-import type * as Workload from '#shared/types/workload'
+import type { Container } from '#shared/types/workload'
 
 defineProps<{
-  containers?: Workload.WorkloadResponse['containers']
+  containers?: Container[]
 }>()
 </script>

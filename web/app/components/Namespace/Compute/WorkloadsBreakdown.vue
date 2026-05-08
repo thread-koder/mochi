@@ -177,10 +177,10 @@
 </template>
 
 <script setup lang="ts">
-import type * as Compute from '#shared/types/compute'
+import type { WorkloadAnalysis } from '#shared/types/compute'
 
 const props = defineProps<{
-  workloads?: Compute.NamespaceAnalysis['workloads']
+  workloads?: WorkloadAnalysis[]
   namespace: string
 }>()
 

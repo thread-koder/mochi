@@ -54,9 +54,9 @@
 </template>
 
 <script setup lang="ts">
-import type * as Home from '#shared/types/home'
+import type { HomeResponse } from '#shared/types/home'
 
-const { data, error } = await useApiData<Home.HomeResponse>('/api/v1/home')
+const { data, error } = await useApiData<HomeResponse>('/api/v1/home')
 
 const { parseError } = useApiError()
 if (error.value) {

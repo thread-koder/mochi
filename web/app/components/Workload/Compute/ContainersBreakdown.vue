@@ -428,10 +428,10 @@
 </template>
 
 <script setup lang="ts">
-import type * as Compute from '#shared/types/compute'
+import type { PodAnalysis, ContainerAnalysis, ResourceProvisioning } from '#shared/types/compute'
 
 const props = defineProps<{
-  pods?: Compute.WorkloadAnalysis['pods']
+  pods?: PodAnalysis[]
 }>()
 
 const sortMetric = ref<string | null>('p95')
@@ -448,11 +448,11 @@ const resourceOptions: Array<{ value: string, label: string }> = [
   { value: 'cpu', label: 'CPU' },
   { value: 'memory', label: 'Memory' },
 ]
-const filteredContainers = ref<Array<Compute.WorkloadContainerAnalysis & { pod_name: string }>>([])
+const filteredContainers = ref<Array<ContainerAnalysis & { pod_name: string }>>([])
 
 const containers = computed(() => {
   if (!props.pods) return []
-  const allContainers: Array<Compute.WorkloadContainerAnalysis & { pod_name: string }> = []
+  const allContainers: Array<ContainerAnalysis & { pod_name: string }> = []
   props.pods.forEach((pod) => {
     if (pod.containers) {
       pod.containers.forEach((container) => {
@@ -477,13 +477,13 @@ const toggleExpand = (key: string) => {
   }
 }
 
-const provisioningStatus = (provisioning: Compute.ProvisioningType): string => {
+const provisioningStatus = (provisioning: ResourceProvisioning): string => {
   if (provisioning.is_over_provisioned) return 'Over-provisioned'
   if (provisioning.is_under_provisioned) return 'Under-provisioned'
   return 'Optimal'
 }
 
-const provisioningStatusClass = (provisioning: Compute.ProvisioningType): string => {
+const provisioningStatusClass = (provisioning: ResourceProvisioning): string => {
   if (provisioning.is_over_provisioned) return 'bg-warning-light/20 text-warning-light border-warning-light/30'
   if (provisioning.is_under_provisioned) return 'bg-error-light/20 text-error-light border-error-light/30'
   return 'bg-success-light/20 text-success-light border-success-light/30'

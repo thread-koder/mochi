@@ -97,10 +97,10 @@
 </template>
 
 <script setup lang="ts">
-import type * as Compute from '#shared/types/compute'
+import type { RecommendationRecord } from '#shared/types/compute'
 
 defineProps<{
-  recommendation: Compute.RecommendationRecord
+  recommendation: RecommendationRecord
 }>()
 
 const formatDate = (dateString: string): string => {

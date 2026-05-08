@@ -39,9 +39,9 @@
 </template>
 
 <script setup lang="ts">
-import type * as Workload from '#shared/types/workload'
+import type { Pod } from '#shared/types/workload'
 
 defineProps<{
-  pods?: Workload.WorkloadResponse['pods']
+  pods?: Pod[]
 }>()
 </script>

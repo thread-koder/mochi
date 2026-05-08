@@ -85,7 +85,7 @@
 
 <script setup lang="ts">
 import type { FetchError } from 'ofetch'
-import type * as Compute from '#shared/types/compute'
+import type { NamespaceAnalysis } from '#shared/types/compute'
 
 const props = defineProps<{
   namespace: string
@@ -97,12 +97,12 @@ const { parseError } = useApiError()
 const timeRange = ref<string | null>(null)
 const analysisPending = ref(false)
 const analysisError = ref<FetchError | null>(null)
-const analysis = ref<Compute.NamespaceAnalysis | null>(null)
+const analysis = ref<NamespaceAnalysis | null>(null)
 
 const executeAnalysis = async () => {
   analysisPending.value = true
   try {
-    analysis.value = await $api<Compute.NamespaceAnalysis>(`/api/v1/compute/analyze/namespaces/${props.namespace}?timeRange=${timeRange.value}`)
+    analysis.value = await $api<NamespaceAnalysis>(`/api/v1/compute/analyze/namespaces/${props.namespace}?timeRange=${timeRange.value}`)
   }
   catch (error) {
     analysisError.value = error as FetchError

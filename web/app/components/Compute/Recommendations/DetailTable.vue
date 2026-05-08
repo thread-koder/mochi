@@ -161,10 +161,10 @@
 </template>
 
 <script setup lang="ts">
-import type * as Compute from '#shared/types/compute'
+import type { RecommendationRecord } from '#shared/types/compute'
 
 const props = defineProps<{
-  recommendation: Compute.RecommendationRecord
+  recommendation: RecommendationRecord
 }>()
 
 const hasRecommendations = computed(

@@ -107,12 +107,12 @@
 </template>
 
 <script setup lang="ts">
-import type * as Compute from '#shared/types/compute'
+import type { RecommendationRecord } from '#shared/types/compute'
 
 const route = useRoute()
 const id = route.params.id as string
 
-const { data, error, pending, refresh } = await useApiData<Compute.RecommendationRecord>(
+const { data, error, pending, refresh } = await useApiData<RecommendationRecord>(
   `/api/v1/compute/recommendations/${id}`,
 )
 

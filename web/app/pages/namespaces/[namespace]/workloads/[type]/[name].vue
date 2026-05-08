@@ -106,13 +106,13 @@
 </template>
 
 <script setup lang="ts">
-import type * as Workload from '#shared/types/workload'
+import type { WorkloadResponse } from '#shared/types/workload'
 
 const route = useRoute()
 const { namespace, type, name } = route.params
 const { activeTab, setTab } = useTab('overview')
 
-const { data, error } = await useApiData<Workload.WorkloadResponse>(`/api/v1/workloads/${namespace}/${type}/${name}`)
+const { data, error } = await useApiData<WorkloadResponse>(`/api/v1/workloads/${namespace}/${type}/${name}`)
 
 const { parseError } = useApiError()
 if (error.value) {

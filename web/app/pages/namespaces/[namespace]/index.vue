@@ -98,12 +98,12 @@
 </template>
 
 <script setup lang="ts">
-import type * as Namespace from '#shared/types/namespace'
+import type { NamespaceResponse } from '#shared/types/namespace'
 
 const { namespace } = useRoute().params
 const { activeTab, setTab } = useTab('overview')
 
-const { data, error } = await useApiData<Namespace.NamespaceResponse>(`/api/v1/namespaces/${namespace}`)
+const { data, error } = await useApiData<NamespaceResponse>(`/api/v1/namespaces/${namespace}`)
 
 const { parseError } = useApiError()
 if (error.value) {

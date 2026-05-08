@@ -38,10 +38,10 @@
 </template>
 
 <script setup lang="ts">
-import type * as Namespace from '#shared/types/namespace'
+import type { Workload } from '#shared/types/namespace'
 
 defineProps<{
-  workloads?: Namespace.NamespaceResponse['workloads']
+  workloads?: Workload[]
   namespace: string
 }>()
 </script>

@@ -243,10 +243,10 @@
 
 <script setup lang="ts">
 import type { FetchError } from 'ofetch'
-import type * as Compute from '#shared/types/compute'
+import type { Recommendation } from '#shared/types/compute'
 
 const props = defineProps<{
-  recommendation: Compute.Recommendation | null
+  recommendation: Recommendation | null
 }>()
 
 const isOpen = defineModel<boolean>({ required: true })

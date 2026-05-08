@@ -154,10 +154,10 @@
 </template>
 
 <script setup lang="ts">
-import type * as Compute from '#shared/types/compute'
+import type { PodAnalysis } from '#shared/types/compute'
 
 const props = defineProps<{
-  pods?: Compute.WorkloadAnalysis['pods']
+  pods?: PodAnalysis[]
 }>()
 
 const sortMetric = ref<string | null>('p95')

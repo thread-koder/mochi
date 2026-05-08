@@ -25,9 +25,9 @@
 </template>
 
 <script setup lang="ts">
-import type * as Workload from '#shared/types/workload'
+import type { WorkloadResponse } from '#shared/types/workload'
 
 defineProps<{
-  workloadData?: Workload.WorkloadResponse
+  workloadData?: WorkloadResponse
 }>()
 </script>

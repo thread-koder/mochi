@@ -47,10 +47,10 @@
 </template>
 
 <script setup lang="ts">
-import type * as Namespace from '#shared/types/namespace'
+import type { StandalonePod } from '#shared/types/namespace'
 
 defineProps<{
-  pods?: Namespace.NamespaceResponse['standalone_pods'] | Namespace.NamespaceResponse['system_pods']
+  pods?: StandalonePod[]
   namespace: string
   title: string
   badgeLabel: string

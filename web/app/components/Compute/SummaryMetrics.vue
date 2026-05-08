@@ -272,10 +272,10 @@
 </template>
 
 <script setup lang="ts">
-import type * as Compute from '#shared/types/compute'
+import type { UtilizationResult, StabilityResult } from '#shared/types/compute'
 
 defineProps<{
-  utilization?: Compute.UtilizationResult
-  stability?: Compute.StabilityResult
+  utilization?: UtilizationResult
+  stability?: StabilityResult
 }>()
 </script>

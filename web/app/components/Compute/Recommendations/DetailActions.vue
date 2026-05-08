@@ -104,12 +104,12 @@
 
 <script setup lang="ts">
 import type { FetchError } from 'ofetch'
-import type * as Compute from '#shared/types/compute'
+import type { ContainerRecommendation } from '#shared/types/compute'
 
 const props = defineProps<{
   recommendationId: number
   status: string
-  recommendations: Compute.ContainerRecommendation[]
+  recommendations: ContainerRecommendation[]
 }>()
 
 const emit = defineEmits<{

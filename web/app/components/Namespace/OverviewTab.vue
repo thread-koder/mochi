@@ -51,9 +51,9 @@
 </template>
 
 <script setup lang="ts">
-import type * as Namespace from '#shared/types/namespace'
+import type { NamespaceResponse } from '#shared/types/namespace'
 
 defineProps<{
-  nsData?: Namespace.NamespaceResponse
+  nsData?: NamespaceResponse
 }>()
 </script>

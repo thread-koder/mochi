@@ -42,7 +42,7 @@
     <!-- Filter Bar -->
     <ComputeRecommendationsFilterBar
       v-model="filters"
-      :namespaces="namespacesData"
+      :namespaces="namespaces"
     />
 
     <!-- Recommendations List -->
@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import type * as Namespace from '#shared/types/namespace'
+import type { Namespace } from '#shared/types/namespace'
 import type { FilterState } from '~/components/Compute/Recommendations/FilterBar.vue'
 
 const filters = ref<FilterState>({
@@ -62,5 +62,5 @@ const filters = ref<FilterState>({
   workloadName: null,
 })
 
-const { data: namespacesData } = await useApiData<Namespace.Namespace[]>('/api/v1/namespaces')
+const { data: namespaces } = await useApiData<Namespace[]>('/api/v1/namespaces')
 </script>

@@ -95,12 +95,12 @@
 </template>
 
 <script setup lang="ts">
-import type * as Namespace from '#shared/types/namespace'
+import type { Namespace } from '#shared/types/namespace'
 
 const { parseError } = useApiError()
 
 const { data, pending, error }
-  = await useApiData<Namespace.Namespace[]>('/api/v1/namespaces')
+  = await useApiData<Namespace[]>('/api/v1/namespaces')
 
 const phaseColor = (phase: string) => {
   return phase.toLowerCase() === 'active' ? 'bg-success' : 'bg-warning'

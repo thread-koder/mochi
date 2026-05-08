@@ -262,7 +262,7 @@
 </template>
 
 <script setup lang="ts">
-import type * as Namespace from '#shared/types/namespace'
+import type { Namespace } from '#shared/types/namespace'
 
 export interface FilterState {
   namespace: string | null
@@ -273,7 +273,7 @@ export interface FilterState {
 }
 
 const props = defineProps<{
-  namespaces?: Namespace.Namespace[]
+  namespaces?: Namespace[]
 }>()
 
 const filters = defineModel<FilterState>({
@@ -304,7 +304,7 @@ watch(() => filters.value.workloadName, (value) => {
 }, { immediate: true })
 
 const namespaceOptions = computed(() => {
-  return props.namespaces?.map((ns: Namespace.Namespace) => ns.name) || []
+  return props.namespaces?.map((ns: Namespace) => ns.name) || []
 })
 
 const statusOptions: Array<{ value: string, label: string }> = [
