@@ -81,3 +81,24 @@ export const statusBadgeClass = (status: string): string => {
       return 'bg-primary/20 text-primary-light border-primary/30'
   }
 }
+
+/**
+ * Returns an empty string if not on the client-side.
+ * Chart.js cannot use Tailwind classes, so we read :root CSS variables.
+ * Design tokens are expected to use modern CSS syntax (e.g. oklch), not bare hex.
+ * @param variableName - The name of the CSS variable to resolve.
+ * @param opacity - The opacity to apply to the color.
+ * @returns The resolved color string.
+ */
+export const cssVariableColor = (variableName: string, opacity?: number): string => {
+  if (!import.meta.client) return ''
+  const root = document.documentElement
+  const computedStyle = getComputedStyle(root)
+  const value = computedStyle.getPropertyValue(variableName).trim()
+  if (!value) return ''
+
+  if (opacity !== undefined) {
+    return value.replace(/\)$/, ` / ${opacity})`)
+  }
+  return value
+}

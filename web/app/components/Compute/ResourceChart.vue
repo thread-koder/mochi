@@ -43,19 +43,6 @@ const props = defineProps<{
 const chartCanvas = ref<HTMLCanvasElement | null>(null)
 let chartInstance: Chart | null = null
 
-const cssVariableColor = (variableName: string, opacity?: number): string => {
-  if (!import.meta.client) return ''
-  const root = document.documentElement
-  const computedStyle = getComputedStyle(root)
-  const value = computedStyle.getPropertyValue(variableName).trim()
-  if (!value) return ''
-
-  if (opacity !== undefined) {
-    return value.replace(/\)$/, ` / ${opacity})`)
-  }
-  return value
-}
-
 const initChart = () => {
   if (!chartCanvas.value || !props.data || props.data.length === 0) {
     return
@@ -83,17 +70,22 @@ const initChart = () => {
   // Avoids using chart.js's "grace" feature, which can cause fill artifacts
   const yMax = maxValue > 0 ? maxValue * 1.1 : 1
 
-  // Get theme colors
-  const primaryColor = isCPU
+  const borderColor = isCPU
     ? cssVariableColor('--color-primary-light')
     : cssVariableColor('--color-secondary-light')
-  const primaryColorWithOpacity = isCPU
+  const bgColor = isCPU
     ? cssVariableColor('--color-primary-light', 0.1)
     : cssVariableColor('--color-secondary-light', 0.1)
   const gridColor = isCPU
     ? cssVariableColor('--color-primary', 0.1)
     : cssVariableColor('--color-secondary', 0.1)
   const textColor = cssVariableColor('--color-on-surface-secondary')
+
+  const tooltipBgColor = cssVariableColor('--color-surface-elevated')
+  const tooltipBorderColor = isCPU
+    ? cssVariableColor('--color-primary', 0.3)
+    : cssVariableColor('--color-secondary', 0.3)
+  const tooltipBodyColor = cssVariableColor('--color-on-surface')
 
   chartInstance = new Chart(ctx, {
     type: 'line',
@@ -104,8 +96,8 @@ const initChart = () => {
           : 'Memory Utilization',
         data: chartData,
         parsing: false,
-        borderColor: primaryColor,
-        backgroundColor: primaryColorWithOpacity,
+        borderColor: borderColor,
+        backgroundColor: bgColor,
         borderWidth: 2,
         fill: true,
         tension: 0.6,
@@ -136,13 +128,11 @@ const initChart = () => {
           },
         },
         tooltip: {
-          backgroundColor: cssVariableColor('--color-surface-elevated'),
-          borderColor: isCPU
-            ? cssVariableColor('--color-primary', 0.3)
-            : cssVariableColor('--color-secondary', 0.3),
+          backgroundColor: tooltipBgColor,
+          borderColor: tooltipBorderColor,
           borderWidth: 1,
           titleColor: textColor,
-          bodyColor: cssVariableColor('--color-on-surface'),
+          bodyColor: tooltipBodyColor,
           titleFont: { family: 'Inconsolata', size: 14 },
           bodyFont: { family: 'Inconsolata', size: 14 },
           cornerRadius: 8,
