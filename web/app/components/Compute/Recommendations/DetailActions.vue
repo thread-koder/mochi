@@ -128,10 +128,7 @@ const hasRecommendations = computed(
 
 const canApply = computed(() => {
   return (
-    hasRecommendations.value
-    && props.status !== 'applied'
-    && props.status !== 'rejected'
-    && props.status !== 'superseded'
+    hasRecommendations.value && props.status === 'pending'
   )
 })
 
