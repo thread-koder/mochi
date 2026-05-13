@@ -93,7 +93,7 @@
       <ComputeRecommendationsDetailOverview :recommendation="data" />
 
       <!-- Container Recommendations Table -->
-      <ComputeRecommendationsDetailTable :recommendation="data" />
+      <ComputeRecommendationsDetailTable :recommendations="data.recommendations" />
 
       <!-- Actions -->
       <ComputeRecommendationsDetailActions

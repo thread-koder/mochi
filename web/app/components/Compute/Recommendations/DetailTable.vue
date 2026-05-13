@@ -4,7 +4,7 @@
       Container Recommendations
     </h2>
     <div
-      v-if="!hasRecommendations "
+      v-if="!hasRecommendations"
       class="py-8"
     >
       <UiEmptyState
@@ -36,7 +36,7 @@
         </thead>
         <tbody>
           <tr
-            v-for="rec in recommendation.recommendations"
+            v-for="rec in recommendations"
             :key="rec.container_name"
             class="border-b border-primary/10 hover:bg-primary/5 transition-colors"
           >
@@ -161,13 +161,13 @@
 </template>
 
 <script setup lang="ts">
-import type { RecommendationRecord } from '#shared/types/compute'
+import type { ContainerRecommendation } from '#shared/types/compute'
 
 const props = defineProps<{
-  recommendation: RecommendationRecord
+  recommendations: ContainerRecommendation[]
 }>()
 
 const hasRecommendations = computed(
-  () => (props.recommendation?.recommendations?.length ?? 0) > 0,
+  () => (props.recommendations?.length ?? 0) > 0,
 )
 </script>
