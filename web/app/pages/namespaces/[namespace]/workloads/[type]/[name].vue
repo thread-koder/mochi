@@ -34,7 +34,7 @@
           </h1>
           <div class="flex items-center space-x-2 flex-wrap">
             <span class="px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
-              {{ data?.type }}
+              {{ workloadTypeLabel(data?.type ?? '') }}
             </span>
             <span
               v-if="data?.type !== 'Pod'"
@@ -106,6 +106,7 @@
 </template>
 
 <script setup lang="ts">
+import { workloadTypeLabel } from '#shared/constants/workload'
 import type { WorkloadResponse } from '#shared/types/workload'
 
 const route = useRoute()

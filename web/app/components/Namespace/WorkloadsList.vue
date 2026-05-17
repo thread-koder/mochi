@@ -20,7 +20,7 @@
         class="flex items-center space-x-4 glass hover:bg-primary/10 rounded-lg p-4 transition-all text-on-surface-secondary hover:text-on-surface"
       >
         <span class="px-2 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
-          {{ workload.type }}
+          {{ workloadTypeLabel(workload.type) }}
         </span>
         <div class="flex-1">
           <h3 class="font-medium">
@@ -38,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import { workloadTypeLabel } from '#shared/constants/workload'
 import type { Workload } from '#shared/types/namespace'
 
 defineProps<{
