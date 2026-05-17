@@ -34,8 +34,6 @@ export const timeAgo = (timestamp: string) => {
  * @returns A human-readable duration string.
  */
 export const formatDuration = (duration: string): string => {
-  if (!duration) return duration
-
   const hoursMatch = duration.match(/(\d+)h/)
   const minutesMatch = duration.match(/(\d+)m/)
   const secondsMatch = duration.match(/(\d+)s/)

@@ -1,28 +1,10 @@
 /**
- * Formats a CPU value to a human-readable string.
- * @param value - The CPU value to format.
- * @returns A human-readable string.
- */
-export const formatCPU = (value?: number): string => {
-  if (value === undefined || value === null || isNaN(value)) {
-    return 'N/A'
-  }
-
-  if (value < 1) {
-    const millicores = value * 1000
-    return `${millicores < 1 ? millicores.toFixed(2) : Math.round(millicores)}m`
-  }
-
-  return `${value.toFixed(2)} cores`
-}
-
-/**
  * Formats a byte value to a human-readable string.
  * @param value - The byte value to format.
  * @returns A human-readable string.
  */
 export const formatBytes = (value?: number): string => {
-  if (value === undefined || value === null || isNaN(value)) {
+  if (value === undefined || isNaN(value)) {
     return 'N/A'
   }
 
@@ -48,7 +30,7 @@ export const formatBytes = (value?: number): string => {
  * @returns A percentage string.
  */
 export const formatPercentage = (value: number): string => {
-  if (value === undefined || value === null || isNaN(value)) {
+  if (isNaN(value)) {
     return 'N/A'
   }
   return `${(value * 100).toFixed(1)}%`
@@ -65,14 +47,4 @@ export const formatChangePercent = (percent: number | null | undefined): string 
   }
   const sign = percent >= 0 ? '+' : ''
   return `${sign}${percent.toFixed(1)}%`
-}
-
-/**
- * Formats a snake_case or lowercase value to Title Case
- * @param value - The string to format.
- * @returns A human-readable label string.
- */
-export const formatTitleCase = (value: string): string => {
-  if (!value) return ''
-  return value.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }

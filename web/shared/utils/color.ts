@@ -62,27 +62,6 @@ export const scoreBadgeClass = (
 }
 
 /**
- * Returns Tailwind classes for a recommendation status badge
- * @param status - The recommendation status string.
- * @returns Tailwind CSS class string for the badge
- */
-export const statusBadgeClass = (status: string): string => {
-  const s = status?.toLowerCase() ?? ''
-  switch (s) {
-    case 'applied':
-      return 'bg-success-light/20 text-success-light border-success-light/30'
-    case 'rejected':
-      return 'bg-error-light/20 text-error-light border-error-light/30'
-    case 'pending':
-      return 'bg-warning-light/20 text-warning-light border-warning-light/30'
-    case 'superseded':
-      return 'bg-on-surface-muted/20 text-on-surface-muted border-on-surface-muted/30'
-    default:
-      return 'bg-primary/20 text-primary-light border-primary/30'
-  }
-}
-
-/**
  * Returns an empty string if not on the client-side.
  * Chart.js cannot use Tailwind classes, so we read :root CSS variables.
  * Design tokens are expected to use modern CSS syntax (e.g. oklch), not bare hex.
