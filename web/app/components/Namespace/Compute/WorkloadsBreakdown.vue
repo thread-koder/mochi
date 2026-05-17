@@ -10,19 +10,19 @@
       <div class="flex items-center gap-2">
         <UiSearchableSelect
           v-model="sortMetric"
-          :options="metricOptions"
+          :options="UTILIZATION_METRIC_OPTIONS"
           :searchable="false"
           placeholder="Metric"
         />
         <UiSearchableSelect
           v-model="sortResource"
-          :options="resourceOptions"
+          :options="UTILIZATION_RESOURCE_OPTIONS"
           :searchable="false"
           placeholder="Resource"
         />
         <UiSearchableSelect
           v-model="filterType"
-          :options="workloadTypeOptions"
+          :options="WORKLOAD_TYPE_OPTIONS"
           :searchable="false"
           placeholder="All Types"
           null-option="All Types"
@@ -66,7 +66,7 @@
                 <span>No workloads found</span>
                 <span v-if="filterType">
                   <span> for type: </span>
-                  <span class="text-primary-light capitalize">{{ filterType }}</span>
+                  <span class="text-primary-light">{{ workloadTypeLabel(filterType) }}</span>
                 </span>
               </div>
             </td>
@@ -88,7 +88,7 @@
             </td>
             <td class="py-3 px-4">
               <span class="px-2 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
-                {{ workload.workload_type }}
+                {{ workloadTypeLabel(workload.workload_type) }}
               </span>
             </td>
             <td class="py-3 px-4 text-right">
@@ -177,6 +177,13 @@
 </template>
 
 <script setup lang="ts">
+import {
+  UTILIZATION_METRIC_OPTIONS,
+  UTILIZATION_RESOURCE_OPTIONS,
+} from '#shared/constants/compute/utilization'
+import { WORKLOAD_TYPE_OPTIONS, workloadTypeLabel } from '#shared/constants/workload'
+import { utilizationSortMetricValue } from '#shared/utils/compute/utilization'
+import { formatCPU } from '#shared/utils/compute/format'
 import type { WorkloadAnalysis } from '#shared/types/compute'
 
 const props = defineProps<{
@@ -184,66 +191,23 @@ const props = defineProps<{
   namespace: string
 }>()
 
-const sortMetric = ref<string | null>('p95')
-const sortResource = ref<string | null>('cpu')
+const sortMetric = ref<string>('p95')
+const sortResource = ref<string>('cpu')
 const filterType = ref<string | null>(null)
-
-const metricOptions: Array<{ value: string, label: string }> = [
-  { value: 'current', label: 'Current' },
-  { value: 'p95', label: 'P95' },
-  { value: 'mean', label: 'Mean' },
-  { value: 'max', label: 'Max' },
-]
-
-const resourceOptions: Array<{ value: string, label: string }> = [
-  { value: 'cpu', label: 'CPU' },
-  { value: 'memory', label: 'Memory' },
-]
-
-const workloadTypeOptions: Array<{ value: string, label: string }> = [
-  { value: 'deployment', label: 'Deployment' },
-  { value: 'statefulset', label: 'StatefulSet' },
-  { value: 'daemonset', label: 'DaemonSet' },
-  { value: 'pod', label: 'Pod' },
-]
 
 const filteredWorkloads = computed(() => {
   if (!props.workloads) return []
 
-  let filtered = [...props.workloads]
+  const workloads = filterType.value
+    ? props.workloads.filter(w => w.workload_type === filterType.value)
+    : [...props.workloads]
 
-  if (filterType.value) {
-    filtered = filtered.filter(
-      w => w.workload_type.toLowerCase() === filterType.value!.toLowerCase(),
-    )
-  }
-
-  filtered.sort((a, b) => {
-    let aValue: number | undefined
-    let bValue: number | undefined
-    const resource = (sortResource.value ?? 'cpu') as 'cpu' | 'memory'
-
-    if (sortMetric.value === 'current') {
-      aValue = a.utilization[resource].current
-      bValue = b.utilization[resource].current
-    }
-    else if (sortMetric.value === 'p95') {
-      aValue = a.utilization[resource].stats.percentile.p95
-      bValue = b.utilization[resource].stats.percentile.p95
-    }
-    else if (sortMetric.value === 'mean') {
-      aValue = a.utilization[resource].stats.mean
-      bValue = b.utilization[resource].stats.mean
-    }
-    else if (sortMetric.value === 'max') {
-      aValue = a.utilization[resource].stats.max
-      bValue = b.utilization[resource].stats.max
-    }
-
-    return (bValue ?? 0) - (aValue ?? 0)
+  workloads.sort((a, b) => {
+    const aValue = utilizationSortMetricValue(a.utilization, sortMetric.value, sortResource.value)
+    const bValue = utilizationSortMetricValue(b.utilization, sortMetric.value, sortResource.value)
+    return bValue - aValue
   })
-
-  return filtered
+  return workloads
 })
 
 const navigateToWorkload = (workloadType: string, workloadName: string) => {

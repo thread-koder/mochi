@@ -21,6 +21,7 @@ import {
   Filler,
 } from 'chart.js'
 import 'chartjs-adapter-date-fns'
+import { formatCPU } from '#shared/utils/compute/format'
 
 Chart.register(
   LineController,

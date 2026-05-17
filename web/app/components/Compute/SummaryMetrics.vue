@@ -272,6 +272,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatCPU } from '#shared/utils/compute/format'
 import type { UtilizationResult, StabilityResult } from '#shared/types/compute'
 
 defineProps<{

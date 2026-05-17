@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="containers && containers.length > 0"
+    v-if="filteredContainers.length > 0"
     class="glass rounded-xl p-6"
   >
     <div class="flex items-center justify-between mb-4">
@@ -10,13 +10,13 @@
       <div class="flex items-center gap-2">
         <UiSearchableSelect
           v-model="sortMetric"
-          :options="metricOptions"
+          :options="UTILIZATION_METRIC_OPTIONS"
           :searchable="false"
           placeholder="Metric"
         />
         <UiSearchableSelect
           v-model="sortResource"
-          :options="resourceOptions"
+          :options="UTILIZATION_RESOURCE_OPTIONS"
           :searchable="false"
           placeholder="Resource"
         />
@@ -428,42 +428,40 @@
 </template>
 
 <script setup lang="ts">
+import {
+  UTILIZATION_METRIC_OPTIONS,
+  UTILIZATION_RESOURCE_OPTIONS,
+} from '#shared/constants/compute/utilization'
+import { utilizationSortMetricValue } from '#shared/utils/compute/utilization'
+import { formatCPU } from '#shared/utils/compute/format'
 import type { PodAnalysis, ContainerAnalysis, ResourceProvisioning } from '#shared/types/compute'
 
 const props = defineProps<{
   pods?: PodAnalysis[]
 }>()
 
-const sortMetric = ref<string | null>('p95')
-const sortResource = ref<string | null>('cpu')
+const sortMetric = ref<string>('p95')
+const sortResource = ref<string>('cpu')
 
-const metricOptions: Array<{ value: string, label: string }> = [
-  { value: 'current', label: 'Current' },
-  { value: 'p95', label: 'P95' },
-  { value: 'mean', label: 'Mean' },
-  { value: 'max', label: 'Max' },
-]
+const filteredContainers = computed(() => {
+  if (!props.pods?.length) return []
 
-const resourceOptions: Array<{ value: string, label: string }> = [
-  { value: 'cpu', label: 'CPU' },
-  { value: 'memory', label: 'Memory' },
-]
-const filteredContainers = ref<Array<ContainerAnalysis & { pod_name: string }>>([])
-
-const containers = computed(() => {
-  if (!props.pods) return []
-  const allContainers: Array<ContainerAnalysis & { pod_name: string }> = []
-  props.pods.forEach((pod) => {
-    if (pod.containers) {
-      pod.containers.forEach((container) => {
-        allContainers.push({
-          ...container,
-          pod_name: pod.pod_name,
-        })
+  const containers: Array<ContainerAnalysis & { pod_name: string }> = []
+  for (const pod of props.pods) {
+    if (!pod.containers?.length) continue
+    for (const container of pod.containers) {
+      containers.push({
+        ...container,
+        pod_name: pod.pod_name,
       })
     }
+  }
+
+  return containers.sort((a, b) => {
+    const aValue = utilizationSortMetricValue(a.utilization, sortMetric.value, sortResource.value)
+    const bValue = utilizationSortMetricValue(b.utilization, sortMetric.value, sortResource.value)
+    return bValue - aValue
   })
-  return allContainers
 })
 
 const expandedRows = ref<Set<string>>(new Set())
@@ -494,40 +492,4 @@ const metricColor = (value: number, threshold: number): string => {
   if (value > threshold * 0.5) return 'text-warning-light'
   return 'text-on-surface'
 }
-
-const sortContainers = () => {
-  if (!containers.value || containers.value.length === 0) {
-    filteredContainers.value = []
-    return
-  }
-
-  filteredContainers.value = [...containers.value].sort((a, b) => {
-    let aValue: number | undefined
-    let bValue: number | undefined
-    const resource = (sortResource.value ?? 'cpu') as 'cpu' | 'memory'
-
-    if (sortMetric.value === 'current') {
-      aValue = a.utilization[resource].current
-      bValue = b.utilization[resource].current
-    }
-    else if (sortMetric.value === 'p95') {
-      aValue = a.utilization[resource].stats.percentile.p95
-      bValue = b.utilization[resource].stats.percentile.p95
-    }
-    else if (sortMetric.value === 'mean') {
-      aValue = a.utilization[resource].stats.mean
-      bValue = b.utilization[resource].stats.mean
-    }
-    else if (sortMetric.value === 'max') {
-      aValue = a.utilization[resource].stats.max
-      bValue = b.utilization[resource].stats.max
-    }
-
-    return (bValue ?? 0) - (aValue ?? 0)
-  })
-}
-
-watch([containers, sortMetric, sortResource], () => {
-  sortContainers()
-}, { immediate: true })
 </script>
