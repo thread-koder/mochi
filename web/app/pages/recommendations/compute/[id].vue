@@ -53,10 +53,10 @@
             </NuxtLink>
             <!-- Status Badge -->
             <span
-              :class="statusBadgeClass(data?.status ?? '')"
+              :class="recommendationStatusBadgeClass(data?.status ?? '')"
               class="px-3 py-1 rounded-full text-xs font-medium border"
             >
-              {{ formatTitleCase(data?.status ?? '') }}
+              {{ recommendationStatusLabel(data?.status ?? '') }}
             </span>
             <!-- Created -->
             <span
@@ -107,6 +107,8 @@
 </template>
 
 <script setup lang="ts">
+import { recommendationStatusLabel } from '#shared/constants/compute/recommendations'
+import { recommendationStatusBadgeClass } from '#shared/utils/compute/color'
 import type { RecommendationRecord } from '#shared/types/compute'
 
 const route = useRoute()

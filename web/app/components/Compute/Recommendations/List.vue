@@ -146,20 +146,20 @@
             </td>
             <td class="py-3 px-4">
               <span class="px-2 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
-                {{ record.workload_type }}
+                {{ workloadTypeLabel(record.workload_type) }}
               </span>
             </td>
             <td class="py-3 px-4">
               <span
-                :class="statusBadgeClass(record.status)"
+                :class="recommendationStatusBadgeClass(record.status)"
                 class="px-2 py-1 rounded-full text-xs font-medium border"
               >
-                {{ formatTitleCase(record.status) }}
+                {{ recommendationStatusLabel(record.status) }}
               </span>
             </td>
             <td class="py-3 px-4">
               <span class="px-2 py-1 rounded-full text-xs font-medium bg-secondary/20 text-secondary-light border border-secondary/30">
-                {{ formatTitleCase(record.recommendation_mode) }}
+                {{ recommendationModeLabel(record.recommendation_mode) }}
               </span>
             </td>
             <td class="py-3 px-4">
@@ -191,7 +191,13 @@
 </template>
 
 <script setup lang="ts">
-import type * as Compute from '#shared/types/compute'
+import {
+  recommendationModeLabel,
+  recommendationStatusLabel,
+} from '#shared/constants/compute/recommendations'
+import { workloadTypeLabel } from '#shared/constants/workload'
+import { recommendationStatusBadgeClass } from '#shared/utils/compute/color'
+import type { RecommendationsResponse, RecommendationRecord } from '#shared/types/compute'
 import type { FilterState } from '~/components/Compute/Recommendations/FilterBar.vue'
 
 const props = defineProps<{
@@ -217,7 +223,7 @@ const queryString = computed(() => buildQuery(props.filters, currentPage.value))
 
 const { parseError } = useApiError()
 
-const { data: recommendations, pending, error } = useLazyAsyncData<Compute.RecommendationsResponse>(
+const { data: recommendations, pending, error } = useLazyAsyncData<RecommendationsResponse>(
   () => `compute-recommendations-${queryString.value}`,
   () => $api(`/api/v1/compute/recommendations?${queryString.value}`),
   { watch: [queryString] },
@@ -231,7 +237,7 @@ watch(() => props.filters, () => {
   currentPage.value = 1
 }, { deep: true })
 
-const averageConfidence = (record: Compute.RecommendationRecord): number => {
+const averageConfidence = (record: RecommendationRecord): number => {
   const recs = record.recommendations ?? []
   if (recs.length === 0) return 0
   const sum = recs.reduce((acc, r) => acc + (r.confidence_score ?? 0), 0)
@@ -239,7 +245,8 @@ const averageConfidence = (record: Compute.RecommendationRecord): number => {
 }
 
 type SortColumn = 'namespace' | 'workload_name' | 'workload_type' | 'status' | 'mode' | 'confidence' | 'created_at'
-const sortBy = ref<SortColumn | null>('created_at')
+
+const sortBy = ref<SortColumn>('created_at')
 const sortDir = ref<'asc' | 'desc'>('desc')
 
 const setSort = (column: SortColumn) => {
@@ -252,50 +259,45 @@ const setSort = (column: SortColumn) => {
   }
 }
 
+const sortValue = (record: RecommendationRecord, column: SortColumn): string | number => {
+  switch (column) {
+    case 'namespace':
+      return record.namespace
+    case 'workload_name':
+      return record.workload_name
+    case 'workload_type':
+      return record.workload_type
+    case 'status':
+      return record.status
+    case 'mode':
+      return record.recommendation_mode
+    case 'confidence':
+      return averageConfidence(record)
+    case 'created_at':
+      return new Date(record.created_at).getTime()
+  }
+}
+
 const sortedRecords = computed(() => {
-  const list = records.value ?? []
-  if (!sortBy.value) return list
+  const list = records.value
+  const column = sortBy.value
   const dir = sortDir.value === 'asc' ? 1 : -1
-  return [...list].sort((a, b) => {
-    let aVal: string | number
-    let bVal: string | number
-    switch (sortBy.value!) {
-      case 'namespace':
-        aVal = a.namespace
-        bVal = b.namespace
-        break
-      case 'workload_name':
-        aVal = a.workload_name
-        bVal = b.workload_name
-        break
-      case 'workload_type':
-        aVal = a.workload_type
-        bVal = b.workload_type
-        break
-      case 'status':
-        aVal = a.status
-        bVal = b.status
-        break
-      case 'mode':
-        aVal = a.recommendation_mode
-        bVal = b.recommendation_mode
-        break
-      case 'confidence':
-        aVal = averageConfidence(a)
-        bVal = averageConfidence(b)
-        break
-      case 'created_at':
-        aVal = new Date(a.created_at).getTime()
-        bVal = new Date(b.created_at).getTime()
-        break
-      default:
-        return 0
-    }
+
+  const mapped = list.map(record => ({
+    record,
+    value: sortValue(record, column),
+  }))
+
+  mapped.sort((a, b) => {
+    const aVal = a.value
+    const bVal = b.value
     if (typeof aVal === 'string' && typeof bVal === 'string') {
       return dir * aVal.localeCompare(bVal)
     }
     return dir * ((aVal as number) - (bVal as number))
   })
+
+  return mapped.map(item => item.record)
 })
 
 const navigateToDetail = (id: number) => {

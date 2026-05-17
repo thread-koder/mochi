@@ -30,7 +30,7 @@
           </div>
           <div class="flex items-center justify-between min-h-9">
             <span class="text-sm text-on-surface-secondary shrink-0">Type:</span>
-            <span class="px-2 py-1 rounded-full text-sm font-medium bg-primary/20 text-primary-light border border-primary/30 shrink-0">{{ recommendation.workload_type }}</span>
+            <span class="px-2 py-1 rounded-full text-sm font-medium bg-primary/20 text-primary-light border border-primary/30 shrink-0">{{ workloadTypeLabel(recommendation.workload_type) }}</span>
           </div>
         </div>
       </div>
@@ -43,7 +43,7 @@
         <div class="space-y-2">
           <div class="flex items-center justify-between min-h-9">
             <span class="text-sm text-on-surface-secondary shrink-0">Mode:</span>
-            <span class="text-sm text-on-surface font-medium">{{ formatTitleCase(recommendation.recommendation_mode) }}</span>
+            <span class="text-sm text-on-surface font-medium">{{ recommendationModeLabel(recommendation.recommendation_mode) }}</span>
           </div>
           <div
             v-if="recommendation.analysis_time_range"
@@ -55,10 +55,10 @@
           <div class="flex items-center justify-between min-h-9">
             <span class="text-sm text-on-surface-secondary shrink-0">Status:</span>
             <span
-              :class="statusBadgeClass(recommendation.status)"
+              :class="recommendationStatusBadgeClass(recommendation.status)"
               class="px-2 py-1 rounded-full text-sm font-medium border shrink-0"
             >
-              {{ formatTitleCase(recommendation.status) }}
+              {{ recommendationStatusLabel(recommendation.status) }}
             </span>
           </div>
         </div>
@@ -97,6 +97,12 @@
 </template>
 
 <script setup lang="ts">
+import {
+  recommendationModeLabel,
+  recommendationStatusLabel,
+} from '#shared/constants/compute/recommendations'
+import { workloadTypeLabel } from '#shared/constants/workload'
+import { recommendationStatusBadgeClass } from '#shared/utils/compute/color'
 import type { RecommendationRecord } from '#shared/types/compute'
 
 defineProps<{

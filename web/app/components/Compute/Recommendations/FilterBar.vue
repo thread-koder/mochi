@@ -26,7 +26,7 @@
           />
           <UiSearchableSelect
             v-model="filters.status"
-            :options="statusOptions"
+            :options="RECOMMENDATION_STATUS_OPTIONS"
             :searchable="false"
             placeholder="All Status"
             null-option="All Status"
@@ -41,7 +41,7 @@
           />
           <UiSearchableSelect
             v-model="filters.mode"
-            :options="modeOptions"
+            :options="RECOMMENDATION_MODE_OPTIONS"
             :searchable="false"
             placeholder="All Modes"
             null-option="All Modes"
@@ -56,7 +56,7 @@
           />
           <UiSearchableSelect
             v-model="filters.workloadType"
-            :options="workloadTypeOptions"
+            :options="WORKLOAD_TYPE_OPTIONS"
             :searchable="false"
             placeholder="All Types"
             null-option="All Types"
@@ -141,7 +141,7 @@
                   name="lucide:circle-check"
                   class="text-xs shrink-0"
                 />
-                <span>{{ statusLabel(filters.status) }}</span>
+                <span>{{ recommendationStatusLabel(filters.status) }}</span>
                 <button
                   class="hover:text-primary transition-colors shrink-0 flex items-center cursor-pointer"
                   @click="filters.status = null"
@@ -170,7 +170,7 @@
                   name="lucide:settings"
                   class="text-xs shrink-0"
                 />
-                <span>{{ modeLabel(filters.mode) }}</span>
+                <span>{{ recommendationModeLabel(filters.mode) }}</span>
                 <button
                   class="hover:text-primary transition-colors shrink-0 flex items-center cursor-pointer"
                   @click="filters.mode = null"
@@ -199,7 +199,7 @@
                   name="lucide:server"
                   class="text-xs shrink-0"
                 />
-                <span>{{ filters.workloadType }}</span>
+                <span>{{ workloadTypeLabel(filters.workloadType) }}</span>
                 <button
                   class="hover:text-primary transition-colors shrink-0 flex items-center cursor-pointer"
                   @click="filters.workloadType = null"
@@ -262,6 +262,13 @@
 </template>
 
 <script setup lang="ts">
+import {
+  RECOMMENDATION_MODE_OPTIONS,
+  RECOMMENDATION_STATUS_OPTIONS,
+  recommendationModeLabel,
+  recommendationStatusLabel,
+} from '#shared/constants/compute/recommendations'
+import { WORKLOAD_TYPE_OPTIONS, workloadTypeLabel } from '#shared/constants/workload'
 import type { Namespace } from '#shared/types/namespace'
 
 export interface FilterState {
@@ -307,50 +314,11 @@ const namespaceOptions = computed(() => {
   return props.namespaces?.map((ns: Namespace) => ns.name) || []
 })
 
-const statusOptions: Array<{ value: string, label: string }> = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'applied', label: 'Applied' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'superseded', label: 'Superseded' },
-]
-
-const modeOptions: Array<{ value: string, label: string }> = [
-  { value: 'cost_optimized', label: 'Cost Optimized' },
-  { value: 'burstable', label: 'Burstable' },
-  { value: 'guaranteed', label: 'Guaranteed' },
-]
-
-const workloadTypeOptions: Array<{ value: string, label: string }> = [
-  { value: 'Deployment', label: 'Deployment' },
-  { value: 'StatefulSet', label: 'StatefulSet' },
-  { value: 'DaemonSet', label: 'DaemonSet' },
-  { value: 'Pod', label: 'Pod' },
-]
-
 const hasActiveFilters = computed(() => {
   return !!(filters.value.namespace
     || filters.value.status || filters.value.mode
     || filters.value.workloadType || filters.value.workloadName)
 })
-
-const modeLabel = (mode: string): string => {
-  const labels: Record<string, string> = {
-    cost_optimized: 'Cost Optimized',
-    burstable: 'Burstable',
-    guaranteed: 'Guaranteed',
-  }
-  return labels[mode] || mode
-}
-
-const statusLabel = (status: string): string => {
-  const labels: Record<string, string> = {
-    pending: 'Pending',
-    applied: 'Applied',
-    rejected: 'Rejected',
-    superseded: 'Superseded',
-  }
-  return labels[status] || status
-}
 
 const clearFilters = () => {
   filters.value = {
