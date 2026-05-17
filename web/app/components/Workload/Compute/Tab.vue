@@ -127,7 +127,7 @@ const props = defineProps<{
 
 const { parseError } = useApiError()
 
-const timeRange = ref<string | null>(null)
+const timeRange = ref('24h')
 const analysisPending = ref(false)
 const analysisError = ref<FetchError | null>(null)
 const analysis = ref<WorkloadAnalysis | null>(null)
@@ -149,23 +149,24 @@ const executeAnalysis = async () => {
   }
 }
 
-watch(timeRange, async (newTimeRange, oldTimeRange) => {
-  if (!newTimeRange) {
-    timeRange.value = '24h'
-    return
-  }
+watch(
+  [
+    () => props.isActive === true,
+    timeRange,
+    () => props.namespace,
+    () => props.workloadType,
+    () => props.workloadName,
+  ],
+  async ([isActive, range, ns, wlType, wlName], [, prevRange]) => {
+    if (!isActive || !range || !ns || !wlType || !wlName) return
 
-  const timeChanged = newTimeRange !== oldTimeRange
-  if (timeChanged) {
+    const timeChanged = prevRange !== undefined && range !== prevRange
+    if (analysis.value !== null && !timeChanged) return
+
     await executeAnalysis()
-  }
-})
-
-watch(() => props.isActive, async (isActive) => {
-  if (isActive && !timeRange.value) {
-    timeRange.value = '24h'
-  }
-}, { immediate: true })
+  },
+  { immediate: true },
+)
 
 const onRecommendationGenerated = (recommendation: Recommendation) => {
   generatedRecommendation.value = recommendation

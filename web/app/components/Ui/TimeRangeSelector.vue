@@ -49,7 +49,7 @@ const predefinedOptions = ['1h', '6h', '12h', '24h', '3d', '7d', '14d', '30d']
 const isEditingCustom = ref(false)
 const customInputValue = ref('')
 const customInputRef = ref<HTMLInputElement | null>(null)
-const storedCustomValue = ref<string | null>(null)
+const customValue = ref<string | null>(null)
 
 const timeRangeOptions = computed(() => {
   const options: Array<{ value: string, label: string }> = [
@@ -63,8 +63,8 @@ const timeRangeOptions = computed(() => {
     { value: '30d', label: 'Last 30 Days' },
   ]
 
-  if (storedCustomValue.value) {
-    options.push({ value: CUSTOM_SENTINEL, label: `Custom (${storedCustomValue.value})` })
+  if (customValue.value) {
+    options.push({ value: CUSTOM_SENTINEL, label: `Custom (${customValue.value})` })
   }
   else {
     options.push({ value: CUSTOM_SENTINEL, label: 'Custom' })
@@ -83,7 +83,7 @@ const selectedValue = computed({
   set: (value: string | null) => {
     if (value !== CUSTOM_SENTINEL) {
       isEditingCustom.value = false
-      storedCustomValue.value = null
+      customValue.value = null
       timeRange.value = value
     }
   },
@@ -92,7 +92,7 @@ const selectedValue = computed({
 const onOptionSelect = (value: string | null) => {
   if (value === CUSTOM_SENTINEL) {
     isEditingCustom.value = true
-    customInputValue.value = timeRange.value || storedCustomValue.value || ''
+    customInputValue.value = timeRange.value || customValue.value || ''
     nextTick(() => {
       customInputRef.value?.focus()
     })
@@ -103,14 +103,14 @@ const applyCustom = () => {
   const value = customInputValue.value.trim()
   if (value) {
     timeRange.value = value
-    storedCustomValue.value = predefinedOptions.includes(value) ? null : value
+    customValue.value = predefinedOptions.includes(value) ? null : value
     isEditingCustom.value = false
   }
 }
 
 watch(timeRange, (newValue) => {
   if (newValue && !predefinedOptions.includes(newValue)) {
-    storedCustomValue.value = newValue
+    customValue.value = newValue
   }
 }, { immediate: true })
 </script>
