@@ -1,10 +1,13 @@
 .PHONY: help \
 	core-build core-test core-clean core-run core-dev core-fmt core-lint core-deps core-deps-update \
+	web-deps web-dev web-build web-prepare web-clean web-lint \
 	docker-build docker-run \
 	dev-env-setup dev-env-clean dev-env-status \
 	test-workloads-setup test-workloads-clean
 
 # Variables
+WEB_DIR=web
+PNPM=corepack pnpm
 CORE_DIR=core
 CORE_BUILD_ENV=CGO_ENABLED=0
 BINARY_NAME=mochi
@@ -56,6 +59,31 @@ core-deps: ## Download and tidy core dependencies
 core-deps-update: ## Update core dependencies
 	@echo "Updating core dependencies..."
 	@cd $(CORE_DIR) && go get -u ./... && go mod tidy
+
+# Web (Nuxt)
+web-deps: ## Install web dependencies
+	@echo "Installing web dependencies..."
+	@cd $(WEB_DIR) && $(PNPM) install
+
+web-dev: ## Run Nuxt dev server
+	@echo "Running web dev server..."
+	@cd $(WEB_DIR) && $(PNPM) dev
+
+web-build: ## Build Nuxt for production
+	@echo "Building web..."
+	@cd $(WEB_DIR) && $(PNPM) build
+
+web-prepare: ## Generate Nuxt types and module stubs
+	@echo "Preparing web..."
+	@cd $(WEB_DIR) && $(PNPM) exec nuxt prepare
+
+web-clean: ## Remove Nuxt build artifacts
+	@echo "Cleaning web build artifacts..."
+	@rm -rf $(WEB_DIR)/.output $(WEB_DIR)/.nitro $(WEB_DIR)/.cache $(WEB_DIR)/.data
+
+web-lint: ## Lint web code
+	@echo "Linting web..."
+	@cd $(WEB_DIR) && $(PNPM) lint
 
 # Docker
 docker-build: ## Build Docker image
