@@ -33,4 +33,7 @@ temp/
 *_test.go
 
 # Configs (will be mounted or provided separately)
-configs/
+core/configs/
+
+# Frontend (not part of the Core image)
+web/

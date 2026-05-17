@@ -1,6 +1,12 @@
-.PHONY: help build test clean run lint fmt docker-build docker-run deps deps-update dev dev-env-setup dev-env-clean dev-env-status test-workloads-setup test-workloads-clean
+.PHONY: help \
+	core-build core-test core-clean core-run core-dev core-fmt core-lint core-deps core-deps-update \
+	docker-build docker-run \
+	dev-env-setup dev-env-clean dev-env-status \
+	test-workloads-setup test-workloads-clean
 
 # Variables
+CORE_DIR=core
+CORE_BUILD_ENV=CGO_ENABLED=0
 BINARY_NAME=mochi
 MAIN_PATH=./cmd/mochi
 VERSION?=dev
@@ -12,42 +18,46 @@ help: ## Show this help message
 	@echo 'Usage: make [target]'
 	@echo ''
 	@echo 'Available targets:'
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-25s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-build: ## Build the binary
+# Core (Go)
+core-build: ## Build the core binary
 	@echo "Building $(BINARY_NAME)..."
-	@go build $(LDFLAGS) -o bin/$(BINARY_NAME) $(MAIN_PATH)
+	@cd $(CORE_DIR) && $(CORE_BUILD_ENV) go build $(LDFLAGS) -o ../bin/$(BINARY_NAME) $(MAIN_PATH)
 
-test: ## Run tests
-	@echo "Running tests..."
-	@go test -v -race ./...
+core-test: ## Run core tests (with race detector)
+	@echo "Running core tests..."
+	@cd $(CORE_DIR) && go test -v -race ./...
 
-clean: ## Clean build artifacts
+core-clean: ## Clean core build artifacts
 	@echo "Cleaning..."
 	@rm -rf bin/
-	@go clean
+	@cd $(CORE_DIR) && go clean
 
-run: build ## Build and run the application
+core-run: core-build ## Build and run the core binary
 	@./bin/$(BINARY_NAME)
 
-fmt: ## Format code
-	@echo "Formatting code..."
-	@go fmt ./...
+core-dev: ## Run core in development mode
+	@echo "Running core in development mode..."
+	@cd $(CORE_DIR) && go run $(MAIN_PATH)
 
-lint: ## Run go vet
-	@echo "Running go vet..."
-	@go vet ./...
+core-fmt: ## Format core code
+	@echo "Formatting core code..."
+	@cd $(CORE_DIR) && go fmt ./...
 
-deps: ## Download dependencies
-	@echo "Downloading dependencies..."
-	@go mod download
-	@go mod tidy
+core-lint: ## Run go vet on core
+	@echo "Running go vet on core..."
+	@cd $(CORE_DIR) && go vet ./...
 
-deps-update: ## Update dependencies
-	@echo "Updating dependencies..."
-	@go get -u ./...
-	@go mod tidy
+core-deps: ## Download and tidy core dependencies
+	@echo "Downloading core dependencies..."
+	@cd $(CORE_DIR) && go mod download && go mod tidy
 
+core-deps-update: ## Update core dependencies
+	@echo "Updating core dependencies..."
+	@cd $(CORE_DIR) && go get -u ./... && go mod tidy
+
+# Docker
 docker-build: ## Build Docker image
 	@echo "Building Docker image..."
 	@docker build \
@@ -59,10 +69,7 @@ docker-build: ## Build Docker image
 docker-run: docker-build ## Build and run Docker container
 	@docker run --rm $(BINARY_NAME):$(VERSION)
 
-dev: ## Run in development mode
-	@echo "Running in development mode..."
-	@go run $(MAIN_PATH)
-
+# Development environment (minikube / Helm)
 dev-env-setup: ## Set up PostgreSQL, Prometheus, and Redis in minikube using Helm
 	@chmod +x scripts/setup-dev.sh
 	@./scripts/setup-dev.sh

@@ -4,11 +4,11 @@ FROM golang:1.26-alpine AS builder
 WORKDIR /build
 
 # Copy go mod files
-COPY go.mod go.sum ./
+COPY core/go.mod core/go.sum ./
 RUN go mod download
 
 # Copy source code
-COPY . .
+COPY core/ .
 
 # Build the binary
 ARG VERSION=dev
