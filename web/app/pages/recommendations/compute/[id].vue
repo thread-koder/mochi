@@ -2,41 +2,7 @@
   <div class="p-8">
     <!-- Header -->
     <div class="mb-8">
-      <!-- Breadcrumb -->
-      <div class="flex items-center space-x-2 text-sm mb-4">
-        <NuxtLink
-          to="/"
-          class="text-primary-light hover:text-primary transition-colors"
-        >
-          Home
-        </NuxtLink>
-        <Icon
-          name="lucide:chevron-right"
-          class="text-xs text-on-surface-muted"
-        />
-        <NuxtLink
-          to="/recommendations/compute"
-          class="text-primary-light hover:text-primary transition-colors"
-        >
-          Recommendations
-        </NuxtLink>
-        <Icon
-          name="lucide:chevron-right"
-          class="text-xs text-on-surface-muted"
-        />
-        <NuxtLink
-          to="/recommendations/compute"
-          class="text-primary-light hover:text-primary transition-colors"
-        >
-          Compute
-        </NuxtLink>
-        <Icon
-          name="lucide:chevron-right"
-          class="text-xs text-on-surface-muted"
-        />
-        <span class="text-on-surface">Recommendation #{{ id }}</span>
-      </div>
-
+      <UiBreadcrumb :items="breadcrumbs" />
       <div class="flex items-center justify-between mb-4">
         <div>
           <h1 class="text-4xl font-bold font-heading mb-2">
@@ -113,6 +79,13 @@ import type { RecommendationRecord } from '#shared/types/compute'
 
 const route = useRoute()
 const id = route.params.id as string
+
+const breadcrumbs = computed(() => [
+  { label: 'Home', to: '/' },
+  { label: 'Recommendations', to: '/recommendations/compute' },
+  { label: 'Compute', to: '/recommendations/compute' },
+  { label: `Recommendation #${id}` },
+])
 
 const { data, error, pending, refresh } = await useApiData<RecommendationRecord>(
   `/api/v1/compute/recommendations/${id}`,

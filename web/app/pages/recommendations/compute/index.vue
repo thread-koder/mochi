@@ -2,31 +2,7 @@
   <div class="p-8">
     <!-- Header -->
     <div class="mb-8">
-      <!-- Breadcrumb -->
-      <div class="flex items-center space-x-2 text-sm mb-4">
-        <NuxtLink
-          to="/"
-          class="text-primary-light hover:text-primary transition-colors"
-        >
-          Home
-        </NuxtLink>
-        <Icon
-          name="lucide:chevron-right"
-          class="text-xs text-on-surface-muted"
-        />
-        <NuxtLink
-          to="/recommendations/compute"
-          class="text-primary-light hover:text-primary transition-colors"
-        >
-          Recommendations
-        </NuxtLink>
-        <Icon
-          name="lucide:chevron-right"
-          class="text-xs text-on-surface-muted"
-        />
-        <span class="text-on-surface">Compute</span>
-      </div>
-
+      <UiBreadcrumb :items="breadcrumbs" />
       <div class="flex items-center justify-between mb-4">
         <div>
           <h1 class="text-4xl font-bold font-heading mb-2">
@@ -53,6 +29,12 @@
 <script setup lang="ts">
 import type { Namespace } from '#shared/types/namespace'
 import type { FilterState } from '~/components/Compute/Recommendations/FilterBar.vue'
+
+const breadcrumbs = [
+  { label: 'Home', to: '/' },
+  { label: 'Recommendations', to: '/recommendations/compute' },
+  { label: 'Compute' },
+]
 
 const filters = ref<FilterState>({
   namespace: null,

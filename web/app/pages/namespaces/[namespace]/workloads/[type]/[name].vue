@@ -2,31 +2,7 @@
   <div class="p-8">
     <!-- Header -->
     <div class="mb-4">
-      <!-- Breadcrumb -->
-      <div class="flex items-center space-x-2 text-sm mb-4">
-        <NuxtLink
-          to="/"
-          class="text-primary-light hover:text-primary transition-colors"
-        >
-          Home
-        </NuxtLink>
-        <Icon
-          name="lucide:chevron-right"
-          class="text-xs text-on-surface-muted"
-        />
-        <NuxtLink
-          :to="`/namespaces/${namespace}`"
-          class="text-primary-light hover:text-primary transition-colors"
-        >
-          {{ namespace }}
-        </NuxtLink>
-        <Icon
-          name="lucide:chevron-right"
-          class="text-xs text-on-surface-muted"
-        />
-        <span class="text-on-surface">{{ data?.name }}</span>
-      </div>
-
+      <UiBreadcrumb :items="breadcrumbs" />
       <div class="flex items-center justify-between mb-4">
         <div>
           <h1 class="text-4xl font-bold font-heading mb-2">
@@ -81,6 +57,12 @@ const tabs = [
   { id: 'compute', label: 'Compute' },
 ]
 const activeTab = ref('overview')
+
+const breadcrumbs = computed(() => [
+  { label: 'Home', to: '/' },
+  { label: String(namespace), to: `/namespaces/${namespace}` },
+  { label: data.value?.name ?? String(name) },
+])
 
 const { data, error } = await useApiData<WorkloadResponse>(`/api/v1/workloads/${namespace}/${type}/${name}`)
 
