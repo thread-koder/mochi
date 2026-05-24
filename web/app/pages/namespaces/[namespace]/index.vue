@@ -44,56 +44,20 @@
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="mb-6">
-      <div class="flex space-x-4 border-b border-primary/20">
-        <button
-          class="px-4 py-2 cursor-pointer transition-all"
-          :class="activeTab === 'overview' ? 'border-b-2 border-primary-light text-primary-light font-semibold' : 'text-on-surface-muted hover:text-on-surface-subtle'"
-          @click="setTab('overview')"
-        >
-          Overview
-        </button>
-        <button
-          class="px-4 py-2 cursor-pointer transition-all"
-          :class="activeTab === 'compute' ? 'border-b-2 border-primary-light text-primary-light font-semibold' : 'text-on-surface-muted hover:text-on-surface-subtle'"
-          @click="setTab('compute')"
-        >
-          Compute
-        </button>
-      </div>
-
-      <!-- Overview Tab -->
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0 scale-90"
-        enter-to-class="opacity-100 scale-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100 scale-100"
-        leave-to-class="opacity-0 scale-90"
-      >
-        <NamespaceOverviewTab
-          v-show="activeTab === 'overview'"
-          :ns-data="data"
-        />
-      </Transition>
-
-      <!-- Compute Tab -->
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0 scale-90"
-        enter-to-class="opacity-100 scale-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100 scale-100"
-        leave-to-class="opacity-0 scale-90"
-      >
+    <UiTabs
+      v-model="activeTab"
+      :tabs="tabs"
+    >
+      <template #overview>
+        <NamespaceOverviewTab :ns-data="data" />
+      </template>
+      <template #compute>
         <NamespaceComputeTab
-          v-show="activeTab === 'compute'"
           :namespace="data?.name ?? ''"
           :is-active="activeTab === 'compute'"
         />
-      </Transition>
-    </div>
+      </template>
+    </UiTabs>
   </div>
 </template>
 
@@ -101,7 +65,12 @@
 import type { NamespaceResponse } from '#shared/types/namespace'
 
 const { namespace } = useRoute().params
-const { activeTab, setTab } = useTab('overview')
+
+const tabs = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'compute', label: 'Compute' },
+]
+const activeTab = ref('overview')
 
 const { data, error } = await useApiData<NamespaceResponse>(`/api/v1/namespaces/${namespace}`)
 
