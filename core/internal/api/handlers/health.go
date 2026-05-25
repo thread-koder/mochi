@@ -10,76 +10,95 @@ import (
 	"github.com/thread_koder/mochi/core/internal/kubernetes"
 	"github.com/thread_koder/mochi/core/internal/prometheus"
 	"github.com/thread_koder/mochi/core/internal/redis"
+	"golang.org/x/sync/errgroup"
 )
+
+// HealthResponse is the payload for GET /health.
+type HealthResponse struct {
+	Status string                 `json:"status"`
+	Checks map[string]CheckResult `json:"checks"`
+}
+
+// CheckResult is one dependency health entry in the aggregated health response.
+type CheckResult struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
 
 // Health reports aggregated service health for readiness checks.
 func Health(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	health := gin.H{
-		"status": "healthy",
-		"checks": gin.H{},
+	var dbErr, kubeErr, promErr, redisErr error
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		dbErr = database.HealthCheck(gctx)
+		if dbErr != nil {
+			c.Error(dbErr)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		kubeErr = kubernetes.HealthCheck(gctx)
+		if kubeErr != nil {
+			c.Error(kubeErr)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		promErr = prometheus.HealthCheck(gctx)
+		if promErr != nil {
+			c.Error(promErr)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		redisErr = redis.HealthCheck(gctx)
+		if redisErr != nil {
+			c.Error(redisErr)
+		}
+		return nil
+	})
+
+	_ = g.Wait()
+
+	response := HealthResponse{
+		Status: "healthy",
+		Checks: make(map[string]CheckResult, 4),
 	}
 
-	if err := database.HealthCheck(ctx); err != nil {
-		c.Error(err)
-		health["status"] = "unhealthy"
-		health["checks"].(gin.H)["database"] = gin.H{
-			"status": "unhealthy",
-			"error":  err.Error(),
-		}
-	} else {
-		health["checks"].(gin.H)["database"] = gin.H{
-			"status": "healthy",
-		}
-	}
-
-	if err := kubernetes.HealthCheck(ctx); err != nil {
-		c.Error(err)
-		health["status"] = "unhealthy"
-		health["checks"].(gin.H)["kubernetes"] = gin.H{
-			"status": "unhealthy",
-			"error":  err.Error(),
-		}
-	} else {
-		health["checks"].(gin.H)["kubernetes"] = gin.H{
-			"status": "healthy",
-		}
-	}
-
-	if err := prometheus.HealthCheck(ctx); err != nil {
-		c.Error(err)
-		health["status"] = "unhealthy"
-		health["checks"].(gin.H)["prometheus"] = gin.H{
-			"status": "unhealthy",
-			"error":  err.Error(),
-		}
-	} else {
-		health["checks"].(gin.H)["prometheus"] = gin.H{
-			"status": "healthy",
-		}
-	}
-
-	if err := redis.HealthCheck(ctx); err != nil {
-		c.Error(err)
-		health["status"] = "unhealthy"
-		health["checks"].(gin.H)["redis"] = gin.H{
-			"status": "unhealthy",
-			"error":  err.Error(),
-		}
-	} else {
-		health["checks"].(gin.H)["redis"] = gin.H{
-			"status": "healthy",
+	for _, item := range []struct {
+		key string
+		err error
+	}{
+		{"database", dbErr},
+		{"kubernetes", kubeErr},
+		{"prometheus", promErr},
+		{"redis", redisErr},
+	} {
+		if item.err != nil {
+			response.Status = "unhealthy"
+			response.Checks[item.key] = CheckResult{
+				Status: "unhealthy",
+				Error:  item.err.Error(),
+			}
+		} else {
+			response.Checks[item.key] = CheckResult{Status: "healthy"}
 		}
 	}
 
 	statusCode := http.StatusOK
-	if health["status"] == "unhealthy" {
+	if response.Status == "unhealthy" {
 		statusCode = http.StatusServiceUnavailable
 	}
 
-	c.JSON(statusCode, health)
+	c.JSON(statusCode, response)
 }
 
 // DatabaseHealth reports database connectivity health.
