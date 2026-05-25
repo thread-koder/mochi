@@ -11,6 +11,7 @@ import (
 	"github.com/thread_koder/mochi/core/internal/kubernetes"
 	"github.com/thread_koder/mochi/core/internal/prometheus"
 	"github.com/thread_koder/mochi/core/internal/redis"
+	"golang.org/x/sync/errgroup"
 )
 
 // HomeResponse is the payload for the home page.
@@ -26,30 +27,89 @@ func GetHome(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	response := HomeResponse{
-		ClusterName:  "Kubernetes Cluster",
-		HealthChecks: make(map[string]bool),
-		Activities:   make([]Activity, 0),
-	}
+	var (
+		clusterInfo  *kubernetes.ClusterInfo
+		stats        Stats
+		dbHealthy    bool
+		kubeHealthy  bool
+		promHealthy  bool
+		redisHealthy bool
+		activities   []Activity
+	)
 
-	if info, err := kubernetes.GetClusterInfo(ctx); err != nil {
-		c.Error(fmt.Errorf("failed to get cluster info: %w", err))
-	} else {
-		if info.ClusterName != "" {
-			response.ClusterName = info.ClusterName
+	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		info, err := kubernetes.GetClusterInfo(gctx)
+		if err != nil {
+			c.Error(fmt.Errorf("failed to get cluster info: %w", err))
+			return nil
 		}
+		clusterInfo = info
+		return nil
+	})
+
+	g.Go(func() error {
+		statsData, err := GetStats(gctx)
+		if err != nil {
+			c.Error(fmt.Errorf("failed to get stats: %w", err))
+			return nil
+		}
+		stats = statsData
+		return nil
+	})
+
+	g.Go(func() error {
+		dbHealthy = database.HealthCheck(gctx) == nil
+		return nil
+	})
+
+	g.Go(func() error {
+		kubeHealthy = kubernetes.HealthCheck(gctx) == nil
+		return nil
+	})
+
+	g.Go(func() error {
+		promHealthy = prometheus.HealthCheck(gctx) == nil
+		return nil
+	})
+
+	g.Go(func() error {
+		redisHealthy = redis.HealthCheck(gctx) == nil
+		return nil
+	})
+
+	g.Go(func() error {
+		activityList, err := GetActivities(gctx, 10)
+		if err != nil {
+			c.Error(fmt.Errorf("failed to get activities: %w", err))
+			return nil
+		}
+		activities = activityList
+		return nil
+	})
+
+	_ = g.Wait()
+
+	if activities == nil {
+		activities = make([]Activity, 0)
 	}
 
-	if stats, err := GetStats(ctx); err != nil {
-		c.Error(fmt.Errorf("failed to get stats: %w", err))
-	} else {
-		response.Stats = stats
+	response := HomeResponse{
+		ClusterName: "Kubernetes Cluster",
+		Stats:       stats,
+		HealthChecks: map[string]bool{
+			"database":   dbHealthy,
+			"kubernetes": kubeHealthy,
+			"prometheus": promHealthy,
+			"redis":      redisHealthy,
+		},
+		Activities: activities,
 	}
 
-	response.HealthChecks["database"] = database.HealthCheck(ctx) == nil
-	response.HealthChecks["kubernetes"] = kubernetes.HealthCheck(ctx) == nil
-	response.HealthChecks["prometheus"] = prometheus.HealthCheck(ctx) == nil
-	response.HealthChecks["redis"] = redis.HealthCheck(ctx) == nil
+	if clusterInfo != nil && clusterInfo.ClusterName != "" {
+		response.ClusterName = clusterInfo.ClusterName
+	}
 
 	healthyCount := 0
 	for _, healthy := range response.HealthChecks {
@@ -59,12 +119,6 @@ func GetHome(c *gin.Context) {
 	}
 	if len(response.HealthChecks) > 0 {
 		response.Stats.HealthScore = (healthyCount * 100) / len(response.HealthChecks)
-	}
-
-	if activities, err := GetActivities(ctx, 10); err != nil {
-		c.Error(fmt.Errorf("failed to get activities: %w", err))
-	} else {
-		response.Activities = activities
 	}
 
 	c.JSON(http.StatusOK, response)
