@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/core/internal/api/handlers/common"
 	"github.com/thread_koder/mochi/core/internal/database"
+	"golang.org/x/sync/errgroup"
 )
 
 // WorkloadResponse is the payload for workload detail pages.
@@ -75,12 +76,9 @@ func GetWorkload(c *gin.Context) {
 	defer cancel()
 
 	response := WorkloadResponse{
-		Namespace:  namespaceName,
-		Type:       workloadType,
-		Name:       workloadName,
-		Pods:       make([]Pod, 0),
-		Containers: make([]Container, 0),
-		Stats:      WorkloadStats{},
+		Namespace: namespaceName,
+		Type:      workloadType,
+		Name:      workloadName,
 	}
 
 	var pods []*database.Pod
@@ -179,10 +177,12 @@ func GetWorkload(c *gin.Context) {
 		}
 		// Reject controller-owned pods so the caller uses the correct workload type.
 		if pod.OwnerKind != nil && *pod.OwnerKind != "" && *pod.OwnerKind != "Node" {
+			err := fmt.Errorf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
+				workloadName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind)
+			c.Error(err)
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "invalid pod",
-				"details": fmt.Sprintf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
-					workloadName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind),
+				"error":   "invalid pod",
+				"details": err.Error(),
 			})
 			return
 		}
@@ -195,30 +195,47 @@ func GetWorkload(c *gin.Context) {
 	}
 
 	response.Stats.Pods = len(pods)
+
+	type podData struct {
+		pod        Pod
+		containers []*database.Container
+	}
+
+	results := make([]podData, len(pods))
+	if len(pods) > 0 {
+		g, gctx := errgroup.WithContext(ctx)
+		for i, pod := range pods {
+			g.Go(func() error {
+				nodeName := ""
+				if pod.Node != nil {
+					nodeName = *pod.Node
+				}
+				podDetail := Pod{
+					Name:      pod.Name,
+					UID:       pod.UID,
+					Phase:     pod.Phase,
+					Node:      nodeName,
+					CreatedAt: pod.CreatedAt,
+				}
+
+				containers, err := database.GetContainersByPodUID(gctx, pod.UID)
+				if err != nil {
+					c.Error(fmt.Errorf("failed to get containers for pod %s: %w", pod.Name, err))
+					results[i].pod = podDetail
+					return nil
+				}
+				results[i] = podData{pod: podDetail, containers: containers}
+				return nil
+			})
+		}
+		_ = g.Wait()
+	}
+
+	response.Pods = make([]Pod, 0, len(pods))
 	uniqueContainers := make(map[string]Container)
-
-	for _, pod := range pods {
-		nodeName := ""
-		if pod.Node != nil {
-			nodeName = *pod.Node
-		}
-
-		podDetail := Pod{
-			Name:      pod.Name,
-			UID:       pod.UID,
-			Phase:     pod.Phase,
-			Node:      nodeName,
-			CreatedAt: pod.CreatedAt,
-		}
-		response.Pods = append(response.Pods, podDetail)
-
-		containers, err := database.GetContainersByPodUID(ctx, pod.UID)
-		if err != nil {
-			c.Error(fmt.Errorf("failed to get containers for pod %s: %w", pod.Name, err))
-			continue
-		}
-
-		for _, container := range containers {
+	for _, item := range results {
+		response.Pods = append(response.Pods, item.pod)
+		for _, container := range item.containers {
 			if _, exists := uniqueContainers[container.Name]; !exists {
 				cpuRequest := ""
 				if container.CPURequest != nil {
@@ -237,7 +254,7 @@ func GetWorkload(c *gin.Context) {
 					memoryLimit = *container.MemoryLimit
 				}
 
-				containerDetail := Container{
+				uniqueContainers[container.Name] = Container{
 					Name:          container.Name,
 					Image:         container.Image,
 					CPURequest:    cpuRequest,
@@ -245,7 +262,6 @@ func GetWorkload(c *gin.Context) {
 					MemoryRequest: memoryRequest,
 					MemoryLimit:   memoryLimit,
 				}
-				uniqueContainers[container.Name] = containerDetail
 			}
 		}
 	}
@@ -254,7 +270,6 @@ func GetWorkload(c *gin.Context) {
 	for _, container := range uniqueContainers {
 		response.Containers = append(response.Containers, container)
 	}
-
 	response.Stats.Containers = len(response.Containers)
 
 	c.JSON(http.StatusOK, response)
