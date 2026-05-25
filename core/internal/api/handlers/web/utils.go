@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/thread_koder/mochi/core/internal/database"
+	"golang.org/x/sync/errgroup"
 )
 
 // Stats summarizes top-level cluster counts for the home endpoint.
@@ -18,27 +19,46 @@ type Stats struct {
 
 // GetStats loads summary counters for namespaces, workloads, and pods.
 func GetStats(ctx context.Context) (Stats, error) {
-	stats := Stats{}
+	var namespaceCount, workloadCount, podCount int
 
-	if count, err := database.GetNamespaceCount(ctx); err == nil {
-		stats.Namespaces = count
-	} else {
-		return stats, fmt.Errorf("failed to get namespace count: %w", err)
+	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		var err error
+		namespaceCount, err = database.GetNamespaceCount(gctx)
+		if err != nil {
+			return fmt.Errorf("failed to get namespace count: %w", err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		workloadCount, err = database.GetWorkloadCount(gctx)
+		if err != nil {
+			return fmt.Errorf("failed to get workload count: %w", err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		podCount, err = database.GetPodCount(gctx)
+		if err != nil {
+			return fmt.Errorf("failed to get pod count: %w", err)
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return Stats{}, err
 	}
 
-	if count, err := database.GetWorkloadCount(ctx); err == nil {
-		stats.Workloads = count
-	} else {
-		return stats, fmt.Errorf("failed to get workload count: %w", err)
-	}
-
-	if count, err := database.GetPodCount(ctx); err == nil {
-		stats.Pods = count
-	} else {
-		return stats, fmt.Errorf("failed to get pod count: %w", err)
-	}
-
-	return stats, nil
+	return Stats{
+		Namespaces: namespaceCount,
+		Workloads:  workloadCount,
+		Pods:       podCount,
+	}, nil
 }
 
 // Activity describes a recent recommendation event shown on the home page.
