@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/core/internal/api/handlers/common"
 	"github.com/thread_koder/mochi/core/internal/database"
+	"golang.org/x/sync/errgroup"
 )
 
 // NamespaceResponse is the payload for namespace detail pages.
@@ -69,112 +70,152 @@ func GetNamespace(c *gin.Context) {
 		return
 	}
 
-	response := NamespaceResponse{
-		Name:       namespace.Name,
-		Phase:      namespace.Phase,
-		Stats:      NamespaceStats{},
-		Workloads:  make([]Workload, 0),
-		Standalone: make([]StandalonePod, 0),
-		System:     make([]StandalonePod, 0),
+	var (
+		deployments    []*database.Deployment
+		statefulsets   []*database.StatefulSet
+		daemonsets     []*database.DaemonSet
+		standalonePods []*database.Pod
+		systemPods     []*database.Pod
+		podCount       int
+		containerCount int
+	)
+
+	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		var err error
+		deployments, err = database.GetDeploymentsByNamespace(gctx, namespaceName)
+		if err != nil {
+			c.Error(fmt.Errorf("failed to get deployments: %w", err))
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		statefulsets, err = database.GetStatefulSetsByNamespace(gctx, namespaceName)
+		if err != nil {
+			c.Error(fmt.Errorf("failed to get statefulsets: %w", err))
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		daemonsets, err = database.GetDaemonSetsByNamespace(gctx, namespaceName)
+		if err != nil {
+			c.Error(fmt.Errorf("failed to get daemonsets: %w", err))
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		standalonePods, err = database.GetStandalonePodsByNamespace(gctx, namespaceName)
+		if err != nil {
+			c.Error(fmt.Errorf("failed to get standalone pods: %w", err))
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		systemPods, err = database.GetPodsByOwnerKind(gctx, "Node", namespaceName)
+		if err != nil {
+			c.Error(fmt.Errorf("failed to get system pods: %w", err))
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		podCount, err = database.GetPodCountByNamespace(gctx, namespaceName)
+		if err != nil {
+			c.Error(fmt.Errorf("failed to get pod count: %w", err))
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		containerCount, err = database.GetContainerCountByNamespace(gctx, namespaceName)
+		if err != nil {
+			c.Error(fmt.Errorf("failed to get container count: %w", err))
+		}
+		return nil
+	})
+
+	_ = g.Wait()
+
+	workloads := make([]Workload, 0, len(deployments)+len(statefulsets)+len(daemonsets))
+	for _, dep := range deployments {
+		workloads = append(workloads, Workload{
+			Type:      "Deployment",
+			Name:      dep.Name,
+			Replicas:  dep.Replicas,
+			Ready:     dep.ReadyReplicas,
+			CreatedAt: dep.CreatedAt,
+		})
+	}
+	for _, sts := range statefulsets {
+		workloads = append(workloads, Workload{
+			Type:      "StatefulSet",
+			Name:      sts.Name,
+			Replicas:  sts.Replicas,
+			Ready:     sts.ReadyReplicas,
+			CreatedAt: sts.CreatedAt,
+		})
+	}
+	for _, ds := range daemonsets {
+		workloads = append(workloads, Workload{
+			Type:      "DaemonSet",
+			Name:      ds.Name,
+			Replicas:  ds.DesiredNumberScheduled,
+			Ready:     ds.NumberReady,
+			CreatedAt: ds.CreatedAt,
+		})
 	}
 
-	deployments, err := database.GetDeploymentsByNamespace(ctx, namespace.Name)
-	if err != nil {
-		c.Error(fmt.Errorf("failed to get deployments: %w", err))
-	} else {
-		for _, dep := range deployments {
-			response.Workloads = append(response.Workloads, Workload{
-				Type:      "Deployment",
-				Name:      dep.Name,
-				Replicas:  dep.Replicas,
-				Ready:     dep.ReadyReplicas,
-				CreatedAt: dep.CreatedAt,
-			})
+	standalone := make([]StandalonePod, 0, len(standalonePods))
+	for _, pod := range standalonePods {
+		nodeName := ""
+		if pod.Node != nil {
+			nodeName = *pod.Node
 		}
-		response.Stats.Workloads += len(deployments)
-	}
-
-	statefulsets, err := database.GetStatefulSetsByNamespace(ctx, namespace.Name)
-	if err != nil {
-		c.Error(fmt.Errorf("failed to get statefulsets: %w", err))
-	} else {
-		for _, sts := range statefulsets {
-			response.Workloads = append(response.Workloads, Workload{
-				Type:      "StatefulSet",
-				Name:      sts.Name,
-				Replicas:  sts.Replicas,
-				Ready:     sts.ReadyReplicas,
-				CreatedAt: sts.CreatedAt,
-			})
-		}
-		response.Stats.Workloads += len(statefulsets)
-	}
-
-	daemonsets, err := database.GetDaemonSetsByNamespace(ctx, namespace.Name)
-	if err != nil {
-		c.Error(fmt.Errorf("failed to get daemonsets: %w", err))
-	} else {
-		for _, ds := range daemonsets {
-			response.Workloads = append(response.Workloads, Workload{
-				Type:      "DaemonSet",
-				Name:      ds.Name,
-				Replicas:  ds.DesiredNumberScheduled,
-				Ready:     ds.NumberReady,
-				CreatedAt: ds.CreatedAt,
-			})
-		}
-		response.Stats.Workloads += len(daemonsets)
-	}
-
-	standalonePods, err := database.GetStandalonePodsByNamespace(ctx, namespace.Name)
-	if err != nil {
-		c.Error(fmt.Errorf("failed to get standalone pods: %w", err))
-	} else {
-		for _, pod := range standalonePods {
-			nodeName := ""
-			if pod.Node != nil {
-				nodeName = *pod.Node
-			}
-			response.Standalone = append(response.Standalone, StandalonePod{
-				Name:      pod.Name,
-				Phase:     pod.Phase,
-				Node:      nodeName,
-				CreatedAt: pod.CreatedAt,
-			})
-		}
+		standalone = append(standalone, StandalonePod{
+			Name:      pod.Name,
+			Phase:     pod.Phase,
+			Node:      nodeName,
+			CreatedAt: pod.CreatedAt,
+		})
 	}
 
 	// Node-owned pods are shown separately from standalone user pods.
-	systemPods, err := database.GetPodsByOwnerKind(ctx, "Node", namespace.Name)
-	if err != nil {
-		c.Error(fmt.Errorf("failed to get system pods: %w", err))
-	} else {
-		for _, pod := range systemPods {
-			nodeName := ""
-			if pod.Node != nil {
-				nodeName = *pod.Node
-			}
-			response.System = append(response.System, StandalonePod{
-				Name:      pod.Name,
-				Phase:     pod.Phase,
-				Node:      nodeName,
-				CreatedAt: pod.CreatedAt,
-			})
+	system := make([]StandalonePod, 0, len(systemPods))
+	for _, pod := range systemPods {
+		nodeName := ""
+		if pod.Node != nil {
+			nodeName = *pod.Node
 		}
+		system = append(system, StandalonePod{
+			Name:      pod.Name,
+			Phase:     pod.Phase,
+			Node:      nodeName,
+			CreatedAt: pod.CreatedAt,
+		})
 	}
 
-	podCount, err := database.GetPodCountByNamespace(ctx, namespace.Name)
-	if err != nil {
-		c.Error(fmt.Errorf("failed to get pod count: %w", err))
-	} else {
-		response.Stats.Pods = podCount
-	}
-
-	containerCount, err := database.GetContainerCountByNamespace(ctx, namespace.Name)
-	if err != nil {
-		c.Error(fmt.Errorf("failed to get container count: %w", err))
-	} else {
-		response.Stats.Containers = containerCount
+	response := NamespaceResponse{
+		Name:       namespace.Name,
+		Phase:      namespace.Phase,
+		Workloads:  workloads,
+		Standalone: standalone,
+		System:     system,
+		Stats: NamespaceStats{
+			Workloads:  len(deployments) + len(statefulsets) + len(daemonsets),
+			Pods:       podCount,
+			Containers: containerCount,
+		},
 	}
 
 	c.JSON(http.StatusOK, response)
