@@ -7,6 +7,11 @@ interface ParsedError {
   message: string
 }
 
+interface ApiErrorData {
+  error?: string
+  message?: string
+}
+
 export const useApiError = () => {
   /**
    * Parses an API error and returns status, statusText, and message
@@ -25,13 +30,16 @@ export const useApiError = () => {
 
     const status = error.status ?? error.statusCode ?? 500
     const statusText = error.statusText ?? error.statusMessage ?? 'Fetch Failed'
-    const errorData = error.data as { error?: string, details?: string } | undefined
+    const errorData = error.data as ApiErrorData | undefined
 
     let message = fallback
 
     if (errorData) {
-      if (errorData.details) {
-        message = `${errorData.error || fallback}: ${errorData.details}`
+      if (errorData.message) {
+        message = errorData.message
+      }
+      else if (errorData.error) {
+        message = errorData.error
       }
     }
     else {
