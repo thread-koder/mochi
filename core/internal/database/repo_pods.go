@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
@@ -92,8 +94,8 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 		&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 	)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("pod %s/%s not found", namespace, name)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("pod", fmt.Sprintf("%s/%s", namespace, name))
 		}
 		return nil, fmt.Errorf("failed to query pod by name: %w", err)
 	}

@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
@@ -105,8 +107,8 @@ func GetNamespaceByName(ctx context.Context, name string) (*Namespace, error) {
 		&ns.CreatedAt, &ns.UpdatedAt, &ns.SyncedAt,
 	)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("namespace %s not found", name)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("namespace", name)
 		}
 		return nil, fmt.Errorf("failed to query namespace by name: %w", err)
 	}

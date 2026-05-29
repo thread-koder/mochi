@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
@@ -125,8 +127,8 @@ func GetDeploymentByName(ctx context.Context, name string, namespace string) (*D
 		&dep.CreatedAt, &dep.UpdatedAt, &dep.SyncedAt,
 	)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("deployment %s not found in namespace %s", name, namespace)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("deployment", fmt.Sprintf("%s/%s", namespace, name))
 		}
 		return nil, fmt.Errorf("failed to query deployment by name: %w", err)
 	}

@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
@@ -124,8 +126,8 @@ func GetStatefulSetByName(ctx context.Context, name string, namespace string) (*
 		&sts.CreatedAt, &sts.UpdatedAt, &sts.SyncedAt,
 	)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("statefulset %s not found in namespace %s", name, namespace)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("statefulset", fmt.Sprintf("%s/%s", namespace, name))
 		}
 		return nil, fmt.Errorf("failed to query statefulset by name: %w", err)
 	}

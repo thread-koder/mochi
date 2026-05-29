@@ -2,10 +2,12 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
@@ -71,8 +73,8 @@ func GetComputeRecommendationByID(ctx context.Context, id int64) (*ComputeRecomm
 		&analysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt, &rec.GeneratedAt,
 	)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("compute recommendation %d not found", id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("compute_recommendation", fmt.Sprintf("%d", id))
 		}
 		return nil, fmt.Errorf("failed to query compute recommendation by ID: %w", err)
 	}
@@ -104,8 +106,8 @@ func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadN
 		&analysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt, &rec.GeneratedAt,
 	)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, fmt.Errorf("compute recommendation for %s/%s/%s not found", namespace, workloadType, workloadName)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("compute_recommendation", fmt.Sprintf("%s/%s/%s", namespace, workloadType, workloadName))
 		}
 		return nil, fmt.Errorf("failed to query latest compute recommendation: %w", err)
 	}
@@ -241,7 +243,7 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id int64, status str
 	}
 
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("compute recommendation %d not found", id)
+		return apperrors.NewNotFound("compute_recommendation", fmt.Sprintf("%d", id))
 	}
 
 	log.Debug().
@@ -304,7 +306,7 @@ func DeleteComputeRecommendation(ctx context.Context, id int64) error {
 	}
 
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("compute recommendation %d not found", id)
+		return apperrors.NewNotFound("compute_recommendation", fmt.Sprintf("%d", id))
 	}
 
 	log.Debug().
