@@ -2,12 +2,14 @@ package web
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/core/internal/api/handlers/common"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
 	"golang.org/x/sync/errgroup"
 )
@@ -56,16 +58,10 @@ func GetNamespace(c *gin.Context) {
 	namespace, err := database.GetNamespaceByName(ctx, namespaceName)
 	if err != nil {
 		c.Error(err)
-		if common.IsNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error":   "namespace not found",
-				"details": err.Error(),
-			})
+		if errors.Is(err, &apperrors.NotFoundError{}) {
+			common.WriteNotFoundError(c, "namespace_not_found", "Namespace not found.")
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "failed to get namespace",
-				"details": err.Error(),
-			})
+			common.WriteInternalError(c, "Failed to get namespace.")
 		}
 		return
 	}

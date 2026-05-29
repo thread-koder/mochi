@@ -2,6 +2,7 @@ package compute
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/core/internal/api/handlers/common"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/compute"
 	"github.com/thread_koder/mochi/core/internal/database"
 )
@@ -21,29 +23,14 @@ func GenerateRecommendations(c *gin.Context) {
 	timeRangeStr := c.Query("timeRange")
 	modeStr := strings.ToLower(c.Query("mode"))
 
-	validTypes := map[string]bool{
-		"Deployment":  true,
-		"StatefulSet": true,
-		"DaemonSet":   true,
-		"Pod":         true,
-	}
-	if !validTypes[workloadType] {
-		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
-		c.Error(err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid workload type",
-			"details": err.Error(),
-		})
+	if !common.ValidateWorkloadType(c, workloadType) {
 		return
 	}
 
 	if namespace == "" {
 		err := fmt.Errorf("namespace query parameter is empty or missing")
 		c.Error(err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "namespace query parameter is required",
-			"details": err.Error(),
-		})
+		common.WriteValidationError(c, "missing_namespace", "Namespace query parameter is required.")
 		return
 	}
 
@@ -52,10 +39,7 @@ func GenerateRecommendations(c *gin.Context) {
 		timeRange, err := common.ParseTimeRange(timeRangeStr)
 		if err != nil {
 			c.Error(err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "failed to parse time range",
-				"details": err.Error(),
-			})
+			common.WriteValidationError(c, "invalid_time_range", "Invalid timeRange query parameter. Use values like 24h, 7d, or 1h30m.")
 			return
 		}
 		analysisOpts.SetTimeRange(timeRange)
@@ -65,12 +49,9 @@ func GenerateRecommendations(c *gin.Context) {
 	if modeStr != "" {
 		mode := compute.RecommendationMode(modeStr)
 		if mode != compute.ModeBurstable && mode != compute.ModeGuaranteed && mode != compute.ModeCostOptimized {
-			err := fmt.Errorf("mode must be one of: burstable, guaranteed, cost_optimized")
+			err := fmt.Errorf("recommendation mode must be one of: burstable, guaranteed, cost_optimized")
 			c.Error(err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "invalid recommendation mode",
-				"details": err.Error(),
-			})
+			common.WriteValidationError(c, "invalid_recommendation_mode", "Recommendation mode must be one of burstable, guaranteed, or cost_optimized.")
 			return
 		}
 		recConfig.Mode = mode
@@ -79,59 +60,18 @@ func GenerateRecommendations(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	var pods []*database.Pod
-
-	if workloadType == "Pod" {
-		pod, err := database.GetPodByName(ctx, workloadName, namespace)
-		if err != nil {
-			c.Error(err)
-			if common.IsNotFoundError(err) {
-				c.JSON(http.StatusNotFound, gin.H{
-					"error":   "pod not found",
-					"details": err.Error(),
-				})
-			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":   "failed to get pod",
-					"details": err.Error(),
-				})
-			}
-			return
+	if _, err := database.GetNamespaceByName(ctx, namespace); err != nil {
+		c.Error(err)
+		if errors.Is(err, &apperrors.NotFoundError{}) {
+			common.WriteNotFoundError(c, "namespace_not_found", "Namespace not found.")
+		} else {
+			common.WriteInternalError(c, "Failed to get namespace.")
 		}
-
-		// Reject controller-owned pods so the caller uses the correct workload type.
-		if pod.OwnerKind != nil && *pod.OwnerKind != "" && *pod.OwnerKind != "Node" {
-			err := fmt.Errorf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
-				workloadName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind)
-			c.Error(err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "pod belongs to a workload",
-				"details": err.Error(),
-			})
-			return
-		}
-
-		pods = []*database.Pod{pod}
-	} else {
-		podsList, err := database.GetPodsByWorkload(ctx, workloadType, workloadName, namespace)
-		if err != nil {
-			c.Error(err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "failed to get pods for workload",
-				"details": err.Error(),
-			})
-			return
-		}
-		pods = podsList
+		return
 	}
 
-	if len(pods) == 0 {
-		err := fmt.Errorf("no pods found for workload %s/%s", workloadName, namespace)
-		c.Error(err)
-		c.JSON(http.StatusNotFound, gin.H{
-			"error":   "no pods found",
-			"details": err.Error(),
-		})
+	pods, ok := common.ResolveWorkloadPods(c, ctx, workloadType, workloadName, namespace)
+	if !ok {
 		return
 	}
 
@@ -146,10 +86,11 @@ func GenerateRecommendations(c *gin.Context) {
 	)
 	if err != nil {
 		c.Error(err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to generate recommendations",
-			"details": err.Error(),
-		})
+		if errors.Is(err, &apperrors.NoMetricsError{}) {
+			common.WriteNoMetricsError(c, "no_metrics_available", "No metrics available for the requested workload and time range.")
+		} else {
+			common.WriteInternalError(c, "Failed to generate recommendations.")
+		}
 		return
 	}
 
@@ -164,19 +105,7 @@ func GetRecommendations(c *gin.Context) {
 	workloadType := c.Query("workloadType")
 	workloadName := c.Query("workloadName")
 
-	validTypes := map[string]bool{
-		"Deployment":  true,
-		"StatefulSet": true,
-		"DaemonSet":   true,
-		"Pod":         true,
-	}
-	if workloadType != "" && !validTypes[workloadType] {
-		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
-		c.Error(err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid workload type",
-			"details": err.Error(),
-		})
+	if workloadType != "" && !common.ValidateWorkloadType(c, workloadType) {
 		return
 	}
 
@@ -225,10 +154,7 @@ func GetRecommendations(c *gin.Context) {
 	)
 	if err != nil {
 		c.Error(err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to get recommendations",
-			"details": err.Error(),
-		})
+		common.WriteInternalError(c, "Failed to get recommendations.")
 		return
 	}
 
@@ -245,10 +171,7 @@ func GetRecommendationByID(c *gin.Context) {
 	id, err := parseInt64(idStr)
 	if err != nil {
 		c.Error(err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid recommendation ID",
-			"details": err.Error(),
-		})
+		common.WriteValidationError(c, "invalid_recommendation_id", "Recommendation ID must be a valid integer.")
 		return
 	}
 
@@ -258,16 +181,10 @@ func GetRecommendationByID(c *gin.Context) {
 	recommendation, err := database.GetComputeRecommendationByID(ctx, id)
 	if err != nil {
 		c.Error(err)
-		if common.IsNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error":   "recommendation not found",
-				"details": err.Error(),
-			})
+		if errors.Is(err, &apperrors.NotFoundError{}) {
+			common.WriteNotFoundError(c, "recommendation_not_found", "Recommendation not found.")
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "failed to get recommendation",
-				"details": err.Error(),
-			})
+			common.WriteInternalError(c, "Failed to get recommendation.")
 		}
 		return
 	}
@@ -281,29 +198,14 @@ func GetLatestWorkloadRecommendation(c *gin.Context) {
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
 
-	validTypes := map[string]bool{
-		"Deployment":  true,
-		"StatefulSet": true,
-		"DaemonSet":   true,
-		"Pod":         true,
-	}
-	if !validTypes[workloadType] {
-		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
-		c.Error(err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid workload type",
-			"details": err.Error(),
-		})
+	if !common.ValidateWorkloadType(c, workloadType) {
 		return
 	}
 
 	if namespace == "" {
 		err := fmt.Errorf("namespace query parameter is empty or missing")
 		c.Error(err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "namespace query parameter is required",
-			"details": err.Error(),
-		})
+		common.WriteValidationError(c, "missing_namespace", "Namespace query parameter is required.")
 		return
 	}
 
@@ -313,16 +215,10 @@ func GetLatestWorkloadRecommendation(c *gin.Context) {
 	recommendation, err := database.GetLatestComputeRecommendation(ctx, workloadType, workloadName, namespace)
 	if err != nil {
 		c.Error(err)
-		if common.IsNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error":   "recommendation not found",
-				"details": err.Error(),
-			})
+		if errors.Is(err, &apperrors.NotFoundError{}) {
+			common.WriteNotFoundError(c, "recommendation_not_found", "Recommendation not found.")
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "failed to get recommendation",
-				"details": err.Error(),
-			})
+			common.WriteInternalError(c, "Failed to get recommendation.")
 		}
 		return
 	}
@@ -344,26 +240,17 @@ func ApplyRecommendation(c *gin.Context) {
 		id, err = parseInt64(idStr)
 		if err != nil {
 			c.Error(err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "invalid recommendation ID",
-				"details": err.Error(),
-			})
+			common.WriteValidationError(c, "invalid_recommendation_id", "Recommendation ID must be a valid integer.")
 			return
 		}
 
 		recommendation, err = database.GetComputeRecommendationByID(ctx, id)
 		if err != nil {
 			c.Error(err)
-			if common.IsNotFoundError(err) {
-				c.JSON(http.StatusNotFound, gin.H{
-					"error":   "recommendation not found",
-					"details": err.Error(),
-				})
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				common.WriteNotFoundError(c, "recommendation_not_found", "Recommendation not found.")
 			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":   "failed to get recommendation",
-					"details": err.Error(),
-				})
+				common.WriteInternalError(c, "Failed to get recommendation.")
 			}
 			return
 		}
@@ -371,76 +258,46 @@ func ApplyRecommendation(c *gin.Context) {
 		if recommendation.Status == "applied" {
 			err := fmt.Errorf("recommendation %d was already applied", id)
 			c.Error(err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "recommendation already applied",
-				"details": err.Error(),
-			})
+			common.WriteValidationError(c, "recommendation_already_applied", "Recommendation already applied.")
 			return
 		}
 	} else {
 		var bodyRec compute.Recommendation
 		if err := c.ShouldBindJSON(&bodyRec); err != nil {
 			c.Error(err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "invalid request body",
-				"details": err.Error(),
-			})
+			common.WriteValidationError(c, "invalid_request_body", "Request body is invalid.")
 			return
 		}
 
-		validTypes := map[string]bool{
-			"Deployment":  true,
-			"StatefulSet": true,
-			"DaemonSet":   true,
-			"Pod":         true,
-		}
-		if !validTypes[bodyRec.WorkloadType] {
-			err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
+		if bodyRec.WorkloadType == "" || bodyRec.WorkloadName == "" || bodyRec.Namespace == "" || bodyRec.AnalysisTimeRange == "" || bodyRec.RecommendationMode == "" {
+			err := fmt.Errorf("workload_type, workload_name, namespace, analysis_time_range, and recommendation_mode are required")
 			c.Error(err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "invalid workload type",
-				"details": err.Error(),
-			})
+			common.WriteValidationError(c, "missing_required_fields", "workload_type, workload_name, namespace, analysis_time_range, and recommendation_mode are required.")
 			return
 		}
 
-		if bodyRec.WorkloadName == "" || bodyRec.Namespace == "" || bodyRec.AnalysisTimeRange == "" || bodyRec.RecommendationMode == "" {
-			err := fmt.Errorf("workload_name, namespace, analysis_time_range, and recommendation_mode are required")
-			c.Error(err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "missing required fields",
-				"details": err.Error(),
-			})
+		if !common.ValidateWorkloadType(c, bodyRec.WorkloadType) {
 			return
 		}
 
 		if len(bodyRec.Recommendations) == 0 {
 			err := fmt.Errorf("recommendations field is required")
 			c.Error(err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "missing recommendations",
-				"details": err.Error(),
-			})
+			common.WriteValidationError(c, "missing_recommendations", "recommendations is required and cannot be empty.")
 			return
 		}
 
 		dbRec, err := compute.ComputeRecommendationToDB(bodyRec)
 		if err != nil {
 			c.Error(err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "failed to convert recommendation",
-				"details": err.Error(),
-			})
+			common.WriteInternalError(c, "Failed to convert recommendation.")
 			return
 		}
 
 		recommendation = dbRec
 		if err := database.InsertComputeRecommendation(ctx, recommendation); err != nil {
 			c.Error(err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error":   "failed to save recommendation",
-				"details": err.Error(),
-			})
+			common.WriteInternalError(c, "Failed to save recommendation.")
 			return
 		}
 		id = recommendation.ID
@@ -453,19 +310,20 @@ func ApplyRecommendation(c *gin.Context) {
 			}
 		}
 		c.Error(err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to apply recommendation",
-			"details": err.Error(),
-		})
+		common.WriteInternalError(c, "Failed to apply recommendation.")
 		return
 	}
 
 	if err := database.UpdateComputeRecommendationStatus(ctx, id, "applied"); err != nil {
 		c.Error(err)
+		common.WriteInternalError(c, "Failed to record recommendation as applied.")
+		return
 	}
 
 	if err := database.MarkRecommendationsSuperseded(ctx, recommendation.WorkloadType, recommendation.WorkloadName, recommendation.Namespace, id); err != nil {
 		c.Error(err)
+		common.WriteInternalError(c, "Failed to update recommendation history.")
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{

@@ -1,13 +1,9 @@
 package common
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 )
 
 // ParseTimeRange parses time range values like "24h", "7d", or "1h30m".
@@ -34,16 +30,4 @@ func ParseTimeRange(timeRangeStr string) (time.Duration, error) {
 	}
 
 	return duration, nil
-}
-
-// IsNotFoundError reports whether err represents a missing resource.
-func IsNotFoundError(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		return true
-	}
-	errMsg := strings.ToLower(err.Error())
-	return strings.Contains(errMsg, "not found")
 }

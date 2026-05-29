@@ -2,12 +2,14 @@ package web
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/core/internal/api/handlers/common"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
 	"golang.org/x/sync/errgroup"
 )
@@ -56,19 +58,7 @@ func GetWorkload(c *gin.Context) {
 	workloadType := c.Param("type")
 	workloadName := c.Param("name")
 
-	validTypes := map[string]bool{
-		"Deployment":  true,
-		"StatefulSet": true,
-		"DaemonSet":   true,
-		"Pod":         true,
-	}
-	if !validTypes[workloadType] {
-		err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
-		c.Error(err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid workload type",
-			"details": err.Error(),
-		})
+	if !common.ValidateWorkloadType(c, workloadType) {
 		return
 	}
 
@@ -87,16 +77,10 @@ func GetWorkload(c *gin.Context) {
 		dep, err := database.GetDeploymentByName(ctx, workloadName, namespaceName)
 		if err != nil {
 			c.Error(err)
-			if common.IsNotFoundError(err) {
-				c.JSON(http.StatusNotFound, gin.H{
-					"error":   "deployment not found",
-					"details": err.Error(),
-				})
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				common.WriteNotFoundError(c, "deployment_not_found", "Deployment not found.")
 			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":   "failed to get deployment",
-					"details": err.Error(),
-				})
+				common.WriteInternalError(c, "Failed to get deployment.")
 			}
 			return
 		}
@@ -112,16 +96,10 @@ func GetWorkload(c *gin.Context) {
 		sts, err := database.GetStatefulSetByName(ctx, workloadName, namespaceName)
 		if err != nil {
 			c.Error(err)
-			if common.IsNotFoundError(err) {
-				c.JSON(http.StatusNotFound, gin.H{
-					"error":   "statefulset not found",
-					"details": err.Error(),
-				})
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				common.WriteNotFoundError(c, "statefulset_not_found", "StatefulSet not found.")
 			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":   "failed to get statefulset",
-					"details": err.Error(),
-				})
+				common.WriteInternalError(c, "Failed to get StatefulSet.")
 			}
 			return
 		}
@@ -137,16 +115,10 @@ func GetWorkload(c *gin.Context) {
 		ds, err := database.GetDaemonSetByName(ctx, workloadName, namespaceName)
 		if err != nil {
 			c.Error(err)
-			if common.IsNotFoundError(err) {
-				c.JSON(http.StatusNotFound, gin.H{
-					"error":   "daemonset not found",
-					"details": err.Error(),
-				})
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				common.WriteNotFoundError(c, "daemonset_not_found", "DaemonSet not found.")
 			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":   "failed to get daemonset",
-					"details": err.Error(),
-				})
+				common.WriteInternalError(c, "Failed to get DaemonSet.")
 			}
 			return
 		}
@@ -162,28 +134,14 @@ func GetWorkload(c *gin.Context) {
 		pod, err := database.GetPodByName(ctx, workloadName, namespaceName)
 		if err != nil {
 			c.Error(err)
-			if common.IsNotFoundError(err) {
-				c.JSON(http.StatusNotFound, gin.H{
-					"error":   "pod not found",
-					"details": err.Error(),
-				})
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				common.WriteNotFoundError(c, "pod_not_found", "Pod not found.")
 			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error":   "failed to get pod",
-					"details": err.Error(),
-				})
+				common.WriteInternalError(c, "Failed to get pod.")
 			}
 			return
 		}
-		// Reject controller-owned pods so the caller uses the correct workload type.
-		if pod.OwnerKind != nil && *pod.OwnerKind != "" && *pod.OwnerKind != "Node" {
-			err := fmt.Errorf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
-				workloadName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind)
-			c.Error(err)
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":   "invalid pod",
-				"details": err.Error(),
-			})
+		if !common.ValidateStandalonePod(c, pod, workloadName) {
 			return
 		}
 		response.Replicas = 1

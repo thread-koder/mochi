@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/thread_koder/mochi/core/internal/api/handlers/common"
 	"github.com/thread_koder/mochi/core/internal/database"
 )
 
@@ -23,10 +24,7 @@ func GetNamespaces(c *gin.Context) {
 	namespaces, err := database.GetNamespaces(ctx)
 	if err != nil {
 		c.Error(err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to get namespaces",
-			"details": err.Error(),
-		})
+		common.WriteInternalError(c, "Failed to get namespaces.")
 		return
 	}
 

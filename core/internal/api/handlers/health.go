@@ -86,7 +86,7 @@ func Health(c *gin.Context) {
 			response.Status = "unhealthy"
 			response.Checks[item.key] = CheckResult{
 				Status: "unhealthy",
-				Error:  item.err.Error(),
+				Error:  "Dependency is unavailable",
 			}
 		} else {
 			response.Checks[item.key] = CheckResult{Status: "healthy"}
@@ -110,7 +110,7 @@ func DatabaseHealth(c *gin.Context) {
 		c.Error(err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "unhealthy",
-			"error":  err.Error(),
+			"error":  "Dependency is unavailable",
 		})
 		return
 	}
@@ -129,7 +129,7 @@ func KubernetesHealth(c *gin.Context) {
 		c.Error(err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "unhealthy",
-			"error":  err.Error(),
+			"error":  "Dependency is unavailable",
 		})
 		return
 	}
@@ -148,7 +148,7 @@ func PrometheusHealth(c *gin.Context) {
 		c.Error(err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "unhealthy",
-			"error":  err.Error(),
+			"error":  "Dependency is unavailable",
 		})
 		return
 	}
@@ -167,7 +167,7 @@ func RedisHealth(c *gin.Context) {
 		c.Error(err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "unhealthy",
-			"error":  err.Error(),
+			"error":  "Dependency is unavailable",
 		})
 		return
 	}
