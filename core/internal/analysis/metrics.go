@@ -15,10 +15,6 @@ import (
 
 // fetchWorkloadCorrelationMetrics queries per-pod metrics and merges them into workload-level
 // series for cross-metric correlation.
-//
-// At least one compute signal (CPU or memory) is required because it anchors
-// workload characterization.
-// Network and disk queries are best-effort as some pods may not expose those metrics.
 func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, opts CorrelationOptions) (correlationMetrics, error) {
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)
@@ -83,7 +79,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodNetworkReceiveBytesRange(podCtx, r, queryOpts)
 				if err != nil {
-					return nil
+					return fmt.Errorf("failed to query network receive metrics: %w", err)
 				}
 				networkReceiveMatrix = matrix
 				return nil
@@ -92,7 +88,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodNetworkTransmitBytesRange(podCtx, r, queryOpts)
 				if err != nil {
-					return nil
+					return fmt.Errorf("failed to query network transmit metrics: %w", err)
 				}
 				networkTransmitMatrix = matrix
 				return nil
@@ -101,7 +97,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodDiskReadBytesRange(podCtx, r, queryOpts)
 				if err != nil {
-					return nil
+					return fmt.Errorf("failed to query disk read metrics: %w", err)
 				}
 				diskReadMatrix = matrix
 				return nil
@@ -110,7 +106,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 			podG.Go(func() error {
 				matrix, _, err := prometheus.QueryPodDiskWriteBytesRange(podCtx, r, queryOpts)
 				if err != nil {
-					return nil
+					return fmt.Errorf("failed to query disk write metrics: %w", err)
 				}
 				diskWriteMatrix = matrix
 				return nil
@@ -143,10 +139,6 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 		metrics.NetworkTransmit = timeseries.MergeDataPointsByTime(metrics.NetworkTransmit, pm.NetworkTransmit)
 		metrics.DiskRead = timeseries.MergeDataPointsByTime(metrics.DiskRead, pm.DiskRead)
 		metrics.DiskWrite = timeseries.MergeDataPointsByTime(metrics.DiskWrite, pm.DiskWrite)
-	}
-
-	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
-		return correlationMetrics{}, fmt.Errorf("no compute metrics available for correlation analysis")
 	}
 
 	return metrics, nil

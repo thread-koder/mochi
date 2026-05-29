@@ -221,10 +221,6 @@ func GenerateWorkloadRecommendations(
 	config RecommendationConfig,
 	analysisOpts AnalysisOptions,
 ) (Recommendation, error) {
-	if len(pods) == 0 {
-		return Recommendation{}, fmt.Errorf("no pods provided for workload %s/%s", namespace, workloadName)
-	}
-
 	if err := config.Validate(); err != nil {
 		return Recommendation{}, fmt.Errorf("invalid recommendation config: %w", err)
 	}

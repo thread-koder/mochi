@@ -30,7 +30,7 @@ type StabilityResult struct {
 // AnalyzeStability reads the first sample in each scalar slice (see ResourceMetrics), applies
 // filterNoise to percentage fields, and subtracts capped penalties from 1.0 for OOMs, allocation
 // failures, restarts, throttling above 5%, and CPU/memory pressure above 10%.
-func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
+func AnalyzeStability(metrics ResourceMetrics) StabilityResult {
 	result := StabilityResult{
 		StabilityScore: 1.0,
 	}
@@ -80,7 +80,7 @@ func AnalyzeStability(metrics ResourceMetrics) (StabilityResult, error) {
 
 	result.StabilityScore = max(0.0, min(1.0, 1.0-totalPenalty))
 
-	return result, nil
+	return result
 }
 
 // filterNoise returns zero when value is below stabilityNoiseThreshold, otherwise returns value.

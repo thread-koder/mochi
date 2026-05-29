@@ -1,9 +1,5 @@
 package compute
 
-import (
-	"fmt"
-)
-
 // ResourceSpecs is parsed Kubernetes CPU (cores) and memory (bytes) requests and limits.
 type ResourceSpecs struct {
 	CPURequest    *float64 `json:"cpu_request"`
@@ -66,7 +62,7 @@ const (
 // AnalyzeCPUProvisioning scores request/limit fit using P95 vs request, peak vs limit, and stability
 // signals. Missing request or limit is treated as under-provisioned, tiny requests at the cluster floor
 // skip "over provisioned" flags so we do not nag on minimum CPU.
-func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, stability StabilityResult) (CPUProvisioning, error) {
+func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, stability StabilityResult) CPUProvisioning {
 	result := CPUProvisioning{
 		IsOverProvisioned:  false,
 		IsUnderProvisioned: false,
@@ -95,7 +91,7 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 
 	if !hasRequest && !hasLimit {
 		result.Efficiency = 0.0
-		return result, nil
+		return result
 	}
 
 	if stability.CPUThrottling > ThrottlingThreshold {
@@ -168,12 +164,12 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 
 	result.Efficiency = max(0.0, min(1.0, result.Efficiency))
 
-	return result, nil
+	return result
 }
 
 // AnalyzeMemoryProvisioning mirrors AnalyzeCPUProvisioning for memory, using OptimalUtilizationMin
 // as the low bound (CPU uses a burst-aware dynamic min) and memory stability signals (OOM, failcnt, PSI).
-func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilization, stability StabilityResult) (MemoryProvisioning, error) {
+func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilization, stability StabilityResult) MemoryProvisioning {
 	result := MemoryProvisioning{
 		IsOverProvisioned:  false,
 		IsUnderProvisioned: false,
@@ -202,7 +198,7 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 
 	if !hasRequest && !hasLimit {
 		result.Efficiency = 0.0
-		return result, nil
+		return result
 	}
 
 	if stability.MemoryOOM > 0 {
@@ -274,30 +270,22 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 
 	result.Efficiency = max(0.0, min(1.0, result.Efficiency))
 
-	return result, nil
+	return result
 }
 
 // AnalyzeProvisioning runs CPU and memory provisioning and combines efficiency as 30% CPU / 70% memory
 // so memory pressure weighs more in a single headline score.
-func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, stability StabilityResult) (ProvisioningResult, error) {
-	var result ProvisioningResult
-	var err error
-
-	result.CPU, err = AnalyzeCPUProvisioning(specs, utilization.CPU, stability)
-	if err != nil {
-		return ProvisioningResult{}, fmt.Errorf("failed to analyze CPU provisioning: %w", err)
-	}
-
-	result.Memory, err = AnalyzeMemoryProvisioning(specs, utilization.Memory, stability)
-	if err != nil {
-		return ProvisioningResult{}, fmt.Errorf("failed to analyze memory provisioning: %w", err)
+func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, stability StabilityResult) ProvisioningResult {
+	result := ProvisioningResult{
+		CPU:    AnalyzeCPUProvisioning(specs, utilization.CPU, stability),
+		Memory: AnalyzeMemoryProvisioning(specs, utilization.Memory, stability),
 	}
 
 	const cpuWeight = 0.3
 	const memoryWeight = 0.7
 	result.Efficiency = (result.CPU.Efficiency * cpuWeight) + (result.Memory.Efficiency * memoryWeight)
 
-	return result, nil
+	return result
 }
 
 // effectiveMinFromBurstiness lowers the minimum "healthy" request utilization when mean, P95, and peak

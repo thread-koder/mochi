@@ -6,10 +6,12 @@ package compute
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -128,7 +130,7 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 	}
 
 	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
-		return ContainerAnalysis{}, fmt.Errorf("no metrics available for container %s", container.Name)
+		return ContainerAnalysis{}, apperrors.NewNoMetrics(fmt.Sprintf("container %s", container.Name))
 	}
 
 	utilization, err := AnalyzeUtilization(metrics)
@@ -136,20 +138,14 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 		return ContainerAnalysis{}, fmt.Errorf("failed to analyze utilization: %w", err)
 	}
 
-	stability, err := AnalyzeStability(metrics)
-	if err != nil {
-		return ContainerAnalysis{}, fmt.Errorf("failed to analyze stability: %w", err)
-	}
+	stability := AnalyzeStability(metrics)
 
 	specs, err := ParseContainerSpecs(container)
 	if err != nil {
 		return ContainerAnalysis{}, fmt.Errorf("failed to parse container specs: %w", err)
 	}
 
-	provisioning, err := AnalyzeProvisioning(specs, utilization, stability)
-	if err != nil {
-		return ContainerAnalysis{}, fmt.Errorf("failed to analyze provisioning: %w", err)
-	}
+	provisioning := AnalyzeProvisioning(specs, utilization, stability)
 
 	result := ContainerAnalysis{
 		ContainerName: container.Name,
@@ -194,7 +190,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 	}
 
 	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
-		return PodAnalysis{}, fmt.Errorf("no metrics available for pod %s", pod.Name)
+		return PodAnalysis{}, apperrors.NewNoMetrics(fmt.Sprintf("pod %s", pod.Name))
 	}
 
 	utilization, err := AnalyzeUtilization(metrics)
@@ -202,10 +198,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 		return PodAnalysis{}, fmt.Errorf("failed to analyze pod utilization: %w", err)
 	}
 
-	stability, err := AnalyzeStability(metrics)
-	if err != nil {
-		return PodAnalysis{}, fmt.Errorf("failed to analyze pod stability: %w", err)
-	}
+	stability := AnalyzeStability(metrics)
 
 	if err := g.Wait(); err != nil {
 		return PodAnalysis{}, err
@@ -237,10 +230,6 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 		return WorkloadAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
 	}
 
-	if len(pods) == 0 {
-		return WorkloadAnalysis{}, fmt.Errorf("no pods found for workload %s/%s", namespace, workloadName)
-	}
-
 	var podAnalyses []PodAnalysis
 	g, gctx := errgroup.WithContext(ctx)
 	if includePods {
@@ -269,7 +258,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 	}
 
 	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
-		return WorkloadAnalysis{}, fmt.Errorf("no metrics available for workload %s/%s", namespace, workloadName)
+		return WorkloadAnalysis{}, apperrors.NewNoMetrics(fmt.Sprintf("workload %s/%s", namespace, workloadName))
 	}
 
 	utilization, err := AnalyzeUtilization(metrics)
@@ -277,10 +266,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 		return WorkloadAnalysis{}, fmt.Errorf("failed to analyze workload utilization: %w", err)
 	}
 
-	stability, err := AnalyzeStability(metrics)
-	if err != nil {
-		return WorkloadAnalysis{}, fmt.Errorf("failed to analyze workload stability: %w", err)
-	}
+	stability := AnalyzeStability(metrics)
 
 	if err := g.Wait(); err != nil {
 		return WorkloadAnalysis{}, err
@@ -334,7 +320,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 	}
 
 	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
-		return NamespaceAnalysis{}, fmt.Errorf("no metrics available for namespace %s", namespace)
+		return NamespaceAnalysis{}, apperrors.NewNoMetrics(fmt.Sprintf("namespace %s", namespace))
 	}
 
 	utilization, err := AnalyzeUtilization(metrics)
@@ -342,10 +328,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 		return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace utilization: %w", err)
 	}
 
-	stability, err := AnalyzeStability(metrics)
-	if err != nil {
-		return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace stability: %w", err)
-	}
+	stability := AnalyzeStability(metrics)
 
 	if err := g.Wait(); err != nil {
 		return NamespaceAnalysis{}, err
@@ -378,11 +361,12 @@ func analyzeNamespaceWorkloads(ctx context.Context, namespace string, opts Analy
 
 	analyzeSingle := func(kind, name string, pods []*database.Pod) {
 		g.Go(func() error {
-			if len(pods) == 0 {
-				return nil
-			}
 			analysis, err := AnalyzeWorkload(gctx, kind, name, namespace, pods, opts, false)
 			if err != nil {
+				// Skip workloads with no metrics so the namespace response still includes others.
+				if errors.Is(err, &apperrors.NoMetricsError{}) {
+					return nil
+				}
 				return fmt.Errorf("failed to analyze workload %s/%s: %w", kind, name, err)
 			}
 

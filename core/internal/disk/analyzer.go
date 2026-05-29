@@ -4,11 +4,12 @@ package disk
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
 	"golang.org/x/sync/errgroup"
 )
@@ -115,7 +116,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, opts AnalysisOptions) (P
 	}
 
 	if len(metrics.ReadBytes) == 0 && len(metrics.WriteBytes) == 0 {
-		return PodAnalysis{}, fmt.Errorf("no metrics available for pod %s", pod.Name)
+		return PodAnalysis{}, apperrors.NewNoMetrics(fmt.Sprintf("pod %s", pod.Name))
 	}
 
 	utilization, err := AnalyzeUtilization(metrics)
@@ -150,10 +151,6 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 		return WorkloadAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
 	}
 
-	if len(pods) == 0 {
-		return WorkloadAnalysis{}, fmt.Errorf("no pods found for workload %s/%s", namespace, workloadName)
-	}
-
 	var podAnalyses []PodAnalysis
 	g, gctx := errgroup.WithContext(ctx)
 	if includePods {
@@ -179,7 +176,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 	}
 
 	if len(metrics.ReadBytes) == 0 && len(metrics.WriteBytes) == 0 {
-		return WorkloadAnalysis{}, fmt.Errorf("no metrics available for workload %s/%s", namespace, workloadName)
+		return WorkloadAnalysis{}, apperrors.NewNoMetrics(fmt.Sprintf("workload %s/%s", namespace, workloadName))
 	}
 
 	utilization, err := AnalyzeUtilization(metrics)
@@ -239,7 +236,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 	}
 
 	if len(metrics.ReadBytes) == 0 && len(metrics.WriteBytes) == 0 {
-		return NamespaceAnalysis{}, fmt.Errorf("no metrics available for namespace %s", namespace)
+		return NamespaceAnalysis{}, apperrors.NewNoMetrics(fmt.Sprintf("namespace %s", namespace))
 	}
 
 	utilization, err := AnalyzeUtilization(metrics)
@@ -281,14 +278,10 @@ func analyzeNamespaceWorkloads(ctx context.Context, namespace string, opts Analy
 
 	analyzeSingle := func(kind, name string, pods []*database.Pod) {
 		g.Go(func() error {
-			if len(pods) == 0 {
-				return nil
-			}
 			analysis, err := AnalyzeWorkload(gctx, kind, name, namespace, pods, opts, false)
 			if err != nil {
-				// Some workloads never expose disk metrics,
-				// so skip those to return all other workloads that do have data.
-				if strings.Contains(err.Error(), "no metrics available") {
+				// Skip workloads with no metrics so the namespace response still includes others.
+				if errors.Is(err, &apperrors.NoMetricsError{}) {
 					return nil
 				}
 				return fmt.Errorf("failed to analyze workload %s/%s: %w", kind, name, err)

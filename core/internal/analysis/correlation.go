@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
 	"github.com/thread_koder/mochi/core/internal/timeseries"
 	"golang.org/x/text/cases"
@@ -149,13 +150,16 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 		return WorkloadCorrelationResult{}, fmt.Errorf("invalid correlation options: %w", err)
 	}
 
-	if len(pods) == 0 {
-		return WorkloadCorrelationResult{}, fmt.Errorf("no pods found for workload %s/%s", namespace, workloadName)
-	}
-
 	metrics, err := fetchWorkloadCorrelationMetrics(ctx, pods, opts)
 	if err != nil {
 		return WorkloadCorrelationResult{}, fmt.Errorf("failed to fetch workload metrics: %w", err)
+	}
+
+	// At least one of CPU or memory is required as it anchors
+	// workload characterization.
+	// Network and disk are best-effort as some pods may not expose those metrics.
+	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
+		return WorkloadCorrelationResult{}, apperrors.NewNoMetrics(fmt.Sprintf("workload %s/%s", namespace, workloadName))
 	}
 
 	correlations := make([]PairCorrelation, 0, len(metricPairs))
@@ -174,7 +178,7 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 			crossCorr, err := timeseries.CalculateCrossCorrelation(dataA, dataB, opts.MaxLag, opts.LagStep)
 			if err != nil {
 				pairCorr.DataAvailable = false
-				pairCorr.Interpretation = fmt.Sprintf("Could not calculate correlation: %v", err)
+				pairCorr.Interpretation = "Could not calculate correlation"
 			} else {
 				pairCorr.Correlation = crossCorr
 				pairCorr.Interpretation = interpretCorrelation(pair, crossCorr)
