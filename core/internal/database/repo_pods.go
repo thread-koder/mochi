@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/logger"
+	"golang.org/x/sync/errgroup"
 )
 
 // UpsertPodsBatch inserts or updates pods by Kubernetes UID inside one transaction.
@@ -243,13 +244,27 @@ func getPodsByDeployment(ctx context.Context, deploymentName, namespace string) 
 		return []*Pod{}, nil
 	}
 
+	podSets := make([][]*Pod, len(replicasets))
+	g, gctx := errgroup.WithContext(ctx)
+
+	for i, replicaset := range replicasets {
+		g.Go(func() error {
+			pods, err := GetPodsByWorkload(gctx, "ReplicaSet", replicaset.Name, namespace)
+			if err != nil {
+				// Best-effort: omit pods for one RS if the subquery fails, so caller still gets partial data.
+				return nil
+			}
+			podSets[i] = pods
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
 	allPods := make([]*Pod, 0)
-	for _, rs := range replicasets {
-		pods, err := GetPodsByWorkload(ctx, "ReplicaSet", rs.Name, namespace)
-		if err != nil {
-			// Best-effort: omit pods for one RS if the subquery fails, so caller still gets partial data.
-			continue
-		}
+	for _, pods := range podSets {
 		allPods = append(allPods, pods...)
 	}
 
