@@ -4,13 +4,12 @@ package network
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
+	"github.com/thread_koder/mochi/core/internal/analyzer"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -215,14 +214,17 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 	workloadOpts := opts
 	workloadOpts.IncludeTimeSeries = false
 
-	var workloads []WorkloadAnalysis
+	var workloadAnalyses []WorkloadAnalysis
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		workloadsAnalyses, err := analyzeNamespaceWorkloads(gctx, namespace, workloadOpts)
+		analyses, err := analyzer.AnalyzeWorkloads(gctx, namespace,
+			func(ctx context.Context, kind, name, namespace string, pods []*database.Pod) (WorkloadAnalysis, error) {
+				return AnalyzeWorkload(ctx, kind, name, namespace, pods, workloadOpts, false)
+			})
 		if err != nil {
 			return fmt.Errorf("failed to analyze namespace workloads: %w", err)
 		}
-		workloads = workloadsAnalyses
+		workloadAnalyses = analyses
 		return nil
 	})
 
@@ -247,7 +249,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 	result := NamespaceAnalysis{
 		Namespace:   namespace,
 		Utilization: utilization,
-		Workloads:   workloads,
+		Workloads:   workloadAnalyses,
 	}
 
 	if opts.IncludeTimeSeries {
@@ -258,106 +260,4 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 	}
 
 	return result, nil
-}
-
-// analyzeNamespaceWorkloads walks Deployments, StatefulSets, DaemonSets, standalone Pods, and Pods owned by
-// Nodes (system pods like kube-proxy and coredns), and returns one WorkloadAnalysis per entry at workload granularity only.
-func analyzeNamespaceWorkloads(ctx context.Context, namespace string, opts AnalysisOptions) ([]WorkloadAnalysis, error) {
-	workloads := make([]WorkloadAnalysis, 0)
-	var mu sync.Mutex
-
-	g, gctx := errgroup.WithContext(ctx)
-
-	analyzeSingle := func(kind, name string, pods []*database.Pod) {
-		g.Go(func() error {
-			analysis, err := AnalyzeWorkload(gctx, kind, name, namespace, pods, opts, false)
-			if err != nil {
-				// Skip workloads with no metrics so the namespace response still includes others.
-				if errors.Is(err, &apperrors.NoMetricsError{}) {
-					return nil
-				}
-				return fmt.Errorf("failed to analyze workload %s/%s: %w", kind, name, err)
-			}
-
-			mu.Lock()
-			workloads = append(workloads, analysis)
-			mu.Unlock()
-			return nil
-		})
-	}
-
-	// Nested g.Go calls share this errgroup, and Wait still collects every task queued before it returns.
-	fetchAndAnalyze := func(kind, name string) {
-		g.Go(func() error {
-			pods, err := database.GetPodsByWorkload(gctx, kind, name, namespace)
-			if err != nil {
-				return fmt.Errorf("failed to fetch pods for workload %s/%s: %w", kind, name, err)
-			}
-			if len(pods) > 0 {
-				analyzeSingle(kind, name, pods)
-			}
-			return nil
-		})
-	}
-
-	g.Go(func() error {
-		deps, err := database.GetDeploymentsByNamespace(gctx, namespace)
-		if err != nil {
-			return fmt.Errorf("failed to fetch deployments for namespace %s: %w", namespace, err)
-		}
-		for _, d := range deps {
-			fetchAndAnalyze("Deployment", d.Name)
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		stss, err := database.GetStatefulSetsByNamespace(gctx, namespace)
-		if err != nil {
-			return fmt.Errorf("failed to fetch statefulsets for namespace %s: %w", namespace, err)
-		}
-		for _, s := range stss {
-			fetchAndAnalyze("StatefulSet", s.Name)
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		dss, err := database.GetDaemonSetsByNamespace(gctx, namespace)
-		if err != nil {
-			return fmt.Errorf("failed to fetch daemonsets for namespace %s: %w", namespace, err)
-		}
-		for _, ds := range dss {
-			fetchAndAnalyze("DaemonSet", ds.Name)
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		pods, err := database.GetStandalonePodsByNamespace(gctx, namespace)
-		if err != nil {
-			return fmt.Errorf("failed to fetch standalone pods for namespace %s: %w", namespace, err)
-		}
-		for _, p := range pods {
-			analyzeSingle("Pod", p.Name, []*database.Pod{p})
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		pods, err := database.GetPodsByOwnerKind(gctx, "Node", namespace)
-		if err != nil {
-			return fmt.Errorf("failed to fetch system pods for namespace %s: %w", namespace, err)
-		}
-		for _, p := range pods {
-			analyzeSingle("Pod", p.Name, []*database.Pod{p})
-		}
-		return nil
-	})
-
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-
-	return workloads, nil
 }
