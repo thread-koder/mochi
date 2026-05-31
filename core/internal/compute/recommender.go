@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/thread_koder/mochi/core/internal/database"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -229,53 +231,33 @@ func GenerateWorkloadRecommendations(
 		return Recommendation{}, fmt.Errorf("invalid analysis options: %w", err)
 	}
 
+	podRecs := make([][]ContainerRecommendation, len(pods))
+	g, gctx := errgroup.WithContext(ctx)
+	for i, pod := range pods {
+		g.Go(func() error {
+			recs, err := recommendationsForPod(gctx, pod, config, analysisOpts)
+			if err != nil {
+				return err
+			}
+			podRecs[i] = recs
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return Recommendation{}, err
+	}
+
 	containerRecsMap := make(map[string]*ContainerRecommendation)
-
-	for _, pod := range pods {
-		containers, err := database.GetContainersByPodUID(ctx, pod.UID)
-		if err != nil {
-			return Recommendation{}, fmt.Errorf("failed to fetch containers for pod %s: %w", pod.Name, err)
-		}
-
-		for _, container := range containers {
-			containerAnalysis, err := AnalyzeContainer(ctx, container, analysisOpts)
-			if err != nil {
-				return Recommendation{}, fmt.Errorf("failed to analyze container %s: %w", container.Name, err)
-			}
-
-			rec, err := GenerateContainerRecommendation(
-				ctx,
-				container,
-				containerAnalysis,
-				config,
-				analysisOpts.TimeRange,
-			)
-			if err != nil {
-				return Recommendation{}, fmt.Errorf("failed to generate container recommendation for %s: %w", container.Name, err)
-			}
-
-			if rec == nil {
+	for _, recs := range podRecs {
+		for j := range recs {
+			rec := &recs[j]
+			existingRec, exists := containerRecsMap[rec.ContainerName]
+			if !exists {
+				containerRecsMap[rec.ContainerName] = rec
 				continue
 			}
-
-			existingRec, exists := containerRecsMap[container.Name]
-			if !exists {
-				containerRecsMap[container.Name] = rec
-			} else {
-				updateMaxQuantity(&existingRec.CPU.RecommendedRequest, rec.CPU.RecommendedRequest)
-				updateMaxQuantity(&existingRec.CPU.RecommendedLimit, rec.CPU.RecommendedLimit)
-				updateMaxQuantity(&existingRec.Memory.RecommendedRequest, rec.Memory.RecommendedRequest)
-				updateMaxQuantity(&existingRec.Memory.RecommendedLimit, rec.Memory.RecommendedLimit)
-
-				if rec.ConfidenceScore > existingRec.ConfidenceScore {
-					existingRec.ConfidenceScore = rec.ConfidenceScore
-				}
-
-				existingRec.CPU.RequestChangePercent = calculateChangePercentFromStrings(existingRec.CPU.CurrentRequest, existingRec.CPU.RecommendedRequest)
-				existingRec.CPU.LimitChangePercent = calculateChangePercentFromStrings(existingRec.CPU.CurrentLimit, existingRec.CPU.RecommendedLimit)
-				existingRec.Memory.RequestChangePercent = calculateChangePercentFromStrings(existingRec.Memory.CurrentRequest, existingRec.Memory.RecommendedRequest)
-				existingRec.Memory.LimitChangePercent = calculateChangePercentFromStrings(existingRec.Memory.CurrentLimit, existingRec.Memory.RecommendedLimit)
-			}
+			mergeContainerRecommendation(existingRec, rec)
 		}
 	}
 
@@ -283,6 +265,10 @@ func GenerateWorkloadRecommendations(
 	for _, rec := range containerRecsMap {
 		recommendations = append(recommendations, *rec)
 	}
+
+	sort.Slice(recommendations, func(i, j int) bool {
+		return recommendations[i].ContainerName < recommendations[j].ContainerName
+	})
 
 	result := Recommendation{
 		WorkloadType:       workloadType,
@@ -294,6 +280,72 @@ func GenerateWorkloadRecommendations(
 	}
 
 	return result, nil
+}
+
+func recommendationsForPod(
+	ctx context.Context,
+	pod *database.Pod,
+	config RecommendationConfig,
+	analysisOpts AnalysisOptions,
+) ([]ContainerRecommendation, error) {
+	containers, err := database.GetContainersByPodUID(ctx, pod.UID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch containers for pod %s: %w", pod.Name, err)
+	}
+
+	containerRecs := make([]*ContainerRecommendation, len(containers))
+	g, gctx := errgroup.WithContext(ctx)
+	for i, container := range containers {
+		g.Go(func() error {
+			containerAnalysis, err := AnalyzeContainer(gctx, container, analysisOpts)
+			if err != nil {
+				return fmt.Errorf("failed to analyze container %s: %w", container.Name, err)
+			}
+
+			rec, err := GenerateContainerRecommendation(
+				gctx,
+				container,
+				containerAnalysis,
+				config,
+				analysisOpts.TimeRange,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to generate container recommendation for %s: %w", container.Name, err)
+			}
+
+			containerRecs[i] = rec
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	recs := make([]ContainerRecommendation, 0, len(containers))
+	for _, rec := range containerRecs {
+		if rec != nil {
+			recs = append(recs, *rec)
+		}
+	}
+
+	return recs, nil
+}
+
+func mergeContainerRecommendation(existing, incoming *ContainerRecommendation) {
+	updateMaxQuantity(&existing.CPU.RecommendedRequest, incoming.CPU.RecommendedRequest)
+	updateMaxQuantity(&existing.CPU.RecommendedLimit, incoming.CPU.RecommendedLimit)
+	updateMaxQuantity(&existing.Memory.RecommendedRequest, incoming.Memory.RecommendedRequest)
+	updateMaxQuantity(&existing.Memory.RecommendedLimit, incoming.Memory.RecommendedLimit)
+
+	if incoming.ConfidenceScore > existing.ConfidenceScore {
+		existing.ConfidenceScore = incoming.ConfidenceScore
+	}
+
+	existing.CPU.RequestChangePercent = calculateChangePercentFromStrings(existing.CPU.CurrentRequest, existing.CPU.RecommendedRequest)
+	existing.CPU.LimitChangePercent = calculateChangePercentFromStrings(existing.CPU.CurrentLimit, existing.CPU.RecommendedLimit)
+	existing.Memory.RequestChangePercent = calculateChangePercentFromStrings(existing.Memory.CurrentRequest, existing.Memory.RecommendedRequest)
+	existing.Memory.LimitChangePercent = calculateChangePercentFromStrings(existing.Memory.CurrentLimit, existing.Memory.RecommendedLimit)
 }
 
 // ComputeRecommendationToDB maps an API Recommendation to a database row (JSON payload, pending status).
