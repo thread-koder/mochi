@@ -152,9 +152,9 @@ func CalculateCPURequestRecommendation(
 	provisioning CPUProvisioning,
 	stability StabilityResult,
 	config RecommendationConfig,
-) (*float64, error) {
+) *float64 {
 	if !firstTime(currentRequest) && provisioning.Confidence < config.MinConfidenceThreshold {
-		return nil, nil
+		return nil
 	}
 
 	percentileP95 := utilization.Stats.Percentile.P95
@@ -248,12 +248,12 @@ func CalculateCPURequestRecommendation(
 			changePercent := diff / current
 
 			if changePercent < 0.1 {
-				return nil, nil
+				return nil
 			}
 		}
 	}
 
-	return &recommendedCores, nil
+	return &recommendedCores
 }
 
 // CalculateCPULimitRecommendation returns proposed CPU limit from peak usage and from a request multiple. Limit margins skip
@@ -266,9 +266,9 @@ func CalculateCPULimitRecommendation(
 	config RecommendationConfig,
 	recommendedRequest *float64,
 	currentRequest *float64,
-) (*float64, error) {
+) *float64 {
 	if !firstTime(currentLimit) && provisioning.Confidence < config.MinConfidenceThreshold {
-		return nil, nil
+		return nil
 	}
 
 	peakUsage := utilization.Stats.Max
@@ -353,12 +353,12 @@ func CalculateCPULimitRecommendation(
 			changePercent := diff / current
 
 			if changePercent < 0.1 {
-				return nil, nil
+				return nil
 			}
 		}
 	}
 
-	return &recommendedCores, nil
+	return &recommendedCores
 }
 
 // CalculateMemoryRequestRecommendation mirrors the CPU request path in bytes, boosts the baseline when OOM
@@ -370,9 +370,9 @@ func CalculateMemoryRequestRecommendation(
 	stability StabilityResult,
 	config RecommendationConfig,
 	analysisWindow time.Duration,
-) (*float64, error) {
+) *float64 {
 	if !firstTime(currentRequest) && provisioning.Confidence < config.MinConfidenceThreshold {
-		return nil, nil
+		return nil
 	}
 
 	percentileP95 := utilization.Stats.Percentile.P95
@@ -468,12 +468,12 @@ func CalculateMemoryRequestRecommendation(
 			changePercent := diff / current
 
 			if changePercent < 0.1 {
-				return nil, nil
+				return nil
 			}
 		}
 	}
 
-	return &recommendedBytes, nil
+	return &recommendedBytes
 }
 
 // CalculateMemoryLimitRecommendation is the memory version of CalculateCPULimitRecommendation.
@@ -486,9 +486,9 @@ func CalculateMemoryLimitRecommendation(
 	recommendedRequest *float64,
 	currentRequest *float64,
 	analysisWindow time.Duration,
-) (*float64, error) {
+) *float64 {
 	if !firstTime(currentLimit) && provisioning.Confidence < config.MinConfidenceThreshold {
-		return nil, nil
+		return nil
 	}
 
 	peakUsage := utilization.Stats.Max
@@ -578,12 +578,12 @@ func CalculateMemoryLimitRecommendation(
 			changePercent := diff / current
 
 			if changePercent < 0.1 {
-				return nil, nil
+				return nil
 			}
 		}
 	}
 
-	return &recommendedBytes, nil
+	return &recommendedBytes
 }
 
 func maxReductionRatio(config RecommendationConfig) float64 {

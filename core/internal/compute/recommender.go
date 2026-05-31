@@ -76,18 +76,15 @@ func GenerateContainerRecommendation(
 		return nil, fmt.Errorf("failed to parse container specs: %w", err)
 	}
 
-	cpuRequestRecValue, err := CalculateCPURequestRecommendation(
+	cpuRequestRecValue := CalculateCPURequestRecommendation(
 		specs.CPURequest,
 		containerAnalysis.Utilization.CPU,
 		containerAnalysis.Provisioning.CPU,
 		containerAnalysis.Stability,
 		config,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate CPU request recommendation: %w", err)
-	}
 
-	cpuLimitRecValue, err := CalculateCPULimitRecommendation(
+	cpuLimitRecValue := CalculateCPULimitRecommendation(
 		specs.CPULimit,
 		containerAnalysis.Utilization.CPU,
 		containerAnalysis.Provisioning.CPU,
@@ -96,11 +93,8 @@ func GenerateContainerRecommendation(
 		cpuRequestRecValue,
 		specs.CPURequest,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate CPU limit recommendation: %w", err)
-	}
 
-	memoryRequestRecValue, err := CalculateMemoryRequestRecommendation(
+	memoryRequestRecValue := CalculateMemoryRequestRecommendation(
 		specs.MemoryRequest,
 		containerAnalysis.Utilization.Memory,
 		containerAnalysis.Provisioning.Memory,
@@ -108,11 +102,8 @@ func GenerateContainerRecommendation(
 		config,
 		analysisWindow,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate memory request recommendation: %w", err)
-	}
 
-	memoryLimitRecValue, err := CalculateMemoryLimitRecommendation(
+	memoryLimitRecValue := CalculateMemoryLimitRecommendation(
 		specs.MemoryLimit,
 		containerAnalysis.Utilization.Memory,
 		containerAnalysis.Provisioning.Memory,
@@ -122,9 +113,6 @@ func GenerateContainerRecommendation(
 		specs.MemoryRequest,
 		analysisWindow,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate memory limit recommendation: %w", err)
-	}
 
 	cpuRequestRecValue, cpuLimitRecValue = finalizeResourceRecommendations(
 		cpuRequestRecValue, cpuLimitRecValue, specs.CPURequest, specs.CPULimit, config.Mode,
