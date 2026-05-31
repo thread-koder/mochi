@@ -3,6 +3,7 @@ package compute
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,10 +14,42 @@ import (
 	applyappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	applycorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
 	"github.com/thread_koder/mochi/core/internal/kubernetes"
 	"github.com/thread_koder/mochi/core/internal/logger"
 )
+
+// ApplyNotSupportedError reports workload kinds that cannot receive server-side apply.
+type ApplyNotSupportedError struct {
+	WorkloadType string
+	Reason       string
+}
+
+func (e *ApplyNotSupportedError) Error() string {
+	if e == nil {
+		return "apply not supported"
+	}
+	if e.WorkloadType != "" && e.Reason != "" {
+		return fmt.Sprintf("cannot apply recommendations to %s: %s", e.WorkloadType, e.Reason)
+	}
+	if e.WorkloadType != "" {
+		return fmt.Sprintf("cannot apply recommendations to %s", e.WorkloadType)
+	}
+	return "apply not supported"
+}
+
+// Is allows errors.Is(err, &ApplyNotSupportedError{}).
+func (e *ApplyNotSupportedError) Is(target error) bool {
+	_, ok := target.(*ApplyNotSupportedError)
+	return ok
+}
+
+func newApplyNotSupported(workloadType, reason string) error {
+	return &ApplyNotSupportedError{WorkloadType: workloadType, Reason: reason}
+}
+
+var ErrNoContainerRecommendations = errors.New("no container recommendations to apply")
 
 // Annotation keys written when applying recommendations so operators can trace origin and mode.
 const (
@@ -43,7 +76,7 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 	}
 
 	if len(containerRecs) == 0 {
-		return fmt.Errorf("no container recommendations to apply")
+		return ErrNoContainerRecommendations
 	}
 
 	switch rec.WorkloadType {
@@ -56,7 +89,7 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 	case "Pod":
 		return applyToPod()
 	default:
-		return fmt.Errorf("unsupported workload type: %s", rec.WorkloadType)
+		return newApplyNotSupported(rec.WorkloadType, fmt.Sprintf("unsupported workload type: %s", rec.WorkloadType))
 	}
 }
 
@@ -68,7 +101,7 @@ func applyToDeployment(ctx context.Context, rec *database.ComputeRecommendation,
 	_, err := kubernetes.Clientset.AppsV1().Deployments(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return fmt.Errorf("deployment not found: cannot apply recommendations to non-existent workload")
+			return apperrors.NewNotFound("deployment", rec.WorkloadName)
 		}
 		return fmt.Errorf("failed to get deployment: %w", err)
 	}
@@ -104,7 +137,7 @@ func applyToStatefulSet(ctx context.Context, rec *database.ComputeRecommendation
 	_, err := kubernetes.Clientset.AppsV1().StatefulSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return fmt.Errorf("statefulset not found: cannot apply recommendations to non-existent workload")
+			return apperrors.NewNotFound("statefulset", rec.WorkloadName)
 		}
 		return fmt.Errorf("failed to get statefulset: %w", err)
 	}
@@ -139,7 +172,7 @@ func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, 
 	_, err := kubernetes.Clientset.AppsV1().DaemonSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return fmt.Errorf("daemonset not found: cannot apply recommendations to non-existent workload")
+			return apperrors.NewNotFound("daemonset", rec.WorkloadName)
 		}
 		return fmt.Errorf("failed to get daemonset: %w", err)
 	}
@@ -167,7 +200,7 @@ func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, 
 }
 
 func applyToPod() error {
-	return fmt.Errorf("cannot apply recommendations to standalone pod: pods are immutable. Resource changes require pod recreation or management via Deployment/StatefulSet/DaemonSet")
+	return newApplyNotSupported("Pod", "standalone pods are immutable: apply via the owning Deployment, StatefulSet, or DaemonSet")
 }
 
 func getMochiAnnotations(rec *database.ComputeRecommendation) map[string]string {

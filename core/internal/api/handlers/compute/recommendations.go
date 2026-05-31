@@ -310,7 +310,7 @@ func ApplyRecommendation(c *gin.Context) {
 			}
 		}
 		c.Error(err)
-		common.WriteInternalError(c, "Failed to apply recommendation.")
+		writeApplyRecommendationError(c, err)
 		return
 	}
 
@@ -330,4 +330,36 @@ func ApplyRecommendation(c *gin.Context) {
 		"message": "recommendation applied successfully",
 		"id":      id,
 	})
+}
+
+func writeApplyRecommendationError(c *gin.Context, err error) {
+	if errors.Is(err, compute.ErrNoContainerRecommendations) {
+		common.WriteValidationError(c, "missing_container_recommendations", "No container recommendations to apply.")
+		return
+	}
+
+	if applyErr, ok := errors.AsType[*compute.ApplyNotSupportedError](err); ok {
+		if applyErr.WorkloadType == "Pod" {
+			common.WriteValidationError(c, "pod_apply_not_supported", "Standalone pods are immutable: apply via the owning Deployment, StatefulSet, or DaemonSet.")
+			return
+		}
+		common.WriteValidationError(c, "workload_type_not_supported", "Workload type is not supported.")
+		return
+	}
+
+	if notFound, ok := errors.AsType[*apperrors.NotFoundError](err); ok {
+		switch notFound.Resource {
+		case "deployment":
+			common.WriteNotFoundError(c, "deployment_not_found", "Deployment not found.")
+		case "statefulset":
+			common.WriteNotFoundError(c, "statefulset_not_found", "StatefulSet not found.")
+		case "daemonset":
+			common.WriteNotFoundError(c, "daemonset_not_found", "DaemonSet not found.")
+		default:
+			common.WriteNotFoundError(c, "workload_not_found", "Workload not found.")
+		}
+		return
+	}
+
+	common.WriteInternalError(c, "Failed to apply recommendation.")
 }
