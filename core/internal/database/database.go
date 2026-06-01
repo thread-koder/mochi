@@ -58,6 +58,14 @@ func Init(cfg *config.DatabaseConfig) error {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
+	var versionNum int
+	if err := Pool.QueryRow(ctx, "SELECT current_setting('server_version_num')::int").Scan(&versionNum); err != nil {
+		return fmt.Errorf("failed to read PostgreSQL version: %w", err)
+	}
+	if versionNum < 180000 {
+		return fmt.Errorf("PostgreSQL 18 or newer is required (server_version_num=%d)", versionNum)
+	}
+
 	log.Info().
 		Str("host", cfg.Host).
 		Int("port", cfg.Port).

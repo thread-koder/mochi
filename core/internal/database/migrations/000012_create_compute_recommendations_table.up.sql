@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS compute_recommendations (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT uuidv7(),
     workload_type VARCHAR(50) NOT NULL,
     workload_name VARCHAR(255) NOT NULL,
     namespace VARCHAR(255) NOT NULL REFERENCES namespaces(name) ON DELETE CASCADE,

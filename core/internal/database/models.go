@@ -3,11 +3,13 @@ package database
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Node represents a Kubernetes Node metadata.
 type Node struct {
-	ID                      int64           `json:"id" db:"id"`
+	ID                      uuid.UUID       `json:"id" db:"id"`
 	Name                    string          `json:"name" db:"name"`
 	UID                     string          `json:"uid" db:"uid"`
 	InternalIP              *string         `json:"internal_ip,omitempty" db:"internal_ip"`
@@ -30,7 +32,7 @@ type Node struct {
 
 // Namespace represents a Kubernetes Namespace metadata.
 type Namespace struct {
-	ID          int64           `json:"id" db:"id"`
+	ID          uuid.UUID       `json:"id" db:"id"`
 	Name        string          `json:"name" db:"name"`
 	UID         string          `json:"uid" db:"uid"`
 	Phase       string          `json:"phase" db:"phase"`
@@ -43,7 +45,7 @@ type Namespace struct {
 
 // Deployment represents a Kubernetes Deployment metadata.
 type Deployment struct {
-	ID                int64           `json:"id" db:"id"`
+	ID                uuid.UUID       `json:"id" db:"id"`
 	Name              string          `json:"name" db:"name"`
 	Namespace         string          `json:"namespace" db:"namespace"`
 	UID               string          `json:"uid" db:"uid"`
@@ -59,7 +61,7 @@ type Deployment struct {
 
 // ReplicaSet represents a Kubernetes ReplicaSet metadata.
 type ReplicaSet struct {
-	ID            int64           `json:"id" db:"id"`
+	ID            uuid.UUID       `json:"id" db:"id"`
 	Name          string          `json:"name" db:"name"`
 	Namespace     string          `json:"namespace" db:"namespace"`
 	UID           string          `json:"uid" db:"uid"`
@@ -76,7 +78,7 @@ type ReplicaSet struct {
 
 // StatefulSet represents a Kubernetes StatefulSet metadata.
 type StatefulSet struct {
-	ID            int64           `json:"id" db:"id"`
+	ID            uuid.UUID       `json:"id" db:"id"`
 	Name          string          `json:"name" db:"name"`
 	Namespace     string          `json:"namespace" db:"namespace"`
 	UID           string          `json:"uid" db:"uid"`
@@ -91,7 +93,7 @@ type StatefulSet struct {
 
 // DaemonSet represents a Kubernetes DaemonSet metadata.
 type DaemonSet struct {
-	ID                     int64           `json:"id" db:"id"`
+	ID                     uuid.UUID       `json:"id" db:"id"`
 	Name                   string          `json:"name" db:"name"`
 	Namespace              string          `json:"namespace" db:"namespace"`
 	UID                    string          `json:"uid" db:"uid"`
@@ -107,7 +109,7 @@ type DaemonSet struct {
 
 // Service represents a Kubernetes Service metadata.
 type Service struct {
-	ID          int64           `json:"id" db:"id"`
+	ID          uuid.UUID       `json:"id" db:"id"`
 	Name        string          `json:"name" db:"name"`
 	Namespace   string          `json:"namespace" db:"namespace"`
 	UID         string          `json:"uid" db:"uid"`
@@ -124,7 +126,7 @@ type Service struct {
 
 // EndpointSlice represents a Kubernetes EndpointSlice metadata.
 type EndpointSlice struct {
-	ID          int64           `json:"id" db:"id"`
+	ID          uuid.UUID       `json:"id" db:"id"`
 	Name        string          `json:"name" db:"name"`
 	Namespace   string          `json:"namespace" db:"namespace"`
 	UID         string          `json:"uid" db:"uid"`
@@ -142,7 +144,7 @@ type EndpointSlice struct {
 
 // Pod represents a Kubernetes Pod metadata.
 type Pod struct {
-	ID            int64           `json:"id" db:"id"`
+	ID            uuid.UUID       `json:"id" db:"id"`
 	Name          string          `json:"name" db:"name"`
 	Namespace     string          `json:"namespace" db:"namespace"`
 	UID           string          `json:"uid" db:"uid"`
@@ -160,7 +162,7 @@ type Pod struct {
 
 // Container represents a Kubernetes Container metadata.
 type Container struct {
-	ID              int64           `json:"id" db:"id"`
+	ID              uuid.UUID       `json:"id" db:"id"`
 	Name            string          `json:"name" db:"name"`
 	PodUID          string          `json:"pod_uid" db:"pod_uid"`
 	PodName         string          `json:"pod_name" db:"pod_name"`
@@ -179,7 +181,7 @@ type Container struct {
 
 // ComputeRecommendation represents a compute recommendation (CPU/memory) for a workload.
 type ComputeRecommendation struct {
-	ID                 int64           `json:"id" db:"id"`
+	ID                 uuid.UUID       `json:"id" db:"id"`
 	WorkloadType       string          `json:"workload_type" db:"workload_type"`
 	WorkloadName       string          `json:"workload_name" db:"workload_name"`
 	Namespace          string          `json:"namespace" db:"namespace"`

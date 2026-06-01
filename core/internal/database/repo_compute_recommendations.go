@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/logger"
@@ -47,7 +48,7 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 	}
 
 	log.Debug().
-		Int64("id", rec.ID).
+		Str("id", rec.ID.String()).
 		Str("workload_name", rec.WorkloadName).
 		Str("namespace", rec.Namespace).
 		Msg("Compute recommendation inserted successfully")
@@ -56,7 +57,7 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 }
 
 // GetComputeRecommendationByID returns a compute recommendation by its ID.
-func GetComputeRecommendationByID(ctx context.Context, id int64) (*ComputeRecommendation, error) {
+func GetComputeRecommendationByID(ctx context.Context, id uuid.UUID) (*ComputeRecommendation, error) {
 	query := `
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
 		       recommendations, status, analysis_time_range, created_at, updated_at, generated_at
@@ -74,7 +75,7 @@ func GetComputeRecommendationByID(ctx context.Context, id int64) (*ComputeRecomm
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperrors.NewNotFound("compute_recommendation", fmt.Sprintf("%d", id))
+			return nil, apperrors.NewNotFound("compute_recommendation", id.String())
 		}
 		return nil, fmt.Errorf("failed to query compute recommendation by ID: %w", err)
 	}
@@ -224,10 +225,10 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 
 // UpdateComputeRecommendationStatus sets status and updates updated_at.
 // Returns an error if no row matched the ID.
-func UpdateComputeRecommendationStatus(ctx context.Context, id int64, status string) error {
+func UpdateComputeRecommendationStatus(ctx context.Context, id uuid.UUID, status string) error {
 	log := logger.WithComponent("database")
 	log.Debug().
-		Int64("id", id).
+		Str("id", id.String()).
 		Str("status", status).
 		Msg("Updating compute recommendation status")
 
@@ -243,11 +244,11 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id int64, status str
 	}
 
 	if result.RowsAffected() == 0 {
-		return apperrors.NewNotFound("compute_recommendation", fmt.Sprintf("%d", id))
+		return apperrors.NewNotFound("compute_recommendation", id.String())
 	}
 
 	log.Debug().
-		Int64("id", id).
+		Str("id", id.String()).
 		Str("status", status).
 		Msg("Compute recommendation status updated successfully")
 
@@ -256,13 +257,13 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id int64, status str
 
 // MarkRecommendationsSuperseded sets the status of all the recommendations for the same workload to superseded
 // except the applied row (excludeID).
-func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadName, namespace string, excludeID int64) error {
+func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadName, namespace string, excludeID uuid.UUID) error {
 	log := logger.WithComponent("database")
 	log.Debug().
 		Str("workload_type", workloadType).
 		Str("workload_name", workloadName).
 		Str("namespace", namespace).
-		Int64("exclude_id", excludeID).
+		Str("exclude_id", excludeID.String()).
 		Msg("Marking recommendations as superseded")
 
 	query := `
@@ -292,10 +293,10 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 
 // DeleteComputeRecommendation deletes a compute recommendation by its ID.
 // Returns an error if nothing was deleted.
-func DeleteComputeRecommendation(ctx context.Context, id int64) error {
+func DeleteComputeRecommendation(ctx context.Context, id uuid.UUID) error {
 	log := logger.WithComponent("database")
 	log.Debug().
-		Int64("id", id).
+		Str("id", id.String()).
 		Msg("Deleting compute recommendation")
 
 	query := `DELETE FROM compute_recommendations WHERE id = $1`
@@ -306,11 +307,11 @@ func DeleteComputeRecommendation(ctx context.Context, id int64) error {
 	}
 
 	if result.RowsAffected() == 0 {
-		return apperrors.NewNotFound("compute_recommendation", fmt.Sprintf("%d", id))
+		return apperrors.NewNotFound("compute_recommendation", id.String())
 	}
 
 	log.Debug().
-		Int64("id", id).
+		Str("id", id.String()).
 		Msg("Compute recommendation deleted successfully")
 
 	return nil
