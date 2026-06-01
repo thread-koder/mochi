@@ -107,7 +107,7 @@ import type { FetchError } from 'ofetch'
 import type { ContainerRecommendation } from '#shared/types/compute'
 
 const props = defineProps<{
-  recommendationId: number
+  recommendationId: string
   status: string
   recommendations: ContainerRecommendation[]
 }>()

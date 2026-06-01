@@ -300,7 +300,7 @@ const sortedRecords = computed(() => {
   return mapped.map(item => item.record)
 })
 
-const navigateToDetail = (id: number) => {
+const navigateToDetail = (id: string) => {
   navigateTo(`/recommendations/compute/${id}`)
 }
 </script>

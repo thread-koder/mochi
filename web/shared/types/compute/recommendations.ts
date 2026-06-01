@@ -35,7 +35,7 @@ interface Recommendation {
 }
 
 interface RecommendationRecord {
-  id: number
+  id: string
   workload_type: string
   workload_name: string
   namespace: string
