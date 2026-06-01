@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/thread_koder/mochi/core/internal/analyzer"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
-	"github.com/thread_koder/mochi/core/internal/analyzer"
 	"golang.org/x/sync/errgroup"
 )
 
