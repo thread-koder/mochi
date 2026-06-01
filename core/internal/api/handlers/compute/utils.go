@@ -3,6 +3,8 @@ package compute
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/google/uuid"
 )
 
 func parseInt(s string) (int, error) {
@@ -13,10 +15,10 @@ func parseInt(s string) (int, error) {
 	return result, nil
 }
 
-func parseInt64(s string) (int64, error) {
-	result, err := strconv.ParseInt(s, 10, 64)
+func parseUUID(s string) (uuid.UUID, error) {
+	id, err := uuid.Parse(s)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse int64: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to parse UUID: %w", err)
 	}
-	return result, nil
+	return id, nil
 }

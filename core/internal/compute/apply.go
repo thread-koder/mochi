@@ -64,7 +64,7 @@ const (
 func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendation) error {
 	log := logger.WithComponent("compute")
 	log.Info().
-		Int64("recommendation_id", rec.ID).
+		Str("recommendation_id", rec.ID.String()).
 		Str("workload_type", rec.WorkloadType).
 		Str("workload_name", rec.WorkloadName).
 		Str("namespace", rec.Namespace).
@@ -206,7 +206,7 @@ func applyToPod() error {
 func getMochiAnnotations(rec *database.ComputeRecommendation) map[string]string {
 	return map[string]string{
 		AnnotationManagedBy:          "mochi",
-		AnnotationRecommendationID:   fmt.Sprintf("%d", rec.ID),
+		AnnotationRecommendationID:   rec.ID.String(),
 		AnnotationRecommendationMode: rec.RecommendationMode,
 		AnnotationLastApplied:        time.Now().UTC().Format(time.RFC3339),
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/thread_koder/mochi/core/internal/api/handlers/common"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/compute"
@@ -168,10 +169,10 @@ func GetRecommendations(c *gin.Context) {
 func GetRecommendationByID(c *gin.Context) {
 	idStr := c.Param("id")
 
-	id, err := parseInt64(idStr)
+	id, err := parseUUID(idStr)
 	if err != nil {
 		c.Error(err)
-		common.WriteValidationError(c, "invalid_recommendation_id", "Recommendation ID must be a valid integer.")
+		common.WriteValidationError(c, "invalid_recommendation_id", "Recommendation ID must be a valid UUID.")
 		return
 	}
 
@@ -232,15 +233,15 @@ func ApplyRecommendation(c *gin.Context) {
 	defer cancel()
 
 	var recommendation *database.ComputeRecommendation
-	var id int64
+	var id uuid.UUID
 
 	idStr := c.Query("id")
 	if idStr != "" {
 		var err error
-		id, err = parseInt64(idStr)
+		id, err = parseUUID(idStr)
 		if err != nil {
 			c.Error(err)
-			common.WriteValidationError(c, "invalid_recommendation_id", "Recommendation ID must be a valid integer.")
+			common.WriteValidationError(c, "invalid_recommendation_id", "Recommendation ID must be a valid UUID.")
 			return
 		}
 
@@ -256,7 +257,7 @@ func ApplyRecommendation(c *gin.Context) {
 		}
 
 		if recommendation.Status == "applied" {
-			err := fmt.Errorf("recommendation %d was already applied", id)
+			err := fmt.Errorf("recommendation %s was already applied", id)
 			c.Error(err)
 			common.WriteValidationError(c, "recommendation_already_applied", "Recommendation already applied.")
 			return
