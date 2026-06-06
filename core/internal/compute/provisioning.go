@@ -203,12 +203,12 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 
 	if stability.MemoryOOM > 0 {
 		result.IsUnderProvisioned = true
-		penalty := min(stability.MemoryOOM*0.5, 0.35)
+		penalty := eventCountPenalty(stability.MemoryOOM, maxPenaltyOOM, oomCountAtMax)
 		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 	if stability.MemoryFailCnt > 0 {
 		result.IsUnderProvisioned = true
-		penalty := min(stability.MemoryFailCnt*0.2, 0.25)
+		penalty := eventCountPenalty(stability.MemoryFailCnt, maxPenaltyMemoryFailCnt, memoryFailCountAtMax)
 		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
 	}
 	if stability.MemoryPressure > PressureThreshold {

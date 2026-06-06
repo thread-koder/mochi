@@ -1,14 +1,21 @@
 package compute
 
+import "math"
+
 // Per-signal caps on how much each factor can reduce StabilityScore. Without caps, a single noisy
 // counter could drive the score to zero.
 const (
 	maxPenaltyCPUThrottling  = 0.25
 	maxPenaltyCPUPressure    = 0.15
-	maxPenaltyMemoryFailCnt  = 0.25
 	maxPenaltyMemoryPressure = 0.15
-	maxPenaltyOOM            = 0.35
-	maxPenaltyRestarts       = 0.35
+
+	// Log-scaled event penalties.
+	maxPenaltyOOM           = 0.32
+	oomCountAtMax           = 1
+	maxPenaltyMemoryFailCnt = 0.22
+	memoryFailCountAtMax    = 10
+	maxPenaltyRestarts      = 0.25
+	restartsCountAtMax      = 25
 )
 
 // stabilityNoiseThreshold treats PSI and throttling values below 0.1% as zero so scrape jitter
@@ -28,8 +35,9 @@ type StabilityResult struct {
 }
 
 // AnalyzeStability reads the first sample in each scalar slice (see ResourceMetrics), applies
-// filterNoise to percentage fields, and subtracts capped penalties from 1.0 for OOMs, allocation
-// failures, restarts, throttling above 5%, and CPU/memory pressure above 10%.
+// filterNoise to percentage fields, and subtracts capped penalties from 1.0. OOM, allocation
+// failures, and restarts use log-scaled event penalties, while throttling above 5% and CPU/memory
+// pressure above 10% use linear ramps.
 func AnalyzeStability(metrics ResourceMetrics) StabilityResult {
 	result := StabilityResult{
 		StabilityScore: 1.0,
@@ -42,16 +50,16 @@ func AnalyzeStability(metrics ResourceMetrics) StabilityResult {
 		result.CPUPressure = metrics.CPUPressure[0].Value
 	}
 	if len(metrics.MemoryFailCnt) > 0 {
-		result.MemoryFailCnt = metrics.MemoryFailCnt[0].Value
+		result.MemoryFailCnt = math.Round(metrics.MemoryFailCnt[0].Value)
 	}
 	if len(metrics.MemoryOOM) > 0 {
-		result.MemoryOOM = metrics.MemoryOOM[0].Value
+		result.MemoryOOM = math.Round(metrics.MemoryOOM[0].Value)
 	}
 	if len(metrics.MemoryPressure) > 0 {
 		result.MemoryPressure = metrics.MemoryPressure[0].Value
 	}
 	if len(metrics.Restarts) > 0 {
-		result.Restarts = metrics.Restarts[0].Value
+		result.Restarts = math.Round(metrics.Restarts[0].Value)
 	}
 
 	result.CPUThrottling = filterNoise(result.CPUThrottling)
@@ -60,9 +68,9 @@ func AnalyzeStability(metrics ResourceMetrics) StabilityResult {
 
 	var totalPenalty float64
 
-	totalPenalty += min(result.MemoryOOM*0.5, maxPenaltyOOM)
-	totalPenalty += min(result.MemoryFailCnt*0.2, maxPenaltyMemoryFailCnt)
-	totalPenalty += min(result.Restarts*0.3, maxPenaltyRestarts)
+	totalPenalty += eventCountPenalty(result.MemoryOOM, maxPenaltyOOM, oomCountAtMax)
+	totalPenalty += eventCountPenalty(result.MemoryFailCnt, maxPenaltyMemoryFailCnt, memoryFailCountAtMax)
+	totalPenalty += eventCountPenalty(result.Restarts, maxPenaltyRestarts, restartsCountAtMax)
 
 	if result.CPUThrottling > 0.05 {
 		penalty := (result.CPUThrottling - 0.05) * 2.0
@@ -81,6 +89,16 @@ func AnalyzeStability(metrics ResourceMetrics) StabilityResult {
 	result.StabilityScore = max(0.0, min(1.0, 1.0-totalPenalty))
 
 	return result
+}
+
+// eventCountPenalty maps discrete counter events to a capped stability penalty. Log scaling
+// keeps single events as a warning while higher counts increase severity sublinearly.
+func eventCountPenalty(count, maxPenalty, countAtMax float64) float64 {
+	if count <= 0 || maxPenalty <= 0 || countAtMax <= 0 {
+		return 0
+	}
+	penalty := maxPenalty * math.Log1p(count) / math.Log1p(countAtMax)
+	return min(penalty, maxPenalty)
 }
 
 // filterNoise returns zero when value is below stabilityNoiseThreshold, otherwise returns value.
