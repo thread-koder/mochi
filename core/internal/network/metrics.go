@@ -34,7 +34,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 
 	queryOpts := prometheus.QueryOptions{
 		Namespace:     pod.Namespace,
-		Pod:           pod.Name,
+		Pods:          []string{pod.Name},
 		RangeDuration: "5m",
 	}
 
@@ -50,7 +50,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryPodNetworkReceiveBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveBytesRange(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive bytes metrics: %w", err)
 		}
@@ -59,7 +59,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryPodNetworkTransmitBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitBytesRange(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit bytes metrics: %w", err)
 		}
@@ -68,7 +68,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryPodNetworkReceiveErrorsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveErrorsRange(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive errors metrics: %w", err)
 		}
@@ -77,7 +77,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryPodNetworkTransmitErrorsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitErrorsRange(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit errors metrics: %w", err)
 		}
@@ -86,7 +86,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryPodNetworkReceiveDroppedRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveDroppedRange(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive dropped metrics: %w", err)
 		}
@@ -95,7 +95,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryPodNetworkTransmitDroppedRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitDroppedRange(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit dropped metrics: %w", err)
 		}
@@ -117,8 +117,6 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	}, nil
 }
 
-// fetchWorkloadMetrics queries each pod in parallel, then merges per-pod series with MergeDataPointsByTime
-// so each timestamp reflects summed rates across the workload.
 func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts AnalysisOptions) (NetworkMetrics, error) {
 	if len(pods) == 0 {
 		return NetworkMetrics{}, fmt.Errorf("no pods found for workload")
@@ -132,130 +130,92 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 		Step:  opts.RangeStep,
 	}
 
-	type podMetrics struct {
-		ReceiveBytes    []timeseries.DataPoint
-		TransmitBytes   []timeseries.DataPoint
-		ReceiveErrors   []timeseries.DataPoint
-		TransmitErrors  []timeseries.DataPoint
-		ReceiveDropped  []timeseries.DataPoint
-		TransmitDropped []timeseries.DataPoint
+	podNames := make([]string, len(pods))
+	for i, pod := range pods {
+		podNames[i] = pod.Name
 	}
-	results := make([]podMetrics, len(pods))
+	queryOpts := prometheus.QueryOptions{
+		Namespace:     pods[0].Namespace,
+		Pods:          podNames,
+		RangeDuration: "5m",
+	}
+
+	var (
+		receiveMatrix      model.Matrix
+		transmitMatrix     model.Matrix
+		receiveErrMatrix   model.Matrix
+		transmitErrMatrix  model.Matrix
+		receiveDropMatrix  model.Matrix
+		transmitDropMatrix model.Matrix
+	)
 
 	g, gctx := errgroup.WithContext(ctx)
 
-	for i, pod := range pods {
-		queryOpts := prometheus.QueryOptions{
-			Namespace:     pod.Namespace,
-			Pod:           pod.Name,
-			RangeDuration: "5m",
+	g.Go(func() error {
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveBytesRange(gctx, r, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query receive bytes metrics: %w", err)
 		}
+		receiveMatrix = matrix
+		return nil
+	})
 
-		g.Go(func() error {
-			var (
-				receiveMatrix      model.Matrix
-				transmitMatrix     model.Matrix
-				receiveErrMatrix   model.Matrix
-				transmitErrMatrix  model.Matrix
-				receiveDropMatrix  model.Matrix
-				transmitDropMatrix model.Matrix
-			)
+	g.Go(func() error {
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitBytesRange(gctx, r, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query transmit bytes metrics: %w", err)
+		}
+		transmitMatrix = matrix
+		return nil
+	})
 
-			podG, podCtx := errgroup.WithContext(gctx)
+	g.Go(func() error {
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveErrorsRange(gctx, r, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query receive errors metrics: %w", err)
+		}
+		receiveErrMatrix = matrix
+		return nil
+	})
 
-			podG.Go(func() error {
-				matrix, _, err := prometheus.QueryPodNetworkReceiveBytesRange(podCtx, r, queryOpts)
-				if err != nil {
-					return fmt.Errorf("failed to query receive bytes metrics: %w", err)
-				}
-				receiveMatrix = matrix
-				return nil
-			})
+	g.Go(func() error {
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitErrorsRange(gctx, r, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query transmit errors metrics: %w", err)
+		}
+		transmitErrMatrix = matrix
+		return nil
+	})
 
-			podG.Go(func() error {
-				matrix, _, err := prometheus.QueryPodNetworkTransmitBytesRange(podCtx, r, queryOpts)
-				if err != nil {
-					return fmt.Errorf("failed to query transmit bytes metrics: %w", err)
-				}
-				transmitMatrix = matrix
-				return nil
-			})
+	g.Go(func() error {
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveDroppedRange(gctx, r, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query receive dropped metrics: %w", err)
+		}
+		receiveDropMatrix = matrix
+		return nil
+	})
 
-			podG.Go(func() error {
-				matrix, _, err := prometheus.QueryPodNetworkReceiveErrorsRange(podCtx, r, queryOpts)
-				if err != nil {
-					return fmt.Errorf("failed to query receive errors metrics: %w", err)
-				}
-				receiveErrMatrix = matrix
-				return nil
-			})
-
-			podG.Go(func() error {
-				matrix, _, err := prometheus.QueryPodNetworkTransmitErrorsRange(podCtx, r, queryOpts)
-				if err != nil {
-					return fmt.Errorf("failed to query transmit errors metrics: %w", err)
-				}
-				transmitErrMatrix = matrix
-				return nil
-			})
-
-			podG.Go(func() error {
-				matrix, _, err := prometheus.QueryPodNetworkReceiveDroppedRange(podCtx, r, queryOpts)
-				if err != nil {
-					return fmt.Errorf("failed to query receive dropped metrics: %w", err)
-				}
-				receiveDropMatrix = matrix
-				return nil
-			})
-
-			podG.Go(func() error {
-				matrix, _, err := prometheus.QueryPodNetworkTransmitDroppedRange(podCtx, r, queryOpts)
-				if err != nil {
-					return fmt.Errorf("failed to query transmit dropped metrics: %w", err)
-				}
-				transmitDropMatrix = matrix
-				return nil
-			})
-
-			if err := podG.Wait(); err != nil {
-				return err
-			}
-
-			results[i] = podMetrics{
-				ReceiveBytes:    timeseries.MatrixToDataPoints(receiveMatrix),
-				TransmitBytes:   timeseries.MatrixToDataPoints(transmitMatrix),
-				ReceiveErrors:   timeseries.MatrixToDataPoints(receiveErrMatrix),
-				TransmitErrors:  timeseries.MatrixToDataPoints(transmitErrMatrix),
-				ReceiveDropped:  timeseries.MatrixToDataPoints(receiveDropMatrix),
-				TransmitDropped: timeseries.MatrixToDataPoints(transmitDropMatrix),
-			}
-			return nil
-		})
-	}
+	g.Go(func() error {
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitDroppedRange(gctx, r, queryOpts)
+		if err != nil {
+			return fmt.Errorf("failed to query transmit dropped metrics: %w", err)
+		}
+		transmitDropMatrix = matrix
+		return nil
+	})
 
 	if err := g.Wait(); err != nil {
 		return NetworkMetrics{}, err
 	}
 
-	var receiveBytes, transmitBytes []timeseries.DataPoint
-	var receiveErrors, transmitErrors []timeseries.DataPoint
-	var receiveDropped, transmitDropped []timeseries.DataPoint
-	for _, p := range results {
-		receiveBytes = timeseries.MergeDataPointsByTime(receiveBytes, p.ReceiveBytes)
-		transmitBytes = timeseries.MergeDataPointsByTime(transmitBytes, p.TransmitBytes)
-		receiveErrors = timeseries.MergeDataPointsByTime(receiveErrors, p.ReceiveErrors)
-		transmitErrors = timeseries.MergeDataPointsByTime(transmitErrors, p.TransmitErrors)
-		receiveDropped = timeseries.MergeDataPointsByTime(receiveDropped, p.ReceiveDropped)
-		transmitDropped = timeseries.MergeDataPointsByTime(transmitDropped, p.TransmitDropped)
-	}
-
 	return NetworkMetrics{
-		ReceiveBytes:    receiveBytes,
-		TransmitBytes:   transmitBytes,
-		ReceiveErrors:   receiveErrors,
-		TransmitErrors:  transmitErrors,
-		ReceiveDropped:  receiveDropped,
-		TransmitDropped: transmitDropped,
+		ReceiveBytes:    timeseries.MatrixToDataPoints(receiveMatrix),
+		TransmitBytes:   timeseries.MatrixToDataPoints(transmitMatrix),
+		ReceiveErrors:   timeseries.MatrixToDataPoints(receiveErrMatrix),
+		TransmitErrors:  timeseries.MatrixToDataPoints(transmitErrMatrix),
+		ReceiveDropped:  timeseries.MatrixToDataPoints(receiveDropMatrix),
+		TransmitDropped: timeseries.MatrixToDataPoints(transmitDropMatrix),
 	}, nil
 }
 

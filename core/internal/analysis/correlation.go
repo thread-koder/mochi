@@ -117,7 +117,7 @@ type WorkloadCorrelationResult struct {
 	DataPointsUsed    int               `json:"data_points_used"`
 }
 
-// correlationMetrics stores merged per-workload metric series from Prometheus.
+// correlationMetrics stores per-workload metric series from Prometheus.
 type correlationMetrics struct {
 	CPU             []timeseries.DataPoint
 	Memory          []timeseries.DataPoint
@@ -210,7 +210,7 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 	}, nil
 }
 
-// getMetricData returns the merged series for a given metric name.
+// getMetricData returns the series for a given metric name.
 func getMetricData(metrics correlationMetrics, name string) []timeseries.DataPoint {
 	switch name {
 	case "cpu":

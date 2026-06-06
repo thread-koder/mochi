@@ -141,7 +141,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, opts AnalysisOptions) (P
 	return result, nil
 }
 
-// AnalyzeWorkload fetches merged metrics across pods, summarizes workload-level utilization,
+// AnalyzeWorkload fetches workload-scoped metrics, summarizes workload-level utilization,
 // attaches optional workload chart series, and optionally fills Pods with per-pod analyses.
 // When includePods is true, each pod analysis omits TimeSeries
 // so the JSON does not embed full chart series under every workload and pod.

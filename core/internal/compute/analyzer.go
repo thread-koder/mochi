@@ -221,7 +221,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 	return result, nil
 }
 
-// AnalyzeWorkload aggregates metrics across pods, derives workload-level utilization and stability, and
+// AnalyzeWorkload fetches workload-scoped metrics, derives workload-level utilization and stability, and
 // optionally fills Pods with per-pod analyses. When includePods is true, nested pod analyses omit chart
 // series (IncludeTimeSeries is forced off) so responses stay smaller than attaching series at every level.
 func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName string, namespace string, pods []*database.Pod, opts AnalysisOptions, includePods bool) (WorkloadAnalysis, error) {
