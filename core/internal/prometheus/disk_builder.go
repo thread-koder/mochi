@@ -4,67 +4,67 @@ import (
 	"fmt"
 )
 
-// BuildPodDiskReadBytesQuery builds the pod disk read byte rate query.
-func BuildPodDiskReadBytesQuery(namespace, pod, container string, rangeDuration string) (string, error) {
+// BuildWorkloadDiskReadBytesQuery builds the workload disk read byte rate query.
+func BuildWorkloadDiskReadBytesQuery(namespace string, pods []string, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildContainerMetricQuery("container_fs_reads_bytes_total", namespace, pod, container, rangeDuration)
+	base := BuildContainerMetricQuery("container_fs_reads_bytes_total", namespace, pods, container, rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// BuildPodDiskWriteBytesQuery builds the pod disk write byte rate query.
-func BuildPodDiskWriteBytesQuery(namespace, pod, container string, rangeDuration string) (string, error) {
+// BuildWorkloadDiskWriteBytesQuery builds the workload disk write byte rate query.
+func BuildWorkloadDiskWriteBytesQuery(namespace string, pods []string, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildContainerMetricQuery("container_fs_writes_bytes_total", namespace, pod, container, rangeDuration)
+	base := BuildContainerMetricQuery("container_fs_writes_bytes_total", namespace, pods, container, rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// BuildPodDiskReadOpsQuery builds the pod disk read operations rate query.
-func BuildPodDiskReadOpsQuery(namespace, pod, container string, rangeDuration string) (string, error) {
+// BuildWorkloadDiskReadOpsQuery builds the workload disk read operations rate query.
+func BuildWorkloadDiskReadOpsQuery(namespace string, pods []string, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildContainerMetricQuery("container_fs_reads_total", namespace, pod, container, rangeDuration)
+	base := BuildContainerMetricQuery("container_fs_reads_total", namespace, pods, container, rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// BuildPodDiskWriteOpsQuery builds the pod disk write operations rate query.
-func BuildPodDiskWriteOpsQuery(namespace, pod, container string, rangeDuration string) (string, error) {
+// BuildWorkloadDiskWriteOpsQuery builds the workload disk write operations rate query.
+func BuildWorkloadDiskWriteOpsQuery(namespace string, pods []string, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildContainerMetricQuery("container_fs_writes_total", namespace, pod, container, rangeDuration)
+	base := BuildContainerMetricQuery("container_fs_writes_total", namespace, pods, container, rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 

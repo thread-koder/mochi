@@ -5,18 +5,18 @@ import (
 )
 
 // BuildNetworkMetricQuery builds a network metric selector for pod/interface scope.
-func BuildNetworkMetricQuery(metric, namespace, pod, iface, rangeDuration string) string {
+func BuildNetworkMetricQuery(metric, namespace string, pods []string, iface, rangeDuration string) string {
 	query := fmt.Sprintf(`%s{`, metric)
 	needsComma := false
 	if namespace != "" {
 		query += fmt.Sprintf(`namespace="%s"`, namespace)
 		needsComma = true
 	}
-	if pod != "" {
+	if len(pods) > 0 {
 		if needsComma {
 			query += ","
 		}
-		query += fmt.Sprintf(`pod="%s"`, pod)
+		query += podLabelMatcher(pods)
 		needsComma = true
 	}
 	if iface != "" {
@@ -33,99 +33,99 @@ func BuildNetworkMetricQuery(metric, namespace, pod, iface, rangeDuration string
 	return query
 }
 
-// BuildPodNetworkReceiveBytesQuery builds the pod network receive rate query.
-func BuildPodNetworkReceiveBytesQuery(namespace, pod string, rangeDuration string) (string, error) {
+// BuildWorkloadNetworkReceiveBytesQuery builds the workload network receive rate query.
+func BuildWorkloadNetworkReceiveBytesQuery(namespace string, pods []string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildNetworkMetricQuery("container_network_receive_bytes_total", namespace, pod, "", rangeDuration)
+	base := BuildNetworkMetricQuery("container_network_receive_bytes_total", namespace, pods, "", rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// BuildPodNetworkTransmitBytesQuery builds the pod network transmit rate query.
-func BuildPodNetworkTransmitBytesQuery(namespace, pod string, rangeDuration string) (string, error) {
+// BuildWorkloadNetworkTransmitBytesQuery builds the workload network transmit rate query.
+func BuildWorkloadNetworkTransmitBytesQuery(namespace string, pods []string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildNetworkMetricQuery("container_network_transmit_bytes_total", namespace, pod, "", rangeDuration)
+	base := BuildNetworkMetricQuery("container_network_transmit_bytes_total", namespace, pods, "", rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// BuildPodNetworkReceiveErrorsQuery builds the pod network receive error rate query.
-func BuildPodNetworkReceiveErrorsQuery(namespace, pod string, rangeDuration string) (string, error) {
+// BuildWorkloadNetworkReceiveErrorsQuery builds the workload network receive error rate query.
+func BuildWorkloadNetworkReceiveErrorsQuery(namespace string, pods []string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildNetworkMetricQuery("container_network_receive_errors_total", namespace, pod, "", rangeDuration)
+	base := BuildNetworkMetricQuery("container_network_receive_errors_total", namespace, pods, "", rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// BuildPodNetworkTransmitErrorsQuery builds the pod network transmit error rate query.
-func BuildPodNetworkTransmitErrorsQuery(namespace, pod string, rangeDuration string) (string, error) {
+// BuildWorkloadNetworkTransmitErrorsQuery builds the workload network transmit error rate query.
+func BuildWorkloadNetworkTransmitErrorsQuery(namespace string, pods []string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildNetworkMetricQuery("container_network_transmit_errors_total", namespace, pod, "", rangeDuration)
+	base := BuildNetworkMetricQuery("container_network_transmit_errors_total", namespace, pods, "", rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// BuildPodNetworkReceiveDroppedQuery builds the pod dropped receive packet rate query.
-func BuildPodNetworkReceiveDroppedQuery(namespace, pod string, rangeDuration string) (string, error) {
+// BuildWorkloadNetworkReceiveDroppedQuery builds the workload dropped receive packet rate query.
+func BuildWorkloadNetworkReceiveDroppedQuery(namespace string, pods []string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildNetworkMetricQuery("container_network_receive_packets_dropped_total", namespace, pod, "", rangeDuration)
+	base := BuildNetworkMetricQuery("container_network_receive_packets_dropped_total", namespace, pods, "", rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// BuildPodNetworkTransmitDroppedQuery builds the pod dropped transmit packet rate query.
-func BuildPodNetworkTransmitDroppedQuery(namespace, pod string, rangeDuration string) (string, error) {
+// BuildWorkloadNetworkTransmitDroppedQuery builds the workload dropped transmit packet rate query.
+func BuildWorkloadNetworkTransmitDroppedQuery(namespace string, pods []string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildNetworkMetricQuery("container_network_transmit_packets_dropped_total", namespace, pod, "", rangeDuration)
+	base := BuildNetworkMetricQuery("container_network_transmit_packets_dropped_total", namespace, pods, "", rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 

@@ -7,54 +7,54 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// QueryPodNetworkReceiveBytesRange returns pod network receive rate over the requested range.
-func QueryPodNetworkReceiveBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodNetworkReceiveBytesQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
+// QueryWorkloadNetworkReceiveBytesRange returns workload network receive rate over the requested range.
+func QueryWorkloadNetworkReceiveBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadNetworkReceiveBytesQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// QueryPodNetworkTransmitBytesRange returns pod network transmit rate over the requested range.
-func QueryPodNetworkTransmitBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodNetworkTransmitBytesQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
+// QueryWorkloadNetworkTransmitBytesRange returns workload network transmit rate over the requested range.
+func QueryWorkloadNetworkTransmitBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadNetworkTransmitBytesQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// QueryPodNetworkReceiveErrorsRange returns pod receive error rate over the requested range.
-func QueryPodNetworkReceiveErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodNetworkReceiveErrorsQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
+// QueryWorkloadNetworkReceiveErrorsRange returns workload receive error rate over the requested range.
+func QueryWorkloadNetworkReceiveErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadNetworkReceiveErrorsQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// QueryPodNetworkTransmitErrorsRange returns pod transmit error rate over the requested range.
-func QueryPodNetworkTransmitErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodNetworkTransmitErrorsQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
+// QueryWorkloadNetworkTransmitErrorsRange returns workload transmit error rate over the requested range.
+func QueryWorkloadNetworkTransmitErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadNetworkTransmitErrorsQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// QueryPodNetworkReceiveDroppedRange returns dropped receive packet rate over the requested range.
-func QueryPodNetworkReceiveDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodNetworkReceiveDroppedQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
+// QueryWorkloadNetworkReceiveDroppedRange returns dropped receive packet rate over the requested range.
+func QueryWorkloadNetworkReceiveDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadNetworkReceiveDroppedQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// QueryPodNetworkTransmitDroppedRange returns dropped transmit packet rate over the requested range.
-func QueryPodNetworkTransmitDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodNetworkTransmitDroppedQuery(opts.Namespace, opts.Pod, opts.RangeDuration)
+// QueryWorkloadNetworkTransmitDroppedRange returns dropped transmit packet rate over the requested range.
+func QueryWorkloadNetworkTransmitDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadNetworkTransmitDroppedQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}

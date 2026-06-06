@@ -13,8 +13,8 @@ import (
 type QueryOptions struct {
 	// Namespace scopes queries to a Kubernetes namespace when set.
 	Namespace string
-	// Pod scopes queries to a Kubernetes pod when set.
-	Pod string
+	// Pods scopes queries to one or more Kubernetes pods when set.
+	Pods []string
 	// Container scopes queries to a single container when set.
 	Container string
 	// Node is reserved for node-scoped metrics.

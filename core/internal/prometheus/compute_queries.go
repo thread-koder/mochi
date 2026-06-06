@@ -8,72 +8,72 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// QueryPodCPURange returns pod CPU usage over the requested range.
-func QueryPodCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodCPUQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
+// QueryWorkloadCPURange returns workload CPU usage over the requested range.
+func QueryWorkloadCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadCPUQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// QueryPodMemoryRange returns pod memory working set over the requested range.
-func QueryPodMemoryRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodMemoryQuery(opts.Namespace, opts.Pod, opts.Container)
+// QueryWorkloadMemoryRange returns workload memory working set over the requested range.
+func QueryWorkloadMemoryRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadMemoryQuery(opts.Namespace, opts.Pods, opts.Container)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// QueryPodCPUThrottling returns the pod CFS throttling ratio.
-func QueryPodCPUThrottling(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
-	query, err := BuildPodCPUThrottlingQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration, timeRange.String(), step.String())
+// QueryWorkloadCPUThrottling returns the workload CFS throttling ratio.
+func QueryWorkloadCPUThrottling(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
+	query, err := BuildWorkloadCPUThrottlingQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration, timeRange.String(), step.String())
 	if err != nil {
 		return 0, nil, err
 	}
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// QueryPodCPUPressure returns the pod CPU pressure ratio.
-func QueryPodCPUPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
-	query, err := BuildPodCPUPressureQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration, timeRange.String(), step.String())
+// QueryWorkloadCPUPressure returns the workload CPU pressure ratio.
+func QueryWorkloadCPUPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
+	query, err := BuildWorkloadCPUPressureQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration, timeRange.String(), step.String())
 	if err != nil {
 		return 0, nil, err
 	}
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// QueryPodMemoryFailCount returns memory failcnt increases for the pod.
-func QueryPodMemoryFailCount(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
-	query, err := BuildPodMemoryFailCountQuery(opts.Namespace, opts.Pod, opts.Container, timeRange.String())
+// QueryWorkloadMemoryFailCount returns memory failcnt increases for the workload.
+func QueryWorkloadMemoryFailCount(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
+	query, err := BuildWorkloadMemoryFailCountQuery(opts.Namespace, opts.Pods, opts.Container, timeRange.String())
 	if err != nil {
 		return 0, nil, err
 	}
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// QueryPodMemoryOOM returns OOM event increases for the pod.
-func QueryPodMemoryOOM(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
-	query, err := BuildPodMemoryOOMQuery(opts.Namespace, opts.Pod, opts.Container, timeRange.String())
+// QueryWorkloadMemoryOOM returns OOM event increases for the workload.
+func QueryWorkloadMemoryOOM(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
+	query, err := BuildWorkloadMemoryOOMQuery(opts.Namespace, opts.Pods, opts.Container, timeRange.String())
 	if err != nil {
 		return 0, nil, err
 	}
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// QueryPodMemoryPressure returns the pod memory pressure ratio.
-func QueryPodMemoryPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
-	query, err := BuildPodMemoryPressureQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration, timeRange.String(), step.String())
+// QueryWorkloadMemoryPressure returns the workload memory pressure ratio.
+func QueryWorkloadMemoryPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
+	query, err := BuildWorkloadMemoryPressureQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration, timeRange.String(), step.String())
 	if err != nil {
 		return 0, nil, err
 	}
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-// QueryPodRestarts returns restart increases for the pod/container scope.
-func QueryPodRestarts(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
-	query, err := BuildPodRestartsQuery(opts.Namespace, opts.Pod, opts.Container, timeRange.String())
+// QueryWorkloadRestarts returns restart increases for the workload/container scope.
+func QueryWorkloadRestarts(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
+	query, err := BuildWorkloadRestartsQuery(opts.Namespace, opts.Pods, opts.Container, timeRange.String())
 	if err != nil {
 		return 0, nil, err
 	}

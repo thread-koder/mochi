@@ -4,42 +4,42 @@ import (
 	"fmt"
 )
 
-// BuildPodCPUQuery builds the pod CPU usage query.
-func BuildPodCPUQuery(namespace, pod, container string, rangeDuration string) (string, error) {
+// BuildWorkloadCPUQuery builds the workload CPU usage query.
+func BuildWorkloadCPUQuery(namespace string, pods []string, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
 	}
 
-	base := BuildContainerMetricQuery("container_cpu_usage_seconds_total", namespace, pod, container, rangeDuration)
+	base := BuildContainerMetricQuery("container_cpu_usage_seconds_total", namespace, pods, container, rangeDuration)
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-// BuildPodMemoryQuery builds the pod memory working set query.
-func BuildPodMemoryQuery(namespace, pod, container string) (string, error) {
+// BuildWorkloadMemoryQuery builds the workload memory working set query.
+func BuildWorkloadMemoryQuery(namespace string, pods []string, container string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 
-	base := BuildContainerMetricQuery("container_memory_working_set_bytes", namespace, pod, container, "")
+	base := BuildContainerMetricQuery("container_memory_working_set_bytes", namespace, pods, container, "")
 	return fmt.Sprintf("sum(%s)", base), nil
 }
 
-// BuildPodCPUThrottlingQuery builds the pod CFS throttling ratio query.
-func BuildPodCPUThrottlingQuery(namespace, pod, container string, rangeDuration string, timeRange string, step string) (string, error) {
+// BuildWorkloadCPUThrottlingQuery builds the workload CFS throttling ratio query.
+func BuildWorkloadCPUThrottlingQuery(namespace string, pods []string, container string, rangeDuration string, timeRange string, step string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
@@ -49,8 +49,8 @@ func BuildPodCPUThrottlingQuery(namespace, pod, container string, rangeDuration 
 		step = "5m"
 	}
 
-	throttledMetric := BuildContainerMetricQuery("container_cpu_cfs_throttled_periods_total", namespace, pod, container, "")
-	totalMetric := BuildContainerMetricQuery("container_cpu_cfs_periods_total", namespace, pod, container, "")
+	throttledMetric := BuildContainerMetricQuery("container_cpu_cfs_throttled_periods_total", namespace, pods, container, "")
+	totalMetric := BuildContainerMetricQuery("container_cpu_cfs_periods_total", namespace, pods, container, "")
 	throttledRate := fmt.Sprintf("sum(rate(%s[%s]))", throttledMetric, rangeDuration)
 	totalRate := fmt.Sprintf("sum(rate(%s[%s]))", totalMetric, rangeDuration)
 	// Guard against zero denominator, so the ratio is bounded at 0+.
@@ -58,13 +58,13 @@ func BuildPodCPUThrottlingQuery(namespace, pod, container string, rangeDuration 
 	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", ratioQuery, timeRange, step), nil
 }
 
-// BuildPodCPUPressureQuery builds the pod CPU pressure query.
-func BuildPodCPUPressureQuery(namespace, pod, container string, rangeDuration string, timeRange string, step string) (string, error) {
+// BuildWorkloadCPUPressureQuery builds the workload CPU pressure query.
+func BuildWorkloadCPUPressureQuery(namespace string, pods []string, container string, rangeDuration string, timeRange string, step string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
@@ -74,8 +74,7 @@ func BuildPodCPUPressureQuery(namespace, pod, container string, rangeDuration st
 		step = "5m"
 	}
 
-	base := BuildContainerMetricQuery("container_pressure_cpu_stalled_seconds_total", namespace, pod, container, "")
-	rateQuery := fmt.Sprintf("rate(%s[%s])", base, rangeDuration)
+	base := BuildContainerMetricQuery("container_pressure_cpu_stalled_seconds_total", namespace, pods, container, "")
 
 	// Container-level: sum stalled rate across all instances of this container
 	if container != "" {
@@ -83,50 +82,57 @@ func BuildPodCPUPressureQuery(namespace, pod, container string, rangeDuration st
 		return fmt.Sprintf("avg_over_time((%s)[%s:%s])", aggRate, timeRange, step), nil
 	}
 
-	// Pod-level: average stalled rate across containers in the pod (keeps metric as a 0–1 fraction)
-	aggRate := fmt.Sprintf("avg(%s)", rateQuery)
-	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", aggRate, timeRange, step), nil
+	// Single pod: average stalled rate across containers in the pod (keeps metric as a 0–1 fraction)
+	if len(pods) == 1 {
+		rateQuery := fmt.Sprintf("rate(%s[%s])", base, rangeDuration)
+		aggRate := fmt.Sprintf("avg(%s)", rateQuery)
+		return fmt.Sprintf("avg_over_time((%s)[%s:%s])", aggRate, timeRange, step), nil
+	}
+
+	// Multi-pod: average stalled rate across containers in the workload (keeps metric as a 0–1 fraction)
+	rateQuery := fmt.Sprintf("avg(rate(%s[%s]))", base, rangeDuration)
+	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step), nil
 }
 
-// BuildPodMemoryFailCountQuery builds the pod memory failcnt increase query.
-func BuildPodMemoryFailCountQuery(namespace, pod, container string, timeRange string) (string, error) {
+// BuildWorkloadMemoryFailCountQuery builds the workload memory failcnt increase query.
+func BuildWorkloadMemoryFailCountQuery(namespace string, pods []string, container string, timeRange string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if timeRange == "" {
 		timeRange = "5m"
 	}
 
-	base := BuildContainerMetricQuery("container_memory_failcnt", namespace, pod, container, timeRange)
+	base := BuildContainerMetricQuery("container_memory_failcnt", namespace, pods, container, timeRange)
 	return fmt.Sprintf("sum(increase(%s))", base), nil
 }
 
-// BuildPodMemoryOOMQuery builds the pod OOM event increase query.
-func BuildPodMemoryOOMQuery(namespace, pod, container string, timeRange string) (string, error) {
+// BuildWorkloadMemoryOOMQuery builds the workload OOM event increase query.
+func BuildWorkloadMemoryOOMQuery(namespace string, pods []string, container string, timeRange string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if timeRange == "" {
 		timeRange = "5m"
 	}
 
-	base := BuildContainerMetricQuery("container_oom_events_total", namespace, pod, container, timeRange)
+	base := BuildContainerMetricQuery("container_oom_events_total", namespace, pods, container, timeRange)
 	return fmt.Sprintf("sum(increase(%s))", base), nil
 }
 
-// BuildPodMemoryPressureQuery builds the pod memory pressure query.
-func BuildPodMemoryPressureQuery(namespace, pod, container string, rangeDuration string, timeRange string, step string) (string, error) {
+// BuildWorkloadMemoryPressureQuery builds the workload memory pressure query.
+func BuildWorkloadMemoryPressureQuery(namespace string, pods []string, container string, rangeDuration string, timeRange string, step string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if rangeDuration == "" {
 		rangeDuration = "5m"
@@ -136,8 +142,7 @@ func BuildPodMemoryPressureQuery(namespace, pod, container string, rangeDuration
 		step = "5m"
 	}
 
-	base := BuildContainerMetricQuery("container_pressure_memory_stalled_seconds_total", namespace, pod, container, "")
-	rateQuery := fmt.Sprintf("rate(%s[%s])", base, rangeDuration)
+	base := BuildContainerMetricQuery("container_pressure_memory_stalled_seconds_total", namespace, pods, container, "")
 
 	// Container-level: sum stalled rate across all instances of this container
 	if container != "" {
@@ -145,31 +150,40 @@ func BuildPodMemoryPressureQuery(namespace, pod, container string, rangeDuration
 		return fmt.Sprintf("avg_over_time((%s)[%s:%s])", aggRate, timeRange, step), nil
 	}
 
-	// Pod-level: average stalled rate across containers in the pod (keeps metric as a 0–1 fraction)
-	aggRate := fmt.Sprintf("avg(%s)", rateQuery)
-	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", aggRate, timeRange, step), nil
+	// Single pod: average stalled rate across containers in the pod (keeps metric as a 0–1 fraction)
+	if len(pods) == 1 {
+		rateQuery := fmt.Sprintf("rate(%s[%s])", base, rangeDuration)
+		aggRate := fmt.Sprintf("avg(%s)", rateQuery)
+		return fmt.Sprintf("avg_over_time((%s)[%s:%s])", aggRate, timeRange, step), nil
+	}
+
+	// Multi-pod: average stalled rate across containers in the workload (keeps metric as a 0–1 fraction)
+	rateQuery := fmt.Sprintf("avg(rate(%s[%s]))", base, rangeDuration)
+	return fmt.Sprintf("avg_over_time((%s)[%s:%s])", rateQuery, timeRange, step), nil
 }
 
-// BuildPodRestartsQuery builds the pod/container restart increase query.
-func BuildPodRestartsQuery(namespace, pod, container string, timeRange string) (string, error) {
+// BuildWorkloadRestartsQuery builds the workload/container restart increase query.
+func BuildWorkloadRestartsQuery(namespace string, pods []string, container string, timeRange string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
-	if pod == "" {
-		return "", fmt.Errorf("pod is required")
+	if len(pods) == 0 {
+		return "", fmt.Errorf("pods are required")
 	}
 	if timeRange == "" {
 		timeRange = "5m"
 	}
+
+	podMatch := podLabelMatcher(pods)
 
 	// Container-level: restarts for a single container
 	if container != "" {
-		query := fmt.Sprintf(`kube_pod_container_status_restarts_total{namespace="%s",pod="%s",container="%s"}`, namespace, pod, container)
+		query := fmt.Sprintf(`kube_pod_container_status_restarts_total{namespace="%s",%s,container="%s"}`, namespace, podMatch, container)
 		return fmt.Sprintf("sum(increase(%s[%s]))", query, timeRange), nil
 	}
 
-	// Pod-level: sum of restarts across all containers in the pod
-	query := fmt.Sprintf(`kube_pod_container_status_restarts_total{namespace="%s",pod="%s"}`, namespace, pod)
+	// Workload-level: sum of restarts across all containers in the matched pods
+	query := fmt.Sprintf(`kube_pod_container_status_restarts_total{namespace="%s",%s}`, namespace, podMatch)
 	return fmt.Sprintf("sum(increase(%s[%s]))", query, timeRange), nil
 }
 

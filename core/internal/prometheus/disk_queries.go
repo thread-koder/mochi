@@ -7,36 +7,36 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// QueryPodDiskReadBytesRange returns pod disk read byte rate over the requested range.
-func QueryPodDiskReadBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodDiskReadBytesQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
+// QueryWorkloadDiskReadBytesRange returns workload disk read byte rate over the requested range.
+func QueryWorkloadDiskReadBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadDiskReadBytesQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// QueryPodDiskWriteBytesRange returns pod disk write byte rate over the requested range.
-func QueryPodDiskWriteBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodDiskWriteBytesQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
+// QueryWorkloadDiskWriteBytesRange returns workload disk write byte rate over the requested range.
+func QueryWorkloadDiskWriteBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadDiskWriteBytesQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// QueryPodDiskReadOpsRange returns pod disk read operations rate over the requested range.
-func QueryPodDiskReadOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodDiskReadOpsQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
+// QueryWorkloadDiskReadOpsRange returns workload disk read operations rate over the requested range.
+func QueryWorkloadDiskReadOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadDiskReadOpsQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-// QueryPodDiskWriteOpsRange returns pod disk write operations rate over the requested range.
-func QueryPodDiskWriteOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildPodDiskWriteOpsQuery(opts.Namespace, opts.Pod, opts.Container, opts.RangeDuration)
+// QueryWorkloadDiskWriteOpsRange returns workload disk write operations rate over the requested range.
+func QueryWorkloadDiskWriteOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadDiskWriteOpsQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
