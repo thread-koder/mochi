@@ -6,8 +6,8 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-// MatrixToDataPoints flattens a Prometheus matrix into a single time-ordered slice.
-// Callers aggregate by timestamp later when multiple series represent one workload metric.
+// MatrixToDataPoints flattens a Prometheus matrix into a chronologically sorted slice.
+// Range queries use top-level sum(...) so the matrix should contain one series.
 func MatrixToDataPoints(matrix model.Matrix) []DataPoint {
 	totalSize := 0
 	for _, series := range matrix {
@@ -29,17 +29,5 @@ func MatrixToDataPoints(matrix model.Matrix) []DataPoint {
 		return dataPoints[i].Timestamp.Before(dataPoints[j].Timestamp)
 	})
 
-	return dataPoints
-}
-
-// VectorToDataPoints converts an instant vector into DataPoint values.
-func VectorToDataPoints(vector model.Vector) []DataPoint {
-	dataPoints := make([]DataPoint, 0, len(vector))
-	for _, sample := range vector {
-		dataPoints = append(dataPoints, DataPoint{
-			Value:     float64(sample.Value),
-			Timestamp: sample.Timestamp.Time(),
-		})
-	}
 	return dataPoints
 }

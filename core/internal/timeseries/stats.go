@@ -55,15 +55,6 @@ func CalculateMean(values []float64) float64 {
 	return sum / float64(len(values))
 }
 
-// ExtractValues copies only the numeric values from data points.
-func ExtractValues(dataPoints []DataPoint) []float64 {
-	values := make([]float64, len(dataPoints))
-	for i, dp := range dataPoints {
-		values[i] = dp.Value
-	}
-	return values
-}
-
 // CalculateStats calculates a full summary (central tendency, spread, and percentiles).
 func CalculateStats(dataPoints []DataPoint) (StatsResult, error) {
 	if len(dataPoints) == 0 {
