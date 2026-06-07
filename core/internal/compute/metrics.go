@@ -76,7 +76,7 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryWorkloadCPUThrottling(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryWorkloadCPUThrottling(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU throttling metrics: %w", err)
 		}
@@ -85,7 +85,7 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryWorkloadCPUPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryWorkloadCPUPressure(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU pressure metrics: %w", err)
 		}
@@ -112,7 +112,7 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryWorkloadMemoryPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryWorkloadMemoryPressure(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query memory pressure metrics: %w", err)
 		}
@@ -192,7 +192,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryWorkloadCPUThrottling(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryWorkloadCPUThrottling(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU throttling metrics: %w", err)
 		}
@@ -201,7 +201,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryWorkloadCPUPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryWorkloadCPUPressure(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU pressure metrics: %w", err)
 		}
@@ -228,7 +228,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryWorkloadMemoryPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryWorkloadMemoryPressure(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query memory pressure metrics: %w", err)
 		}
@@ -316,7 +316,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryWorkloadCPUThrottling(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryWorkloadCPUThrottling(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU throttling metrics: %w", err)
 		}
@@ -325,7 +325,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryWorkloadCPUPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryWorkloadCPUPressure(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU pressure metrics: %w", err)
 		}
@@ -352,7 +352,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryWorkloadMemoryPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryWorkloadMemoryPressure(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query memory pressure metrics: %w", err)
 		}
@@ -431,7 +431,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryNamespaceCPUThrottling(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryNamespaceCPUThrottling(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU throttling metrics: %w", err)
 		}
@@ -440,7 +440,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryNamespaceCPUPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryNamespaceCPUPressure(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU pressure metrics: %w", err)
 		}
@@ -467,7 +467,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		value, _, err := prometheus.QueryNamespaceMemoryPressure(gctx, opts.TimeRange, opts.RangeStep, queryOpts)
+		value, _, err := prometheus.QueryNamespaceMemoryPressure(gctx, opts.TimeRange, opts.stabilitySubqueryStep(), queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query memory pressure metrics: %w", err)
 		}
