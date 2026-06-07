@@ -20,7 +20,6 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
 	timeRangeStr := c.Query("timeRange")
-	maxLagStr := c.Query("maxLag")
 
 	if !common.ValidateWorkloadType(c, workloadType) {
 		return
@@ -43,16 +42,6 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 			return
 		}
 		opts.SetTimeRange(timeRange)
-	}
-
-	if maxLagStr != "" {
-		maxLag, err := common.ParseTimeRange(maxLagStr)
-		if err != nil {
-			c.Error(err)
-			common.WriteValidationError(c, "invalid_max_lag", "Invalid maxLag query parameter. Use values like 30m, 2h, or 1d.")
-			return
-		}
-		opts.MaxLag = maxLag
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)

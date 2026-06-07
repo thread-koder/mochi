@@ -33,29 +33,19 @@ func DefaultCorrelationOptions() CorrelationOptions {
 	return opts
 }
 
-// SetTimeRange stores timeRange and sets RangeStep so each range query stays near a safe
-// point count for Prometheus (targets roughly 11k samples or fewer per series according to Prometheus limits).
+// SetTimeRange stores timeRange, sets RangeStep from tiered resolution rules, and syncs lag settings.
 func (opts *CorrelationOptions) SetTimeRange(timeRange time.Duration) {
 	opts.TimeRange = timeRange
-	const maxPoints = 11000
+	opts.RangeStep = timeseries.RangeStepForTimeRange(timeRange)
+	opts.syncLagSettings()
+}
 
-	totalMinutes := timeRange.Minutes()
-	minStepMinutes := totalMinutes / maxPoints
-
-	if minStepMinutes <= 1 {
-		opts.RangeStep = 1 * time.Minute
-	} else if minStepMinutes <= 5 {
-		opts.RangeStep = 5 * time.Minute
-	} else if minStepMinutes <= 15 {
-		opts.RangeStep = 15 * time.Minute
-	} else if minStepMinutes <= 30 {
-		opts.RangeStep = 30 * time.Minute
-	} else if minStepMinutes <= 60 {
-		opts.RangeStep = 1 * time.Hour
-	} else if minStepMinutes <= 240 {
-		opts.RangeStep = 4 * time.Hour
-	} else {
-		opts.RangeStep = 6 * time.Hour
+// syncLagSettings aligns lag search resolution with RangeStep so cross-correlation
+// does not probe sub-step offsets that the sampled data cannot support.
+func (opts *CorrelationOptions) syncLagSettings() {
+	opts.LagStep = max(opts.LagStep, opts.RangeStep)
+	if opts.MaxLag > 0 {
+		opts.MaxLag = max(opts.MaxLag, opts.LagStep)
 	}
 }
 

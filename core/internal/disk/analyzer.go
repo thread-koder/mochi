@@ -10,6 +10,7 @@ import (
 	"github.com/thread_koder/mochi/core/internal/analyzer"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
+	"github.com/thread_koder/mochi/core/internal/timeseries"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -33,30 +34,10 @@ func DefaultAnalysisOptions() AnalysisOptions {
 	return opts
 }
 
-// SetTimeRange stores timeRange and sets RangeStep so each range query stays near
-// a safe point count for Prometheus (targets roughly 11k samples or fewer per series).
+// SetTimeRange stores timeRange and sets RangeStep from tiered resolution rules.
 func (opts *AnalysisOptions) SetTimeRange(timeRange time.Duration) {
 	opts.TimeRange = timeRange
-	const maxPoints = 11000
-
-	totalMinutes := timeRange.Minutes()
-	minStepMinutes := totalMinutes / maxPoints
-
-	if minStepMinutes <= 1 {
-		opts.RangeStep = 1 * time.Minute
-	} else if minStepMinutes <= 5 {
-		opts.RangeStep = 5 * time.Minute
-	} else if minStepMinutes <= 15 {
-		opts.RangeStep = 15 * time.Minute
-	} else if minStepMinutes <= 30 {
-		opts.RangeStep = 30 * time.Minute
-	} else if minStepMinutes <= 60 {
-		opts.RangeStep = 1 * time.Hour
-	} else if minStepMinutes <= 240 {
-		opts.RangeStep = 4 * time.Hour
-	} else {
-		opts.RangeStep = 6 * time.Hour
-	}
+	opts.RangeStep = timeseries.RangeStepForTimeRange(timeRange)
 }
 
 // Validate returns an error if TimeRange or RangeStep are not positive.
