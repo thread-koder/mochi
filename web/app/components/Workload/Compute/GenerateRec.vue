@@ -13,14 +13,14 @@
         </label>
         <div class="grid grid-cols-1 gap-3">
           <button
-            v-for="mode in modes"
+            v-for="mode in RECOMMENDATION_MODE_OPTIONS"
             :key="mode.value"
             class="flex items-start gap-4 p-4 rounded-lg border-2 transition-all text-left
              hover:bg-primary/5 cursor-pointer"
             :class="selectedMode === mode.value
               ? 'border-primary-light bg-primary/10'
               : 'border-primary/20 bg-surface-elevated'"
-            @click="selectedMode = mode.value"
+            @click="selectedMode = mode.value as RecommendationMode"
           >
             <div
               class="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center
@@ -116,6 +116,7 @@
 
 <script setup lang="ts">
 import type { FetchError } from 'ofetch'
+import { RECOMMENDATION_MODE_OPTIONS } from '#shared/constants/compute/recommendations'
 import type { Recommendation, RecommendationMode } from '#shared/types/compute'
 
 const props = defineProps<{
@@ -130,27 +131,6 @@ const emit = defineEmits<{
 }>()
 
 const isOpen = defineModel<boolean>({ required: true })
-
-const modes = [
-  {
-    value: 'cost_optimized',
-    label: 'Cost Optimized',
-    icon: 'lucide:dollar-sign',
-    description: 'Maximum cost savings, accept throttling risk',
-  },
-  {
-    value: 'burstable',
-    label: 'Burstable',
-    icon: 'lucide:activity',
-    description: 'Balance performance, reliability, and efficiency',
-  },
-  {
-    value: 'guaranteed',
-    label: 'Guaranteed',
-    icon: 'lucide:circle-check',
-    description: 'Best performance, no throttling risk',
-  },
-] as const
 
 const { parseError } = useApiError()
 

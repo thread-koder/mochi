@@ -5,10 +5,30 @@ export const RECOMMENDATION_STATUS_OPTIONS: { value: string, label: string }[] =
   { value: 'superseded', label: 'Superseded' },
 ]
 
-export const RECOMMENDATION_MODE_OPTIONS: { value: string, label: string }[] = [
-  { value: 'cost_optimized', label: 'Cost Optimized' },
-  { value: 'burstable', label: 'Burstable' },
-  { value: 'guaranteed', label: 'Guaranteed' },
+export const RECOMMENDATION_MODE_OPTIONS: {
+  value: string
+  label: string
+  description: string
+  icon: string
+}[] = [
+  {
+    value: 'cost_optimized',
+    label: 'Cost Optimized',
+    description: 'Aggressive rightsizing from P95 usage, with larger allowed cuts.',
+    icon: 'lucide:dollar-sign',
+  },
+  {
+    value: 'burstable',
+    label: 'Burstable',
+    description: 'P95-based sizing with burst headroom (limit > request). Recommended default.',
+    icon: 'lucide:activity',
+  },
+  {
+    value: 'guaranteed',
+    label: 'Guaranteed',
+    description: 'Peak-based sizing with request equal to limit (Guaranteed QoS).',
+    icon: 'lucide:circle-check',
+  },
 ]
 
 export const recommendationStatusLabel = (status: string): string =>
