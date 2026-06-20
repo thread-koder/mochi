@@ -156,8 +156,8 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 
 	maxDataPoints := 0
 	for _, pair := range metricPairs {
-		dataA := getMetricData(metrics, pair.MetricA)
-		dataB := getMetricData(metrics, pair.MetricB)
+		dataA := metricData(metrics, pair.MetricA)
+		dataB := metricData(metrics, pair.MetricB)
 
 		pairCorr := PairCorrelation{
 			Pair:          pair,
@@ -200,8 +200,8 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 	}, nil
 }
 
-// getMetricData returns the series for a given metric name.
-func getMetricData(metrics correlationMetrics, name string) []timeseries.DataPoint {
+// metricData returns the series for a given metric name.
+func metricData(metrics correlationMetrics, name string) []timeseries.DataPoint {
 	switch name {
 	case "cpu":
 		return metrics.CPU
