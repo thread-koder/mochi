@@ -15,7 +15,7 @@ import (
 
 // setupRoutes registers all public HTTP routes.
 func setupRoutes(router *gin.Engine) {
-	cacheTTL := redis.GetDefaultTTL(&config.AppConfig.Redis)
+	cacheTTL := redis.CacheTTL(&config.AppConfig.Redis)
 
 	router.GET("/health", handlers.Health)
 	router.GET("/health/database", handlers.DatabaseHealth)

@@ -83,7 +83,7 @@ func Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// GetDefaultTTL returns the configured cache TTL in seconds.
-func GetDefaultTTL(cfg *config.RedisConfig) time.Duration {
+// CacheTTL returns the configured cache TTL in seconds.
+func CacheTTL(cfg *config.RedisConfig) time.Duration {
 	return time.Duration(cfg.CacheTTL) * time.Second
 }
