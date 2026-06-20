@@ -60,7 +60,7 @@ const (
 )
 
 // ApplyRecommendation patches Deployment, StatefulSet, or DaemonSet pod templates with recommended
-// requests/limits via server-side apply. Standalone Pods return an error because their spec is immutable.
+// requests/limits via server-side apply. Pods return an error because their spec is immutable.
 func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendation) error {
 	log := logger.WithComponent("compute")
 	log.Info().
@@ -200,7 +200,7 @@ func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, 
 }
 
 func applyToPod() error {
-	return newApplyNotSupported("Pod", "standalone pods are immutable: apply via the owning Deployment, StatefulSet, or DaemonSet")
+	return newApplyNotSupported("Pod", "pods are immutable: apply manually or via the owning Deployment, StatefulSet, or DaemonSet")
 }
 
 func getMochiAnnotations(rec *database.ComputeRecommendation) map[string]string {

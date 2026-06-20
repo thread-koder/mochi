@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/thread_koder/mochi/core/internal/database"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -336,15 +337,21 @@ func mergeContainerRecommendation(existing, incoming *ContainerRecommendation) {
 	existing.Memory.LimitChangePercent = calculateChangePercentFromStrings(existing.Memory.CurrentLimit, existing.Memory.RecommendedLimit)
 }
 
-// ComputeRecommendationToDB maps an API Recommendation to a database row (JSON payload, pending status).
-func ComputeRecommendationToDB(rec Recommendation) (*database.ComputeRecommendation, error) {
+// NewComputeRecommendationRecord returns a compute recommendation record with a new UUIDv7.
+func NewComputeRecommendationRecord(rec Recommendation) (*database.ComputeRecommendation, error) {
 	recommendationsJSON, err := json.Marshal(rec.Recommendations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal recommendations: %w", err)
 	}
 
+	id, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate recommendation id: %w", err)
+	}
+
 	now := time.Now()
 	return &database.ComputeRecommendation{
+		ID:                 id,
 		WorkloadType:       rec.WorkloadType,
 		WorkloadName:       rec.WorkloadName,
 		Namespace:          rec.Namespace,

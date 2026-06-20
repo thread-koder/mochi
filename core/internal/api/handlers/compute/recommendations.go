@@ -234,10 +234,10 @@ func ApplyRecommendation(c *gin.Context) {
 
 	var recommendation *database.ComputeRecommendation
 	var id uuid.UUID
+	var err error
 
 	idStr := c.Query("id")
 	if idStr != "" {
-		var err error
 		id, err = parseUUID(idStr)
 		if err != nil {
 			c.Error(err)
@@ -257,21 +257,21 @@ func ApplyRecommendation(c *gin.Context) {
 		}
 
 		if recommendation.Status == "applied" {
-			err := fmt.Errorf("recommendation %s was already applied", id)
+			err = fmt.Errorf("recommendation %s is already applied", id)
 			c.Error(err)
 			common.WriteValidationError(c, "recommendation_already_applied", "Recommendation already applied.")
 			return
 		}
 	} else {
 		var bodyRec compute.Recommendation
-		if err := c.ShouldBindJSON(&bodyRec); err != nil {
+		if err = c.ShouldBindJSON(&bodyRec); err != nil {
 			c.Error(err)
 			common.WriteValidationError(c, "invalid_request_body", "Request body is invalid.")
 			return
 		}
 
 		if bodyRec.WorkloadType == "" || bodyRec.WorkloadName == "" || bodyRec.Namespace == "" || bodyRec.AnalysisTimeRange == "" || bodyRec.RecommendationMode == "" {
-			err := fmt.Errorf("workload_type, workload_name, namespace, analysis_time_range, and recommendation_mode are required")
+			err = fmt.Errorf("workload_type, workload_name, namespace, analysis_time_range, and recommendation_mode are required")
 			c.Error(err)
 			common.WriteValidationError(c, "missing_required_fields", "workload_type, workload_name, namespace, analysis_time_range, and recommendation_mode are required.")
 			return
@@ -282,48 +282,43 @@ func ApplyRecommendation(c *gin.Context) {
 		}
 
 		if len(bodyRec.Recommendations) == 0 {
-			err := fmt.Errorf("recommendations field is required")
+			err = fmt.Errorf("recommendations field is required")
 			c.Error(err)
 			common.WriteValidationError(c, "missing_recommendations", "recommendations is required and cannot be empty.")
 			return
 		}
 
-		dbRec, err := compute.ComputeRecommendationToDB(bodyRec)
+		recommendation, err = compute.NewComputeRecommendationRecord(bodyRec)
 		if err != nil {
 			c.Error(err)
-			common.WriteInternalError(c, "Failed to convert recommendation.")
-			return
-		}
-
-		recommendation = dbRec
-		if err := database.InsertComputeRecommendation(ctx, recommendation); err != nil {
-			c.Error(err)
-			common.WriteInternalError(c, "Failed to save recommendation.")
+			common.WriteInternalError(c, "Failed to create recommendation record.")
 			return
 		}
 		id = recommendation.ID
 	}
 
 	if err := compute.ApplyRecommendation(ctx, recommendation); err != nil {
-		if idStr == "" {
-			if delErr := database.DeleteComputeRecommendation(ctx, id); delErr != nil {
-				c.Error(delErr)
-			}
-		}
 		c.Error(err)
 		writeApplyRecommendationError(c, err)
 		return
 	}
 
-	if err := database.UpdateComputeRecommendationStatus(ctx, id, "applied"); err != nil {
+	if idStr == "" {
+		recommendation.Status = "applied"
+		if err := database.InsertComputeRecommendation(ctx, recommendation); err != nil {
+			c.Error(err)
+			common.WriteInternalError(c, "Failed to save recommendation record.")
+			return
+		}
+	} else if err := database.UpdateComputeRecommendationStatus(ctx, id, "applied"); err != nil {
 		c.Error(err)
-		common.WriteInternalError(c, "Failed to record recommendation as applied.")
+		common.WriteInternalError(c, "Failed to update recommendation status to applied.")
 		return
 	}
 
 	if err := database.MarkRecommendationsSuperseded(ctx, recommendation.WorkloadType, recommendation.WorkloadName, recommendation.Namespace, id); err != nil {
 		c.Error(err)
-		common.WriteInternalError(c, "Failed to update recommendation history.")
+		common.WriteInternalError(c, "Failed to mark superseded recommendations.")
 		return
 	}
 
@@ -341,7 +336,7 @@ func writeApplyRecommendationError(c *gin.Context, err error) {
 
 	if applyErr, ok := errors.AsType[*compute.ApplyNotSupportedError](err); ok {
 		if applyErr.WorkloadType == "Pod" {
-			common.WriteValidationError(c, "pod_apply_not_supported", "Standalone pods are immutable: apply via the owning Deployment, StatefulSet, or DaemonSet.")
+			common.WriteValidationError(c, "pod_apply_not_supported", "Pods are immutable and cannot be auto-updated. Update resources manually, or apply via the owning Deployment, StatefulSet, or DaemonSet.")
 			return
 		}
 		common.WriteValidationError(c, "workload_type_not_supported", "Workload type is not supported.")

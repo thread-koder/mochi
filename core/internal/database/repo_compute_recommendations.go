@@ -12,11 +12,16 @@ import (
 	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
-// InsertComputeRecommendation inserts a compute recommendation and sets its ID.
+// InsertComputeRecommendation inserts a compute recommendation.
 // AnalysisTimeRange is stored as an interval when the string parses as a duration, otherwise the column stays unset.
 func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation) error {
+	if rec.ID == uuid.Nil {
+		return fmt.Errorf("compute recommendation ID is required")
+	}
+
 	log := logger.WithComponent("database")
 	log.Debug().
+		Str("id", rec.ID.String()).
 		Str("workload_type", rec.WorkloadType).
 		Str("workload_name", rec.WorkloadName).
 		Str("namespace", rec.Namespace).
@@ -24,10 +29,9 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 
 	query := `
 		INSERT INTO compute_recommendations (
-			workload_type, workload_name, namespace, recommendation_mode,
+			id, workload_type, workload_name, namespace, recommendation_mode,
 			recommendations, status, analysis_time_range, created_at, updated_at, generated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		RETURNING id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
 
 	var analysisTimeRange *time.Duration
@@ -38,11 +42,11 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 		}
 	}
 
-	err := Pool.QueryRow(ctx, query,
-		rec.WorkloadType, rec.WorkloadName, rec.Namespace, rec.RecommendationMode,
+	_, err := Pool.Exec(ctx, query,
+		rec.ID, rec.WorkloadType, rec.WorkloadName, rec.Namespace, rec.RecommendationMode,
 		rec.Recommendations, rec.Status, analysisTimeRange,
 		rec.CreatedAt, rec.UpdatedAt, rec.GeneratedAt,
-	).Scan(&rec.ID)
+	)
 	if err != nil {
 		return fmt.Errorf("failed to insert compute recommendation: %w", err)
 	}
