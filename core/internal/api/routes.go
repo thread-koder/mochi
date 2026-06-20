@@ -32,19 +32,19 @@ func setupRoutes(router *gin.Engine) {
 
 		compute := v1.Group("/compute")
 		{
-			analysisGroup := compute.Group("")
-			analysisGroup.Use(middleware.CacheMiddleware(cacheTTL))
+			computeAnalysis := compute.Group("")
+			computeAnalysis.Use(middleware.CacheMiddleware(cacheTTL))
 			{
-				analysisGroup.GET("/analyze/namespaces/:namespace", computeHandlers.AnalyzeNamespace)
-				analysisGroup.GET("/analyze/workloads/:workloadType/:workloadName", computeHandlers.AnalyzeWorkload)
+				computeAnalysis.GET("/analyze/namespaces/:namespace", computeHandlers.AnalyzeNamespace)
+				computeAnalysis.GET("/analyze/workloads/:workloadType/:workloadName", computeHandlers.AnalyzeWorkload)
 			}
 
-			recommendationsGroup := compute.Group("")
-			recommendationsGroup.Use(middleware.CacheMiddleware(cacheTTL))
+			computeRecommendations := compute.Group("")
+			computeRecommendations.Use(middleware.CacheMiddleware(cacheTTL))
 			{
-				recommendationsGroup.GET("/recommendations", computeHandlers.GetRecommendations)
-				recommendationsGroup.GET("/recommendations/:id", computeHandlers.GetRecommendationByID)
-				recommendationsGroup.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestWorkloadRecommendation)
+				computeRecommendations.GET("/recommendations", computeHandlers.GetRecommendations)
+				computeRecommendations.GET("/recommendations/:id", computeHandlers.GetRecommendationByID)
+				computeRecommendations.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestWorkloadRecommendation)
 			}
 
 			compute.POST("/recommendations/generate/:workloadType/:workloadName", computeHandlers.GenerateRecommendations)
@@ -53,33 +53,30 @@ func setupRoutes(router *gin.Engine) {
 
 		network := v1.Group("/network")
 		{
-			networkAnalysisGroup := network.Group("")
-			networkAnalysisGroup.Use(middleware.CacheMiddleware(cacheTTL))
+			networkAnalysis := network.Group("")
+			networkAnalysis.Use(middleware.CacheMiddleware(cacheTTL))
 			{
-				networkAnalysisGroup.GET("/analyze/namespaces/:namespace", networkHandlers.AnalyzeNamespace)
-				networkAnalysisGroup.GET("/analyze/workloads/:workloadType/:workloadName", networkHandlers.AnalyzeWorkload)
+				networkAnalysis.GET("/analyze/namespaces/:namespace", networkHandlers.AnalyzeNamespace)
+				networkAnalysis.GET("/analyze/workloads/:workloadType/:workloadName", networkHandlers.AnalyzeWorkload)
 			}
 		}
 
-		diskGroup := v1.Group("/disk")
+		disk := v1.Group("/disk")
 		{
-			diskAnalysisGroup := diskGroup.Group("")
-			diskAnalysisGroup.Use(middleware.CacheMiddleware(cacheTTL))
+			diskAnalysis := disk.Group("")
+			diskAnalysis.Use(middleware.CacheMiddleware(cacheTTL))
 			{
-				diskAnalysisGroup.GET("/analyze/namespaces/:namespace", diskHandlers.AnalyzeNamespace)
-				diskAnalysisGroup.GET("/analyze/workloads/:workloadType/:workloadName", diskHandlers.AnalyzeWorkload)
+				diskAnalysis.GET("/analyze/namespaces/:namespace", diskHandlers.AnalyzeNamespace)
+				diskAnalysis.GET("/analyze/workloads/:workloadType/:workloadName", diskHandlers.AnalyzeWorkload)
 			}
 		}
 
 		// This group is used for analyses that are not specific
 		// to a single domain (cross-domain).
-		analysisGroup := v1.Group("/analysis")
+		analysis := v1.Group("/analysis")
+		analysis.Use(middleware.CacheMiddleware(cacheTTL))
 		{
-			correlationGroup := analysisGroup.Group("")
-			correlationGroup.Use(middleware.CacheMiddleware(cacheTTL))
-			{
-				correlationGroup.GET("/correlations/workloads/:workloadType/:workloadName", analysisHandlers.AnalyzeWorkloadCorrelations)
-			}
+			analysis.GET("/correlations/workloads/:workloadType/:workloadName", analysisHandlers.AnalyzeWorkloadCorrelations)
 		}
 	}
 }
