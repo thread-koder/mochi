@@ -62,6 +62,7 @@ interface CPUUtilization {
   stats: StatsResult
   trend: TrendResult
   anomalies: AnomalyResult
+  sample_size: number
 }
 
 interface MemoryUtilization {
@@ -69,6 +70,7 @@ interface MemoryUtilization {
   stats: StatsResult
   trend: TrendResult
   anomalies: AnomalyResult
+  sample_size: number
 }
 
 interface UtilizationResult {

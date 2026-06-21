@@ -33,7 +33,8 @@ type ContainerRecommendation struct {
 	Confidence    float64              `json:"confidence"`
 }
 
-// CPURecommendation holds current and recommended CPU request/limit strings and percent deltas (one decimal).
+// CPURecommendation holds current and recommended CPU request/limit strings, percent deltas (one decimal),
+// and per-resource confidence for pod merge.
 type CPURecommendation struct {
 	CurrentRequest       *string  `json:"current_request"`
 	RecommendedRequest   *string  `json:"recommended_request"`
@@ -41,9 +42,11 @@ type CPURecommendation struct {
 	CurrentLimit         *string  `json:"current_limit"`
 	RecommendedLimit     *string  `json:"recommended_limit"`
 	LimitChangePercent   *float64 `json:"limit_change_percent"`
+	Confidence           float64  `json:"-"`
 }
 
-// MemoryRecommendation holds current and recommended memory request/limit strings and percent deltas (one decimal).
+// MemoryRecommendation holds current and recommended memory request/limit strings, percent deltas (one decimal),
+// and per-resource confidence for pod merge.
 type MemoryRecommendation struct {
 	CurrentRequest       *string  `json:"current_request"`
 	RecommendedRequest   *string  `json:"recommended_request"`
@@ -51,6 +54,7 @@ type MemoryRecommendation struct {
 	CurrentLimit         *string  `json:"current_limit"`
 	RecommendedLimit     *string  `json:"recommended_limit"`
 	LimitChangePercent   *float64 `json:"limit_change_percent"`
+	Confidence           float64  `json:"-"`
 }
 
 // GenerateContainerRecommendation turns analysis output into a recommendation, applies mode rules
@@ -130,8 +134,8 @@ func GenerateContainerRecommendation(
 	}
 
 	overallConfidence := calculateOverallConfidence(
-		containerAnalysis.Provisioning.CPU,
-		containerAnalysis.Provisioning.Memory,
+		containerAnalysis.Provisioning.CPU.Confidence,
+		containerAnalysis.Provisioning.Memory.Confidence,
 		hasCPURecommendation,
 		hasMemoryRecommendation,
 	)
@@ -184,6 +188,7 @@ func GenerateContainerRecommendation(
 			CurrentLimit:         container.CPULimit,
 			RecommendedLimit:     cpuLimitRec,
 			LimitChangePercent:   cpuLimitChangePercent,
+			Confidence:           containerAnalysis.Provisioning.CPU.Confidence,
 		},
 		Memory: MemoryRecommendation{
 			CurrentRequest:       container.MemoryRequest,
@@ -192,6 +197,7 @@ func GenerateContainerRecommendation(
 			CurrentLimit:         container.MemoryLimit,
 			RecommendedLimit:     memoryLimitRec,
 			LimitChangePercent:   memoryLimitChangePercent,
+			Confidence:           containerAnalysis.Provisioning.Memory.Confidence,
 		},
 		Confidence: overallConfidence,
 	}
@@ -201,8 +207,8 @@ func GenerateContainerRecommendation(
 
 // GenerateWorkloadRecommendations analyzes every pod in the workload, generates a container recommendation
 // per pod instance, then merges by container name: for each resource, the larger recommended quantity wins
-// (so replicas that need more headroom drive the suggestion). Confidence is the max across instances,
-// change percents are recomputed after merging.
+// (so replicas that need more headroom drive the suggestion). Confidence follows the replica that drove
+// each resource quantity, change percents are recomputed after merging.
 func GenerateWorkloadRecommendations(
 	ctx context.Context,
 	workloadType string,
@@ -322,14 +328,26 @@ func recommendationsForPod(
 }
 
 func mergeContainerRecommendation(existing, incoming *ContainerRecommendation) {
-	updateMaxQuantity(&existing.CPU.RecommendedRequest, incoming.CPU.RecommendedRequest)
-	updateMaxQuantity(&existing.CPU.RecommendedLimit, incoming.CPU.RecommendedLimit)
-	updateMaxQuantity(&existing.Memory.RecommendedRequest, incoming.Memory.RecommendedRequest)
-	updateMaxQuantity(&existing.Memory.RecommendedLimit, incoming.Memory.RecommendedLimit)
-
-	if incoming.Confidence > existing.Confidence {
-		existing.Confidence = incoming.Confidence
+	cpuIncomingWon := updateMaxQuantity(&existing.CPU.RecommendedRequest, incoming.CPU.RecommendedRequest) ||
+		updateMaxQuantity(&existing.CPU.RecommendedLimit, incoming.CPU.RecommendedLimit)
+	if cpuIncomingWon {
+		existing.CPU.Confidence = incoming.CPU.Confidence
 	}
+
+	memoryIncomingWon := updateMaxQuantity(&existing.Memory.RecommendedRequest, incoming.Memory.RecommendedRequest) ||
+		updateMaxQuantity(&existing.Memory.RecommendedLimit, incoming.Memory.RecommendedLimit)
+	if memoryIncomingWon {
+		existing.Memory.Confidence = incoming.Memory.Confidence
+	}
+
+	hasCPURecommendation := existing.CPU.RecommendedRequest != nil || existing.CPU.RecommendedLimit != nil
+	hasMemoryRecommendation := existing.Memory.RecommendedRequest != nil || existing.Memory.RecommendedLimit != nil
+	existing.Confidence = calculateOverallConfidence(
+		existing.CPU.Confidence,
+		existing.Memory.Confidence,
+		hasCPURecommendation,
+		hasMemoryRecommendation,
+	)
 
 	existing.CPU.RequestChangePercent = calculateChangePercentFromStrings(existing.CPU.CurrentRequest, existing.CPU.RecommendedRequest)
 	existing.CPU.LimitChangePercent = calculateChangePercentFromStrings(existing.CPU.CurrentLimit, existing.CPU.RecommendedLimit)
@@ -366,19 +384,19 @@ func NewComputeRecommendationRecord(rec Recommendation) (*database.ComputeRecomm
 }
 
 func calculateOverallConfidence(
-	cpuProvisioning CPUProvisioning,
-	memoryProvisioning MemoryProvisioning,
+	cpuConfidence float64,
+	memoryConfidence float64,
 	hasCPURec bool,
 	hasMemoryRec bool,
 ) float64 {
 	if hasCPURec && hasMemoryRec {
-		return max(0.0, min(1.0, (cpuProvisioning.Confidence+memoryProvisioning.Confidence)/2))
+		return max(0.0, min(1.0, (cpuConfidence+memoryConfidence)/2))
 	}
 	if hasCPURec {
-		return max(0.0, min(1.0, cpuProvisioning.Confidence))
+		return max(0.0, min(1.0, cpuConfidence))
 	}
 	if hasMemoryRec {
-		return max(0.0, min(1.0, memoryProvisioning.Confidence))
+		return max(0.0, min(1.0, memoryConfidence))
 	}
 	return 0
 }
@@ -469,24 +487,26 @@ func formatMemoryQuantity(bytes int64) string {
 	}
 }
 
-func updateMaxQuantity(target **string, source *string) {
+func updateMaxQuantity(target **string, source *string) bool {
 	if source == nil {
-		return
+		return false
 	}
 	if *target == nil {
 		*target = source
-		return
+		return true
 	}
 
 	q1, err1 := resource.ParseQuantity(**target)
 	q2, err2 := resource.ParseQuantity(*source)
 	if err1 != nil || err2 != nil {
-		return
+		return false
 	}
 
 	if q2.Cmp(q1) > 0 {
 		*target = source
+		return true
 	}
+	return false
 }
 
 func calculateChangePercentFromStrings(currentStr, recommendedStr *string) *float64 {
