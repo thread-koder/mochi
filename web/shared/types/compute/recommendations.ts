@@ -22,7 +22,7 @@ interface ContainerRecommendation {
   container_name: string
   cpu: CPURecommendation
   memory: MemoryRecommendation
-  confidence_score: number
+  confidence: number
 }
 
 interface Recommendation {

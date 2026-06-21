@@ -240,7 +240,7 @@ watch(() => props.filters, () => {
 const averageConfidence = (record: RecommendationRecord): number => {
   const recs = record.recommendations ?? []
   if (recs.length === 0) return 0
-  const sum = recs.reduce((acc, r) => acc + (r.confidence_score ?? 0), 0)
+  const sum = recs.reduce((acc, r) => acc + (r.confidence ?? 0), 0)
   return sum / recs.length
 }
 

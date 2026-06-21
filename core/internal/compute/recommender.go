@@ -27,10 +27,10 @@ type Recommendation struct {
 
 // ContainerRecommendation is one container’s suggested CPU and memory requests/limits plus a confidence score.
 type ContainerRecommendation struct {
-	ContainerName   string               `json:"container_name"`
-	CPU             CPURecommendation    `json:"cpu"`
-	Memory          MemoryRecommendation `json:"memory"`
-	ConfidenceScore float64              `json:"confidence_score"`
+	ContainerName string               `json:"container_name"`
+	CPU           CPURecommendation    `json:"cpu"`
+	Memory        MemoryRecommendation `json:"memory"`
+	Confidence    float64              `json:"confidence"`
 }
 
 // CPURecommendation holds current and recommended CPU request/limit strings and percent deltas (one decimal).
@@ -193,7 +193,7 @@ func GenerateContainerRecommendation(
 			RecommendedLimit:     memoryLimitRec,
 			LimitChangePercent:   memoryLimitChangePercent,
 		},
-		ConfidenceScore: overallConfidence,
+		Confidence: overallConfidence,
 	}
 
 	return recommendation, nil
@@ -327,8 +327,8 @@ func mergeContainerRecommendation(existing, incoming *ContainerRecommendation) {
 	updateMaxQuantity(&existing.Memory.RecommendedRequest, incoming.Memory.RecommendedRequest)
 	updateMaxQuantity(&existing.Memory.RecommendedLimit, incoming.Memory.RecommendedLimit)
 
-	if incoming.ConfidenceScore > existing.ConfidenceScore {
-		existing.ConfidenceScore = incoming.ConfidenceScore
+	if incoming.Confidence > existing.Confidence {
+		existing.Confidence = incoming.Confidence
 	}
 
 	existing.CPU.RequestChangePercent = calculateChangePercentFromStrings(existing.CPU.CurrentRequest, existing.CPU.RecommendedRequest)

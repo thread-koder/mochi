@@ -158,9 +158,9 @@
               <td class="py-4 px-4 text-center">
                 <span
                   class="px-2 py-1 rounded-full text-sm font-medium border"
-                  :class="scoreBadgeClass(rec.confidence_score)"
+                  :class="scoreBadgeClass(rec.confidence)"
                 >
-                  {{ formatPercentage(rec.confidence_score) }}
+                  {{ formatPercentage(rec.confidence) }}
                 </span>
               </td>
             </tr>
