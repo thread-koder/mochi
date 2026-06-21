@@ -1,5 +1,9 @@
 package compute
 
+import (
+	"github.com/thread_koder/mochi/core/internal/timeseries"
+)
+
 // ResourceSpecs is parsed Kubernetes CPU (cores) and memory (bytes) requests and limits.
 type ResourceSpecs struct {
 	CPURequest    *float64 `json:"cpu_request"`
@@ -9,7 +13,7 @@ type ResourceSpecs struct {
 }
 
 // CPUProvisioning compares observed usage to requests and limits, flags over/under provisioning,
-// and scores efficiency and confidence (coefficient-of-variation based).
+// scores efficiency, and confidence (predictability and data sufficiency).
 type CPUProvisioning struct {
 	RequestUtilization float64  `json:"request_utilization"`
 	LimitUtilization   float64  `json:"limit_utilization"`
@@ -22,7 +26,7 @@ type CPUProvisioning struct {
 }
 
 // MemoryProvisioning compares observed usage to requests and limits, flags over/under provisioning,
-// and scores efficiency and confidence (coefficient-of-variation based).
+// scores efficiency, and confidence (predictability and data sufficiency).
 type MemoryProvisioning struct {
 	RequestUtilization float64  `json:"request_utilization"`
 	LimitUtilization   float64  `json:"limit_utilization"`
@@ -57,26 +61,26 @@ const (
 
 	BurstEffectiveMinFloor = 0.05
 	BurstEffectiveMinCeil  = 0.4
+
+	// Confidence burst softener: partial predictability credit when usage is bursty but well observed.
+	confidenceBurstThreshold  = 2.0
+	confidenceBurstFloor      = 0.6
+	confidenceDataFactorFloor = 0.5
 )
 
 // AnalyzeCPUProvisioning scores request/limit fit using P95 vs request, peak vs limit, and stability
 // signals. Missing request or limit is treated as under-provisioned, tiny requests at the cluster floor
 // skip "over provisioned" flags so we do not nag on minimum CPU.
-func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, stability StabilityResult) CPUProvisioning {
+func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, stability StabilityResult, minSamples int) CPUProvisioning {
 	result := CPUProvisioning{
 		IsOverProvisioned:  false,
 		IsUnderProvisioned: false,
 		Efficiency:         1.0,
-		Confidence:         0.0,
-	}
-
-	if utilization.Stats.Mean == 0 {
-		result.Confidence = 0.0
-	} else if utilization.Stats.StdDev > 0 {
-		cv := utilization.Stats.StdDev / utilization.Stats.Mean
-		result.Confidence = min(1.0, 1.0/(1.0+cv))
-	} else {
-		result.Confidence = 1.0
+		Confidence: computeResourceConfidence(
+			utilization.Stats,
+			utilization.SampleSize,
+			minSamples,
+		),
 	}
 
 	hasRequest := specs.CPURequest != nil && *specs.CPURequest > 0
@@ -169,21 +173,16 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 
 // AnalyzeMemoryProvisioning mirrors AnalyzeCPUProvisioning for memory, using OptimalUtilizationMin
 // as the low bound (CPU uses a burst-aware dynamic min) and memory stability signals (OOM, failcnt, PSI).
-func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilization, stability StabilityResult) MemoryProvisioning {
+func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilization, stability StabilityResult, minSamples int) MemoryProvisioning {
 	result := MemoryProvisioning{
 		IsOverProvisioned:  false,
 		IsUnderProvisioned: false,
 		Efficiency:         1.0,
-		Confidence:         0.0,
-	}
-
-	if utilization.Stats.Mean == 0 {
-		result.Confidence = 0.0
-	} else if utilization.Stats.StdDev > 0 {
-		cv := utilization.Stats.StdDev / utilization.Stats.Mean
-		result.Confidence = min(1.0, 1.0/(1.0+cv))
-	} else {
-		result.Confidence = 1.0
+		Confidence: computeResourceConfidence(
+			utilization.Stats,
+			utilization.SampleSize,
+			minSamples,
+		),
 	}
 
 	hasRequest := specs.MemoryRequest != nil && *specs.MemoryRequest > 0
@@ -275,10 +274,10 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 
 // AnalyzeProvisioning runs CPU and memory provisioning and combines efficiency as 30% CPU / 70% memory
 // so memory pressure weighs more in a single headline score.
-func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, stability StabilityResult) ProvisioningResult {
+func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, stability StabilityResult, minSamples int) ProvisioningResult {
 	result := ProvisioningResult{
-		CPU:    AnalyzeCPUProvisioning(specs, utilization.CPU, stability),
-		Memory: AnalyzeMemoryProvisioning(specs, utilization.Memory, stability),
+		CPU:    AnalyzeCPUProvisioning(specs, utilization.CPU, stability, minSamples),
+		Memory: AnalyzeMemoryProvisioning(specs, utilization.Memory, stability, minSamples),
 	}
 
 	const cpuWeight = 0.3
@@ -288,15 +287,57 @@ func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, sta
 	return result
 }
 
+// computeResourceConfidence scores measurement trust from usage predictability and data sufficiency.
+// Bursty workloads with enough samples receive a predictability floor so cron-style patterns are not
+// over-penalized by coefficient of variation alone.
+func computeResourceConfidence(stats timeseries.StatsResult, sampleSize, minSamples int) float64 {
+	if stats.Mean == 0 {
+		return 0
+	}
+
+	var predictability float64
+	if stats.StdDev > 0 {
+		cv := stats.StdDev / stats.Mean
+		predictability = min(1.0, 1.0/(1.0+cv))
+	} else {
+		predictability = 1.0
+	}
+
+	if minSamples > 0 && sampleSize >= minSamples {
+		score := burstScore(stats.Mean, stats.Percentile.P95, stats.Max)
+		if score > confidenceBurstThreshold {
+			predictability = max(predictability, confidenceBurstFloor)
+		}
+	}
+
+	if minSamples <= 0 {
+		return max(0.0, min(1.0, predictability))
+	}
+
+	dataFactor := min(1.0, float64(sampleSize)/float64(minSamples))
+	if dataFactor < confidenceDataFactorFloor {
+		return 0
+	}
+
+	return max(0.0, min(1.0, predictability*dataFactor))
+}
+
+// burstScore measures how much P95 and peak exceed mean usage.
+func burstScore(mean, p95, peak float64) float64 {
+	if mean <= 0 {
+		return 0
+	}
+	return (p95/mean + peak/mean) / 2.0
+}
+
 // effectiveMinFromBurstiness lowers the minimum "healthy" request utilization when mean, P95, and peak
 // show burstiness, so bursty CPU workloads are not marked over-provisioned for sitting near idle between spikes.
 func effectiveMinFromBurstiness(mean, p95, peak float64) float64 {
 	if mean <= 0 {
 		return BurstEffectiveMinCeil
 	}
-	burstScore := (p95/mean + peak/mean) / 2.0
-	burstScore = max(burstScore, 1.0)
-	effectiveMin := BurstEffectiveMinCeil - (burstScore-1.0)*0.1
+	score := max(burstScore(mean, p95, peak), 1.0)
+	effectiveMin := BurstEffectiveMinCeil - (score-1.0)*0.1
 	effectiveMin = max(effectiveMin, BurstEffectiveMinFloor)
 	effectiveMin = min(effectiveMin, BurstEffectiveMinCeil)
 	return effectiveMin

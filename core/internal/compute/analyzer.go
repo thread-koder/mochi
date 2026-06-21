@@ -49,6 +49,13 @@ func (opts AnalysisOptions) stabilitySubqueryStep() time.Duration {
 	return max(opts.RangeStep, 5*time.Minute)
 }
 
+// MinSamplesForConfidence returns the minimum number of utilization samples required
+// for a confidence score to reflect sufficient observation of the analysis window.
+func (opts AnalysisOptions) MinSamplesForConfidence() int {
+	expected := int(opts.TimeRange / opts.RangeStep)
+	return max(30, expected/4)
+}
+
 // Validate returns an error if TimeRange or RangeStep are not positive.
 func (opts AnalysisOptions) Validate() error {
 	if opts.TimeRange <= 0 {
@@ -131,7 +138,7 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 		return ContainerAnalysis{}, fmt.Errorf("failed to parse container specs: %w", err)
 	}
 
-	provisioning := AnalyzeProvisioning(specs, utilization, stability)
+	provisioning := AnalyzeProvisioning(specs, utilization, stability, opts.MinSamplesForConfidence())
 
 	result := ContainerAnalysis{
 		ContainerName: container.Name,

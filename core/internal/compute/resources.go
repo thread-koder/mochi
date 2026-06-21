@@ -133,8 +133,8 @@ func (config RecommendationConfig) Validate() error {
 	return nil
 }
 
-// CalculateCPURequestRecommendation returns proposed CPU request cores, or nil when confidence is too low
-// (after the workload already has a request) or when the relative change is below a noise threshold.
+// CalculateCPURequestRecommendation returns proposed CPU request cores, or nil when
+// confidence is too low or when the relative change is below a noise threshold.
 // Cost-optimized mode uses a lighter stress floor when throttling and PSI are barely non-zero so we don't
 // suggest anymore reductions or increases.
 func CalculateCPURequestRecommendation(
@@ -144,7 +144,7 @@ func CalculateCPURequestRecommendation(
 	stability StabilityResult,
 	config RecommendationConfig,
 ) *float64 {
-	if !firstTime(currentRequest) && provisioning.Confidence < config.MinConfidenceThreshold {
+	if provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil
 	}
 
@@ -247,8 +247,9 @@ func CalculateCPURequestRecommendation(
 	return &recommendedCores
 }
 
-// CalculateCPULimitRecommendation returns proposed CPU limit from peak usage and from a request multiple. Limit margins skip
-// burst detection because the peak path already captures spikes.
+// CalculateCPULimitRecommendation returns proposed CPU limit from peak usage and from a request multiple, or nil
+// when confidence is too low. Limit margins skip burst detection because the peak path
+// already captures spikes.
 func CalculateCPULimitRecommendation(
 	currentLimit *float64,
 	utilization CPUUtilization,
@@ -258,7 +259,7 @@ func CalculateCPULimitRecommendation(
 	recommendedRequest *float64,
 	currentRequest *float64,
 ) *float64 {
-	if !firstTime(currentLimit) && provisioning.Confidence < config.MinConfidenceThreshold {
+	if provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil
 	}
 
@@ -353,7 +354,8 @@ func CalculateCPULimitRecommendation(
 }
 
 // CalculateMemoryRequestRecommendation mirrors the CPU request path in bytes, boosts the baseline when OOM
-// or allocation failures appear, and normalizes OOM/fail rates by analysisWindow for the stress multiplier.
+// or allocation failures appear, normalizes OOM/fail rates by analysisWindow for the stress multiplier,
+// and returns nil when confidence is too low.
 func CalculateMemoryRequestRecommendation(
 	currentRequest *float64,
 	utilization MemoryUtilization,
@@ -362,7 +364,7 @@ func CalculateMemoryRequestRecommendation(
 	config RecommendationConfig,
 	analysisWindow time.Duration,
 ) *float64 {
-	if !firstTime(currentRequest) && provisioning.Confidence < config.MinConfidenceThreshold {
+	if provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil
 	}
 
@@ -467,7 +469,8 @@ func CalculateMemoryRequestRecommendation(
 	return &recommendedBytes
 }
 
-// CalculateMemoryLimitRecommendation is the memory version of CalculateCPULimitRecommendation.
+// CalculateMemoryLimitRecommendation is the memory version of CalculateCPULimitRecommendation and returns nil
+// when confidence is too low.
 func CalculateMemoryLimitRecommendation(
 	currentLimit *float64,
 	utilization MemoryUtilization,
@@ -478,7 +481,7 @@ func CalculateMemoryLimitRecommendation(
 	currentRequest *float64,
 	analysisWindow time.Duration,
 ) *float64 {
-	if !firstTime(currentLimit) && provisioning.Confidence < config.MinConfidenceThreshold {
+	if provisioning.Confidence < config.MinConfidenceThreshold {
 		return nil
 	}
 

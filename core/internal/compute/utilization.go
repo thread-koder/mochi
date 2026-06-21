@@ -14,18 +14,20 @@ type TimeSeries struct {
 
 // CPUUtilization summarizes CPU usage from a time series: latest value, distribution stats, trend, and anomalies.
 type CPUUtilization struct {
-	Current   float64                  `json:"current"`
-	Stats     timeseries.StatsResult   `json:"stats"`
-	Trend     timeseries.TrendResult   `json:"trend"`
-	Anomalies timeseries.AnomalyResult `json:"anomalies"`
+	Current    float64                  `json:"current"`
+	Stats      timeseries.StatsResult   `json:"stats"`
+	Trend      timeseries.TrendResult   `json:"trend"`
+	Anomalies  timeseries.AnomalyResult `json:"anomalies"`
+	SampleSize int                      `json:"sample_size"`
 }
 
 // MemoryUtilization summarizes memory usage (bytes) from a time series: latest value, stats, trend, and anomalies.
 type MemoryUtilization struct {
-	Current   float64                  `json:"current"`
-	Stats     timeseries.StatsResult   `json:"stats"`
-	Trend     timeseries.TrendResult   `json:"trend"`
-	Anomalies timeseries.AnomalyResult `json:"anomalies"`
+	Current    float64                  `json:"current"`
+	Stats      timeseries.StatsResult   `json:"stats"`
+	Trend      timeseries.TrendResult   `json:"trend"`
+	Anomalies  timeseries.AnomalyResult `json:"anomalies"`
+	SampleSize int                      `json:"sample_size"`
 }
 
 // UtilizationResult is CPU and memory utilization summaries for one scope (container, pod, workload, or namespace).
@@ -69,10 +71,11 @@ func AnalyzeCPUUtilization(cpuData []timeseries.DataPoint) (CPUUtilization, erro
 	}
 
 	return CPUUtilization{
-		Current:   current,
-		Stats:     stats,
-		Trend:     trend,
-		Anomalies: anomalies,
+		Current:    current,
+		Stats:      stats,
+		Trend:      trend,
+		Anomalies:  anomalies,
+		SampleSize: len(cpuData),
 	}, nil
 }
 
@@ -109,10 +112,11 @@ func AnalyzeMemoryUtilization(memoryData []timeseries.DataPoint) (MemoryUtilizat
 	}
 
 	return MemoryUtilization{
-		Current:   current,
-		Stats:     stats,
-		Trend:     trend,
-		Anomalies: anomalies,
+		Current:    current,
+		Stats:      stats,
+		Trend:      trend,
+		Anomalies:  anomalies,
+		SampleSize: len(memoryData),
 	}, nil
 }
 
