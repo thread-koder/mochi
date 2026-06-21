@@ -8,15 +8,6 @@ import (
 	"github.com/thread_koder/mochi/core/internal/timeseries"
 )
 
-// ResourceRecommendation is suggested CPU and memory quantities as Kubernetes strings plus a confidence score.
-type ResourceRecommendation struct {
-	CPURequest    *string `json:"cpu_request"`
-	CPULimit      *string `json:"cpu_limit"`
-	MemoryRequest *string `json:"memory_request"`
-	MemoryLimit   *string `json:"memory_limit"`
-	Confidence    float64 `json:"confidence"`
-}
-
 // RecommendationMode selects sizing behavior: cost_optimized, burstable, or guaranteed.
 type RecommendationMode string
 
