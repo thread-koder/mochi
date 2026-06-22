@@ -258,8 +258,8 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id uuid.UUID, status
 	return nil
 }
 
-// MarkRecommendationsSuperseded sets the status of all the recommendations for the same workload to superseded
-// except the applied row (excludeID).
+// MarkRecommendationsSuperseded changes the status of active recommendations (eg. not superseded)
+// for the same workload to superseded, excluding the applied row (excludeID).
 func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadName, namespace string, excludeID uuid.UUID) error {
 	log := logger.WithComponent("database")
 	log.Debug().
@@ -276,6 +276,7 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 		  AND workload_name = $2
 		  AND namespace = $3
 		  AND id != $4
+		  AND status != 'superseded'
 	`
 
 	result, err := Pool.Exec(ctx, query, workloadType, workloadName, namespace, excludeID)
