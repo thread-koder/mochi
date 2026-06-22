@@ -63,8 +63,8 @@ const (
 	BurstEffectiveMinCeil  = 0.4
 
 	// Confidence burst softener: partial predictability credit when usage is bursty but well observed.
-	confidenceBurstThreshold  = 2.0
-	confidenceBurstFloor      = 0.6
+	confidenceBurstThreshold  = 1.6
+	confidenceBurstFloor      = 0.8
 	confidenceDataFactorFloor = 0.5
 )
 
