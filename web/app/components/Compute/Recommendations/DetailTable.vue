@@ -1,8 +1,11 @@
 <template>
   <div class="glass rounded-xl p-6">
-    <h2 class="text-2xl font-bold font-heading mb-4">
+    <h2 class="text-2xl font-bold font-heading mb-1">
       Container Recommendations
     </h2>
+    <p class="text-xs text-on-surface-secondary mb-4">
+      Values reflect the resources at recommendation time, not live settings.
+    </p>
     <div
       v-if="!hasRecommendations"
       class="py-8"
@@ -46,104 +49,10 @@
               </span>
             </td>
             <td class="py-4 px-4">
-              <div class="space-y-1.5">
-                <!-- CPU Request -->
-                <div
-                  v-if="rec.cpu.current_request || rec.cpu.recommended_request"
-                  class="text-sm flex items-center"
-                >
-                  <span class="text-on-surface-secondary min-w-[60px]">Request:</span>
-                  <span class="text-on-surface ml-2">
-                    {{ rec.cpu.current_request ?? 'N/A' }}
-                  </span>
-                  <Icon
-                    name="lucide:arrow-right"
-                    class="mx-2 text-xs text-on-surface-muted shrink-0"
-                  />
-                  <span class="font-medium text-primary-light">
-                    {{ rec.cpu.recommended_request ?? 'N/A' }}
-                  </span>
-                  <span
-                    v-if="rec.cpu.request_change_percent !== null && rec.cpu.request_change_percent !== undefined"
-                    class="ml-2 text-xs text-on-surface-muted"
-                  >
-                    ({{ formatChangePercent(rec.cpu.request_change_percent) }})
-                  </span>
-                </div>
-                <!-- CPU Limit -->
-                <div
-                  v-if="rec.cpu.current_limit || rec.cpu.recommended_limit"
-                  class="text-sm flex items-center"
-                >
-                  <span class="text-on-surface-secondary min-w-[60px]">Limit:</span>
-                  <span class="text-on-surface ml-2">
-                    {{ rec.cpu.current_limit ?? 'N/A' }}
-                  </span>
-                  <Icon
-                    name="lucide:arrow-right"
-                    class="mx-2 text-xs text-on-surface-muted shrink-0"
-                  />
-                  <span class="font-medium text-primary-light">
-                    {{ rec.cpu.recommended_limit ?? 'N/A' }}
-                  </span>
-                  <span
-                    v-if="rec.cpu.limit_change_percent !== null && rec.cpu.limit_change_percent !== undefined"
-                    class="ml-2 text-xs text-on-surface-muted"
-                  >
-                    ({{ formatChangePercent(rec.cpu.limit_change_percent) }})
-                  </span>
-                </div>
-              </div>
+              <ComputeRecommendationsResourceGroup :resource="rec.cpu" />
             </td>
             <td class="py-4 px-4">
-              <div class="space-y-1.5">
-                <!-- Memory Request -->
-                <div
-                  v-if="rec.memory.current_request || rec.memory.recommended_request"
-                  class="text-sm flex items-center"
-                >
-                  <span class="text-on-surface-secondary min-w-[60px]">Request:</span>
-                  <span class="text-on-surface ml-2">
-                    {{ rec.memory.current_request ?? 'N/A' }}
-                  </span>
-                  <Icon
-                    name="lucide:arrow-right"
-                    class="mx-2 text-xs text-on-surface-muted shrink-0"
-                  />
-                  <span class="font-medium text-primary-light">
-                    {{ rec.memory.recommended_request ?? 'N/A' }}
-                  </span>
-                  <span
-                    v-if="rec.memory.request_change_percent !== null && rec.memory.request_change_percent !== undefined"
-                    class="ml-2 text-xs text-on-surface-muted"
-                  >
-                    ({{ formatChangePercent(rec.memory.request_change_percent) }})
-                  </span>
-                </div>
-                <!-- Memory Limit -->
-                <div
-                  v-if="rec.memory.current_limit || rec.memory.recommended_limit"
-                  class="text-sm flex items-center"
-                >
-                  <span class="text-on-surface-secondary min-w-[60px]">Limit:</span>
-                  <span class="text-on-surface ml-2">
-                    {{ rec.memory.current_limit ?? 'N/A' }}
-                  </span>
-                  <Icon
-                    name="lucide:arrow-right"
-                    class="mx-2 text-xs text-on-surface-muted shrink-0"
-                  />
-                  <span class="font-medium text-primary-light">
-                    {{ rec.memory.recommended_limit ?? 'N/A' }}
-                  </span>
-                  <span
-                    v-if="rec.memory.limit_change_percent !== null && rec.memory.limit_change_percent !== undefined"
-                    class="ml-2 text-xs text-on-surface-muted"
-                  >
-                    ({{ formatChangePercent(rec.memory.limit_change_percent) }})
-                  </span>
-                </div>
-              </div>
+              <ComputeRecommendationsResourceGroup :resource="rec.memory" />
             </td>
             <td class="py-4 px-4 text-center">
               <span
