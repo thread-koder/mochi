@@ -228,7 +228,6 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 }
 
 // UpdateComputeRecommendationStatus sets status and updates updated_at.
-// Returns an error if no row matched the ID.
 func UpdateComputeRecommendationStatus(ctx context.Context, id uuid.UUID, status string) error {
 	log := logger.WithComponent("database")
 	log.Debug().
@@ -291,32 +290,6 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 		Str("workload_name", workloadName).
 		Str("namespace", namespace).
 		Msg("Recommendations marked as superseded successfully")
-
-	return nil
-}
-
-// DeleteComputeRecommendation deletes a compute recommendation by its ID.
-// Returns an error if nothing was deleted.
-func DeleteComputeRecommendation(ctx context.Context, id uuid.UUID) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("id", id.String()).
-		Msg("Deleting compute recommendation")
-
-	query := `DELETE FROM compute_recommendations WHERE id = $1`
-
-	result, err := Pool.Exec(ctx, query, id)
-	if err != nil {
-		return fmt.Errorf("failed to delete compute recommendation: %w", err)
-	}
-
-	if result.RowsAffected() == 0 {
-		return apperrors.NewNotFound("compute_recommendation", id.String())
-	}
-
-	log.Debug().
-		Str("id", id.String()).
-		Msg("Compute recommendation deleted successfully")
 
 	return nil
 }
