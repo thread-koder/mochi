@@ -59,4 +59,6 @@ export type {
   ContainerRecommendation,
   RecommendationsResponse,
   RecommendationMode,
+  CPURecommendation,
+  MemoryRecommendation,
 }
