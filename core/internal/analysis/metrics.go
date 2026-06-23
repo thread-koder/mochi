@@ -13,6 +13,16 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// correlationMetrics stores the metric series for the correlation analysis.
+type correlationMetrics struct {
+	CPU             []timeseries.DataPoint
+	Memory          []timeseries.DataPoint
+	NetworkReceive  []timeseries.DataPoint
+	NetworkTransmit []timeseries.DataPoint
+	DiskRead        []timeseries.DataPoint
+	DiskWrite       []timeseries.DataPoint
+}
+
 func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, opts CorrelationOptions) (correlationMetrics, error) {
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)

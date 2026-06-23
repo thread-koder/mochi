@@ -106,16 +106,6 @@ type WorkloadCorrelationResult struct {
 	DataPointsUsed    int               `json:"data_points_used"`
 }
 
-// correlationMetrics stores per-workload metric series from Prometheus.
-type correlationMetrics struct {
-	CPU             []timeseries.DataPoint
-	Memory          []timeseries.DataPoint
-	NetworkReceive  []timeseries.DataPoint
-	NetworkTransmit []timeseries.DataPoint
-	DiskRead        []timeseries.DataPoint
-	DiskWrite       []timeseries.DataPoint
-}
-
 // metricPairs defines a set of cross-metric comparisons to analyze.
 var metricPairs = []MetricPair{
 	{MetricA: "cpu", MetricB: "memory"},
