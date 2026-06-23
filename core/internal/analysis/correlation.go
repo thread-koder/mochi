@@ -103,7 +103,6 @@ type WorkloadCorrelationResult struct {
 	CharacterizedAs   WorkloadType      `json:"characterized_as"`
 	Insights          []string          `json:"insights"`
 	OptimizationHints []string          `json:"optimization_hints"`
-	AnalysisPeriod    time.Duration     `json:"analysis_period"`
 	DataPointsUsed    int               `json:"data_points_used"`
 }
 
@@ -195,7 +194,6 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 		CharacterizedAs:   characterization,
 		Insights:          insights,
 		OptimizationHints: optimizationHints,
-		AnalysisPeriod:    opts.TimeRange,
 		DataPointsUsed:    maxDataPoints,
 	}, nil
 }
