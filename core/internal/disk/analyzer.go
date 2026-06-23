@@ -1,5 +1,3 @@
-// Package disk loads pod, workload, and namespace disk metrics from Prometheus,
-// summarizes utilization, and optionally attach raw byte-rate and operation-rate samples for charting.
 package disk
 
 import (

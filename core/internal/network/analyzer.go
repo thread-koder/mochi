@@ -1,5 +1,3 @@
-// Package network loads pod, workload, and namespace network metrics from Prometheus,
-// summarizes utilization, and optionally attach raw byte-rate samples for charting.
 package network
 
 import (

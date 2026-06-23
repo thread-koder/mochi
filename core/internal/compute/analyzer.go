@@ -1,7 +1,3 @@
-// Package compute loads pod, workload, and namespace CPU and memory metrics from Prometheus,
-// derives utilization, stability, and provisioning, builds resource recommendations, and can apply
-// them with Kubernetes server-side apply. Optional raw CPU and memory series are included when
-// callers set AnalysisOptions.IncludeTimeSeries.
 package compute
 
 import (

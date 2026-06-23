@@ -1,7 +1,3 @@
-// Package database holds PostgreSQL persistence for the Kubernetes resource snapshot synced from
-// the cluster, compute recommendations. Runtime access uses the shared Pool created by Init.
-// Migrate applies embedded SQL using a separate database/sql connection
-// required by golang-migrate (see Migrate).
 package database
 
 import (
