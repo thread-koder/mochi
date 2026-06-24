@@ -70,10 +70,6 @@ func Init(cfg *config.PrometheusConfig) error {
 
 // HealthCheck verifies the API reachability with a Buildinfo call.
 func HealthCheck(ctx context.Context) error {
-	if Client == nil {
-		return fmt.Errorf("prometheus client not initialized")
-	}
-
 	_, err := API.Buildinfo(ctx)
 	if err != nil {
 		return fmt.Errorf("prometheus health check failed: %w", err)

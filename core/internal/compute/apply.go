@@ -79,10 +79,6 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 		return ErrNoContainerRecommendations
 	}
 
-	if kubernetes.Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
-
 	switch rec.WorkloadType {
 	case "Deployment":
 		return applyToDeployment(ctx, rec, containerRecs)

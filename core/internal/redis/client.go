@@ -71,10 +71,6 @@ func Close() {
 
 // HealthCheck verifies Redis reachability with a Ping call.
 func HealthCheck(ctx context.Context) error {
-	if Client == nil {
-		return fmt.Errorf("redis client not initialized")
-	}
-
 	if err := Client.Ping(ctx).Err(); err != nil {
 		return fmt.Errorf("redis health check failed: %w", err)
 	}

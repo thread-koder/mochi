@@ -25,9 +25,6 @@ type QueryOptions struct {
 
 // QueryRange executes a PromQL range query given the query string, range, and options.
 func QueryRange(ctx context.Context, query string, r v1.Range, opts QueryOptions) (model.Value, v1.Warnings, error) {
-	if API == nil {
-		return nil, nil, fmt.Errorf("prometheus api not initialized")
-	}
 	result, warnings, err := API.QueryRange(ctx, query, r)
 	if err != nil {
 		return nil, warnings, fmt.Errorf("failed to execute PromQL range query: %w", err)
@@ -38,9 +35,6 @@ func QueryRange(ctx context.Context, query string, r v1.Range, opts QueryOptions
 
 // Query executes a PromQL instant query given the query string and timestamp.
 func Query(ctx context.Context, query string, ts time.Time) (model.Value, v1.Warnings, error) {
-	if API == nil {
-		return nil, nil, fmt.Errorf("prometheus api not initialized")
-	}
 	result, warnings, err := API.Query(ctx, query, ts)
 	if err != nil {
 		return nil, warnings, fmt.Errorf("failed to execute PromQL instant query: %w", err)

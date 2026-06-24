@@ -80,10 +80,6 @@ func Close() {
 
 // HealthCheck verifies the database reachability with a Ping call.
 func HealthCheck(ctx context.Context) error {
-	if Pool == nil {
-		return fmt.Errorf("database connection not initialized")
-	}
-
 	if err := Pool.Ping(ctx); err != nil {
 		return fmt.Errorf("database health check failed: %w", err)
 	}

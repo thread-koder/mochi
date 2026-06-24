@@ -93,10 +93,6 @@ func Init(cfg *config.KubernetesConfig) error {
 
 // GetClusterInfo returns basic cluster metadata.
 func GetClusterInfo(ctx context.Context) (*ClusterInfo, error) {
-	if Clientset == nil {
-		return nil, fmt.Errorf("kubernetes client not initialized")
-	}
-
 	info := &ClusterInfo{
 		APIServerURL: RestConfig.Host,
 	}
@@ -112,10 +108,6 @@ func GetClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 
 // HealthCheck verifies the API server reachability with a discovery call.
 func HealthCheck(ctx context.Context) error {
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
-
 	_, err := Clientset.Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("kubernetes health check failed: %w", err)
