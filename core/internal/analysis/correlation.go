@@ -131,7 +131,7 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 
 	metrics, err := fetchWorkloadCorrelationMetrics(ctx, pods, opts)
 	if err != nil {
-		return WorkloadCorrelationResult{}, fmt.Errorf("failed to fetch workload metrics: %w", err)
+		return WorkloadCorrelationResult{}, err
 	}
 
 	// At least one of CPU or memory is required as it anchors

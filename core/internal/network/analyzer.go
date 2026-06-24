@@ -90,7 +90,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, opts AnalysisOptions) (P
 
 	metrics, err := fetchPodMetrics(ctx, pod, opts)
 	if err != nil {
-		return PodAnalysis{}, fmt.Errorf("failed to fetch pod metrics: %w", err)
+		return PodAnalysis{}, err
 	}
 
 	if len(metrics.ReceiveBytes) == 0 && len(metrics.TransmitBytes) == 0 {
@@ -99,7 +99,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, opts AnalysisOptions) (P
 
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
-		return PodAnalysis{}, fmt.Errorf("failed to analyze utilization: %w", err)
+		return PodAnalysis{}, err
 	}
 
 	result := PodAnalysis{
@@ -148,7 +148,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 
 	metrics, err := fetchWorkloadMetrics(ctx, pods, opts)
 	if err != nil {
-		return WorkloadAnalysis{}, fmt.Errorf("failed to fetch workload metrics: %w", err)
+		return WorkloadAnalysis{}, err
 	}
 
 	if len(metrics.ReceiveBytes) == 0 && len(metrics.TransmitBytes) == 0 {
@@ -157,7 +157,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
-		return WorkloadAnalysis{}, fmt.Errorf("failed to analyze workload utilization: %w", err)
+		return WorkloadAnalysis{}, err
 	}
 
 	if err := g.Wait(); err != nil {
@@ -201,7 +201,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 				return AnalyzeWorkload(ctx, kind, name, namespace, pods, workloadOpts, false)
 			})
 		if err != nil {
-			return fmt.Errorf("failed to analyze namespace workloads: %w", err)
+			return err
 		}
 		workloadAnalyses = analyses
 		return nil
@@ -209,7 +209,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 
 	metrics, err := fetchNamespaceMetrics(ctx, namespace, opts)
 	if err != nil {
-		return NamespaceAnalysis{}, fmt.Errorf("failed to fetch namespace metrics: %w", err)
+		return NamespaceAnalysis{}, err
 	}
 
 	if len(metrics.ReceiveBytes) == 0 && len(metrics.TransmitBytes) == 0 {
@@ -218,7 +218,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
-		return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace utilization: %w", err)
+		return NamespaceAnalysis{}, err
 	}
 
 	if err := g.Wait(); err != nil {

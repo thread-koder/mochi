@@ -169,12 +169,12 @@ func CalculateCrossCorrelation(a, b []DataPoint, maxLag time.Duration, lagStep t
 
 	alignedA, alignedB, err := AlignDataPointsByTime(a, b, tolerance)
 	if err != nil {
-		return CrossCorrelationResult{}, fmt.Errorf("failed to align series for zero-lag correlation: %w", err)
+		return CrossCorrelationResult{}, err
 	}
 
 	zeroLagCorr, err := CalculatePearsonCorrelation(alignedA, alignedB)
 	if err != nil {
-		return CrossCorrelationResult{}, fmt.Errorf("failed to calculate zero-lag correlation: %w", err)
+		return CrossCorrelationResult{}, err
 	}
 
 	lagCorrelations := make([]LagCorrelation, 0)

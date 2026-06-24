@@ -3,7 +3,6 @@ package web
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -82,7 +81,7 @@ func GetNamespace(c *gin.Context) {
 		var err error
 		deployments, err = database.GetDeploymentsByNamespace(gctx, namespaceName)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get deployments: %w", err))
+			c.Error(err)
 		}
 		return nil
 	})
@@ -91,7 +90,7 @@ func GetNamespace(c *gin.Context) {
 		var err error
 		statefulsets, err = database.GetStatefulSetsByNamespace(gctx, namespaceName)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get statefulsets: %w", err))
+			c.Error(err)
 		}
 		return nil
 	})
@@ -100,7 +99,7 @@ func GetNamespace(c *gin.Context) {
 		var err error
 		daemonsets, err = database.GetDaemonSetsByNamespace(gctx, namespaceName)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get daemonsets: %w", err))
+			c.Error(err)
 		}
 		return nil
 	})
@@ -109,7 +108,7 @@ func GetNamespace(c *gin.Context) {
 		var err error
 		standalonePods, err = database.GetStandalonePodsByNamespace(gctx, namespaceName)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get standalone pods: %w", err))
+			c.Error(err)
 		}
 		return nil
 	})
@@ -118,7 +117,7 @@ func GetNamespace(c *gin.Context) {
 		var err error
 		systemPods, err = database.GetPodsByOwnerKind(gctx, "Node", namespaceName)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get system pods: %w", err))
+			c.Error(err)
 		}
 		return nil
 	})
@@ -127,7 +126,7 @@ func GetNamespace(c *gin.Context) {
 		var err error
 		podCount, err = database.GetPodCountByNamespace(gctx, namespaceName)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get pod count: %w", err))
+			c.Error(err)
 		}
 		return nil
 	})
@@ -136,7 +135,7 @@ func GetNamespace(c *gin.Context) {
 		var err error
 		containerCount, err = database.GetContainerCountByNamespace(gctx, namespaceName)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get container count: %w", err))
+			c.Error(err)
 		}
 		return nil
 	})

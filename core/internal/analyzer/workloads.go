@@ -69,7 +69,7 @@ func AnalyzeWorkloads[T any](
 	g.Go(func() error {
 		deployments, err := database.GetDeploymentsByNamespace(gctx, namespace)
 		if err != nil {
-			return fmt.Errorf("failed to fetch deployments for namespace %s: %w", namespace, err)
+			return err
 		}
 		for _, deployment := range deployments {
 			analyzeEntry("Deployment", deployment.Name, nil)
@@ -80,7 +80,7 @@ func AnalyzeWorkloads[T any](
 	g.Go(func() error {
 		statefulSets, err := database.GetStatefulSetsByNamespace(gctx, namespace)
 		if err != nil {
-			return fmt.Errorf("failed to fetch statefulsets for namespace %s: %w", namespace, err)
+			return err
 		}
 		for _, statefulSet := range statefulSets {
 			analyzeEntry("StatefulSet", statefulSet.Name, nil)
@@ -91,7 +91,7 @@ func AnalyzeWorkloads[T any](
 	g.Go(func() error {
 		daemonSets, err := database.GetDaemonSetsByNamespace(gctx, namespace)
 		if err != nil {
-			return fmt.Errorf("failed to fetch daemonsets for namespace %s: %w", namespace, err)
+			return err
 		}
 		for _, daemonSet := range daemonSets {
 			analyzeEntry("DaemonSet", daemonSet.Name, nil)
@@ -102,7 +102,7 @@ func AnalyzeWorkloads[T any](
 	g.Go(func() error {
 		standalonePods, err := database.GetStandalonePodsByNamespace(gctx, namespace)
 		if err != nil {
-			return fmt.Errorf("failed to fetch standalone pods for namespace %s: %w", namespace, err)
+			return err
 		}
 		for _, pod := range standalonePods {
 			analyzeEntry("Pod", pod.Name, []*database.Pod{pod})
@@ -113,7 +113,7 @@ func AnalyzeWorkloads[T any](
 	g.Go(func() error {
 		systemPods, err := database.GetPodsByOwnerKind(gctx, "Node", namespace)
 		if err != nil {
-			return fmt.Errorf("failed to fetch system pods for namespace %s: %w", namespace, err)
+			return err
 		}
 		for _, pod := range systemPods {
 			analyzeEntry("Pod", pod.Name, []*database.Pod{pod})

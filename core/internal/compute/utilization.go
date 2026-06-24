@@ -49,7 +49,7 @@ func AnalyzeCPUUtilization(cpuData []timeseries.DataPoint) (CPUUtilization, erro
 
 	stats, err := timeseries.CalculateStats(cpuData)
 	if err != nil {
-		return CPUUtilization{}, fmt.Errorf("failed to calculate CPU stats: %w", err)
+		return CPUUtilization{}, err
 	}
 
 	trend, err := timeseries.AnalyzeTrend(cpuData)
@@ -90,7 +90,7 @@ func AnalyzeMemoryUtilization(memoryData []timeseries.DataPoint) (MemoryUtilizat
 
 	stats, err := timeseries.CalculateStats(memoryData)
 	if err != nil {
-		return MemoryUtilization{}, fmt.Errorf("failed to calculate memory stats: %w", err)
+		return MemoryUtilization{}, err
 	}
 
 	trend, err := timeseries.AnalyzeTrend(memoryData)
@@ -132,14 +132,14 @@ func AnalyzeUtilization(metrics ResourceMetrics) (UtilizationResult, error) {
 	if len(metrics.CPU) > 0 {
 		result.CPU, err = AnalyzeCPUUtilization(metrics.CPU)
 		if err != nil {
-			return UtilizationResult{}, fmt.Errorf("failed to analyze CPU utilization: %w", err)
+			return UtilizationResult{}, err
 		}
 	}
 
 	if len(metrics.Memory) > 0 {
 		result.Memory, err = AnalyzeMemoryUtilization(metrics.Memory)
 		if err != nil {
-			return UtilizationResult{}, fmt.Errorf("failed to analyze memory utilization: %w", err)
+			return UtilizationResult{}, err
 		}
 	}
 

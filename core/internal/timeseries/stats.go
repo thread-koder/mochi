@@ -81,7 +81,7 @@ func CalculateStats(dataPoints []DataPoint) (StatsResult, error) {
 
 	percentiles, err := CalculatePercentiles(values)
 	if err != nil {
-		return StatsResult{}, fmt.Errorf("failed to calculate percentiles: %w", err)
+		return StatsResult{}, err
 	}
 
 	return StatsResult{

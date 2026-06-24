@@ -44,7 +44,7 @@ func DetectAnomalies(dataPoints []DataPoint, thresholdMultiplier float64) (Anoma
 
 	stats, err := CalculateStats(dataPoints)
 	if err != nil {
-		return AnomalyResult{}, fmt.Errorf("failed to calculate stats: %w", err)
+		return AnomalyResult{}, err
 	}
 
 	if stats.StdDev == 0 {

@@ -3,7 +3,6 @@ package web
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -89,7 +88,7 @@ func GetWorkload(c *gin.Context) {
 		response.CreatedAt = dep.CreatedAt
 		pods, err = database.GetPodsByWorkload(ctx, "Deployment", workloadName, namespaceName)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get pods: %w", err))
+			c.Error(err)
 		}
 
 	case "StatefulSet":
@@ -108,7 +107,7 @@ func GetWorkload(c *gin.Context) {
 		response.CreatedAt = sts.CreatedAt
 		pods, err = database.GetPodsByWorkload(ctx, "StatefulSet", workloadName, namespaceName)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get pods: %w", err))
+			c.Error(err)
 		}
 
 	case "DaemonSet":
@@ -127,7 +126,7 @@ func GetWorkload(c *gin.Context) {
 		response.CreatedAt = ds.CreatedAt
 		pods, err = database.GetPodsByWorkload(ctx, "DaemonSet", workloadName, namespaceName)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get pods: %w", err))
+			c.Error(err)
 		}
 
 	case "Pod":
@@ -178,7 +177,7 @@ func GetWorkload(c *gin.Context) {
 
 				containers, err := database.GetContainersByPodUID(gctx, pod.UID)
 				if err != nil {
-					c.Error(fmt.Errorf("failed to get containers for pod %s: %w", pod.Name, err))
+					c.Error(err)
 					results[i].pod = podDetail
 					return nil
 				}

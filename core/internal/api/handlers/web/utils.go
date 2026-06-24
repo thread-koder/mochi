@@ -26,28 +26,19 @@ func GetStats(ctx context.Context) (Stats, error) {
 	g.Go(func() error {
 		var err error
 		namespaceCount, err = database.GetNamespaceCount(gctx)
-		if err != nil {
-			return fmt.Errorf("failed to get namespace count: %w", err)
-		}
-		return nil
+		return err
 	})
 
 	g.Go(func() error {
 		var err error
 		workloadCount, err = database.GetWorkloadCount(gctx)
-		if err != nil {
-			return fmt.Errorf("failed to get workload count: %w", err)
-		}
-		return nil
+		return err
 	})
 
 	g.Go(func() error {
 		var err error
 		podCount, err = database.GetPodCount(gctx)
-		if err != nil {
-			return fmt.Errorf("failed to get pod count: %w", err)
-		}
-		return nil
+		return err
 	})
 
 	if err := g.Wait(); err != nil {
@@ -77,7 +68,7 @@ func GetActivities(ctx context.Context, limit int) ([]Activity, error) {
 		0,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get compute recommendations: %w", err)
+		return nil, err
 	}
 
 	activities := make([]Activity, 0, len(computeRecommendations))

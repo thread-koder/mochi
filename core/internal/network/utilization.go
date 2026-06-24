@@ -49,7 +49,7 @@ func AnalyzeReceiveUtilization(data []timeseries.DataPoint) (DirectionUtilizatio
 
 	stats, err := timeseries.CalculateStats(data)
 	if err != nil {
-		return DirectionUtilization{}, fmt.Errorf("failed to calculate receive stats: %w", err)
+		return DirectionUtilization{}, err
 	}
 
 	trend, err := timeseries.AnalyzeTrend(data)
@@ -89,7 +89,7 @@ func AnalyzeTransmitUtilization(data []timeseries.DataPoint) (DirectionUtilizati
 
 	stats, err := timeseries.CalculateStats(data)
 	if err != nil {
-		return DirectionUtilization{}, fmt.Errorf("failed to calculate transmit stats: %w", err)
+		return DirectionUtilization{}, err
 	}
 
 	trend, err := timeseries.AnalyzeTrend(data)
@@ -149,14 +149,14 @@ func AnalyzeUtilization(metrics NetworkMetrics) (UtilizationResult, error) {
 	if len(metrics.ReceiveBytes) > 0 {
 		result.Receive, err = AnalyzeReceiveUtilization(metrics.ReceiveBytes)
 		if err != nil {
-			return UtilizationResult{}, fmt.Errorf("failed to analyze receive utilization: %w", err)
+			return UtilizationResult{}, err
 		}
 	}
 
 	if len(metrics.TransmitBytes) > 0 {
 		result.Transmit, err = AnalyzeTransmitUtilization(metrics.TransmitBytes)
 		if err != nil {
-			return UtilizationResult{}, fmt.Errorf("failed to analyze transmit utilization: %w", err)
+			return UtilizationResult{}, err
 		}
 	}
 

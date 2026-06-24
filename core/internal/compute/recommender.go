@@ -78,7 +78,7 @@ func GenerateContainerRecommendation(
 
 	specs, err := ParseContainerSpecs(container)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse container specs: %w", err)
+		return nil, err
 	}
 
 	cpuRequestRecValue := CalculateCPURequestRecommendation(
@@ -285,7 +285,7 @@ func recommendationsForPod(
 ) ([]ContainerRecommendation, error) {
 	containers, err := database.GetContainersByPodUID(ctx, pod.UID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch containers for pod %s: %w", pod.Name, err)
+		return nil, err
 	}
 
 	containerRecs := make([]*ContainerRecommendation, len(containers))

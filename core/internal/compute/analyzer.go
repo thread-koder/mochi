@@ -115,7 +115,7 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 
 	metrics, err := fetchContainerMetrics(ctx, container, opts)
 	if err != nil {
-		return ContainerAnalysis{}, fmt.Errorf("failed to fetch container metrics: %w", err)
+		return ContainerAnalysis{}, err
 	}
 
 	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
@@ -124,14 +124,14 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
-		return ContainerAnalysis{}, fmt.Errorf("failed to analyze utilization: %w", err)
+		return ContainerAnalysis{}, err
 	}
 
 	stability := AnalyzeStability(metrics)
 
 	specs, err := ParseContainerSpecs(container)
 	if err != nil {
-		return ContainerAnalysis{}, fmt.Errorf("failed to parse container specs: %w", err)
+		return ContainerAnalysis{}, err
 	}
 
 	provisioning := AnalyzeProvisioning(specs, utilization, stability, opts.MinSamplesForConfidence())
@@ -175,7 +175,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 
 	metrics, err := fetchPodMetrics(ctx, pod, opts)
 	if err != nil {
-		return PodAnalysis{}, fmt.Errorf("failed to fetch pod metrics: %w", err)
+		return PodAnalysis{}, err
 	}
 
 	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
@@ -184,7 +184,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
-		return PodAnalysis{}, fmt.Errorf("failed to analyze pod utilization: %w", err)
+		return PodAnalysis{}, err
 	}
 
 	stability := AnalyzeStability(metrics)
@@ -229,7 +229,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 			g.Go(func() error {
 				containers, err := database.GetContainersByPodUID(gctx, pod.UID)
 				if err != nil {
-					return fmt.Errorf("failed to fetch containers for pod %s: %w", pod.Name, err)
+					return err
 				}
 				podAnalysis, err := AnalyzePod(gctx, pod, containers, podOpts)
 				if err != nil {
@@ -243,7 +243,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 
 	metrics, err := fetchWorkloadMetrics(ctx, pods, opts)
 	if err != nil {
-		return WorkloadAnalysis{}, fmt.Errorf("failed to fetch workload metrics: %w", err)
+		return WorkloadAnalysis{}, err
 	}
 
 	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
@@ -252,7 +252,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
-		return WorkloadAnalysis{}, fmt.Errorf("failed to analyze workload utilization: %w", err)
+		return WorkloadAnalysis{}, err
 	}
 
 	stability := AnalyzeStability(metrics)
@@ -300,7 +300,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 				return AnalyzeWorkload(ctx, kind, name, namespace, pods, workloadOpts, false)
 			})
 		if err != nil {
-			return fmt.Errorf("failed to analyze namespace workloads: %w", err)
+			return err
 		}
 		workloadAnalyses = analyses
 		return nil
@@ -308,7 +308,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 
 	metrics, err := fetchNamespaceMetrics(ctx, namespace, opts)
 	if err != nil {
-		return NamespaceAnalysis{}, fmt.Errorf("failed to fetch namespace metrics: %w", err)
+		return NamespaceAnalysis{}, err
 	}
 
 	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
@@ -317,7 +317,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
-		return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace utilization: %w", err)
+		return NamespaceAnalysis{}, err
 	}
 
 	stability := AnalyzeStability(metrics)

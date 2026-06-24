@@ -45,7 +45,7 @@ func AnalyzeReadBytesUtilization(data []timeseries.DataPoint) (DirectionUtilizat
 
 	stats, err := timeseries.CalculateStats(data)
 	if err != nil {
-		return DirectionUtilization{}, fmt.Errorf("failed to calculate read bytes stats: %w", err)
+		return DirectionUtilization{}, err
 	}
 
 	trend, err := timeseries.AnalyzeTrend(data)
@@ -85,7 +85,7 @@ func AnalyzeWriteBytesUtilization(data []timeseries.DataPoint) (DirectionUtiliza
 
 	stats, err := timeseries.CalculateStats(data)
 	if err != nil {
-		return DirectionUtilization{}, fmt.Errorf("failed to calculate write bytes stats: %w", err)
+		return DirectionUtilization{}, err
 	}
 
 	trend, err := timeseries.AnalyzeTrend(data)
@@ -125,7 +125,7 @@ func AnalyzeReadOpsUtilization(data []timeseries.DataPoint) (DirectionUtilizatio
 
 	stats, err := timeseries.CalculateStats(data)
 	if err != nil {
-		return DirectionUtilization{}, fmt.Errorf("failed to calculate read ops stats: %w", err)
+		return DirectionUtilization{}, err
 	}
 
 	trend, err := timeseries.AnalyzeTrend(data)
@@ -165,7 +165,7 @@ func AnalyzeWriteOpsUtilization(data []timeseries.DataPoint) (DirectionUtilizati
 
 	stats, err := timeseries.CalculateStats(data)
 	if err != nil {
-		return DirectionUtilization{}, fmt.Errorf("failed to calculate write ops stats: %w", err)
+		return DirectionUtilization{}, err
 	}
 
 	trend, err := timeseries.AnalyzeTrend(data)
@@ -207,28 +207,28 @@ func AnalyzeUtilization(metrics DiskMetrics) (UtilizationResult, error) {
 	if len(metrics.ReadBytes) > 0 {
 		result.ReadBytes, err = AnalyzeReadBytesUtilization(metrics.ReadBytes)
 		if err != nil {
-			return UtilizationResult{}, fmt.Errorf("failed to analyze read bytes utilization: %w", err)
+			return UtilizationResult{}, err
 		}
 	}
 
 	if len(metrics.WriteBytes) > 0 {
 		result.WriteBytes, err = AnalyzeWriteBytesUtilization(metrics.WriteBytes)
 		if err != nil {
-			return UtilizationResult{}, fmt.Errorf("failed to analyze write bytes utilization: %w", err)
+			return UtilizationResult{}, err
 		}
 	}
 
 	if len(metrics.ReadOps) > 0 {
 		result.ReadOps, err = AnalyzeReadOpsUtilization(metrics.ReadOps)
 		if err != nil {
-			return UtilizationResult{}, fmt.Errorf("failed to analyze read ops utilization: %w", err)
+			return UtilizationResult{}, err
 		}
 	}
 
 	if len(metrics.WriteOps) > 0 {
 		result.WriteOps, err = AnalyzeWriteOpsUtilization(metrics.WriteOps)
 		if err != nil {
-			return UtilizationResult{}, fmt.Errorf("failed to analyze write ops utilization: %w", err)
+			return UtilizationResult{}, err
 		}
 	}
 

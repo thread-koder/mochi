@@ -2,7 +2,6 @@ package web
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -42,7 +41,7 @@ func GetHome(c *gin.Context) {
 	g.Go(func() error {
 		info, err := kubernetes.GetClusterInfo(gctx)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get cluster info: %w", err))
+			c.Error(err)
 			return nil
 		}
 		clusterInfo = info
@@ -52,7 +51,7 @@ func GetHome(c *gin.Context) {
 	g.Go(func() error {
 		statsData, err := GetStats(gctx)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get stats: %w", err))
+			c.Error(err)
 			return nil
 		}
 		stats = statsData
@@ -82,7 +81,7 @@ func GetHome(c *gin.Context) {
 	g.Go(func() error {
 		activityList, err := GetActivities(gctx, 10)
 		if err != nil {
-			c.Error(fmt.Errorf("failed to get activities: %w", err))
+			c.Error(err)
 			return nil
 		}
 		activities = activityList
