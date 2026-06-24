@@ -79,6 +79,10 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 		return ErrNoContainerRecommendations
 	}
 
+	if kubernetes.Clientset == nil {
+		return fmt.Errorf("kubernetes client not initialized")
+	}
+
 	switch rec.WorkloadType {
 	case "Deployment":
 		return applyToDeployment(ctx, rec, containerRecs)
@@ -94,10 +98,6 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 }
 
 func applyToDeployment(ctx context.Context, rec *database.ComputeRecommendation, containerRecs []ContainerRecommendation) error {
-	if kubernetes.Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
-	}
-
 	_, err := kubernetes.Clientset.AppsV1().Deployments(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -130,10 +130,6 @@ func applyToDeployment(ctx context.Context, rec *database.ComputeRecommendation,
 }
 
 func applyToStatefulSet(ctx context.Context, rec *database.ComputeRecommendation, containerRecs []ContainerRecommendation) error {
-	if kubernetes.Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
-	}
-
 	_, err := kubernetes.Clientset.AppsV1().StatefulSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -165,10 +161,6 @@ func applyToStatefulSet(ctx context.Context, rec *database.ComputeRecommendation
 }
 
 func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, containerRecs []ContainerRecommendation) error {
-	if kubernetes.Clientset == nil {
-		return fmt.Errorf("Kubernetes client not initialized")
-	}
-
 	_, err := kubernetes.Clientset.AppsV1().DaemonSets(rec.Namespace).Get(ctx, rec.WorkloadName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
