@@ -106,30 +106,35 @@ func (w *ResourceSyncWorker) sync() {
 	log := logger.WithComponent("sync-worker")
 
 	// Bound each pass so slow external calls do not block the next schedule forever.
-	syncCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	syncCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	log.Info().Msg("Syncing resources...")
-	if err := kubernetes.SyncResources(syncCtx); err != nil {
-		log.Warn().Err(err).Msg("Failed to sync resources")
+	log.Info().Msg("Starting resource sync pass...")
+	kubernetes.SyncResources(syncCtx)
+	if err := syncCtx.Err(); err != nil {
+		log.Warn().Err(err).Msg("Resource sync pass ended before completion")
 	} else {
-		log.Info().Msg("Resources sync completed")
+		log.Info().Msg("Resource sync pass completed")
 	}
 
 	w.cleanup(syncCtx)
 }
 
-// cleanup deletes stale recommendations after each sync pass.
+// cleanup deletes stale records after each sync pass.
 func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	log := logger.WithComponent("sync-worker")
 	since := time.Now().Add(-w.retentionPeriod)
 
-	log.Info().Msg("Cleaning up records...")
+	log.Info().Msg("Starting cleanup tasks...")
 	if err := database.DeleteComputeRecommendationsOlderThan(ctx, since); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete old compute recommendations")
+		log.Warn().Err(err).Str("task", "compute_recommendations_retention").Msg("Cleanup task failed")
 	}
 	if err := database.DeleteComputeRecommendationsForDeletedWorkloads(ctx); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete compute recommendations for deleted workloads")
+		log.Warn().Err(err).Str("task", "compute_recommendations_deleted_workloads").Msg("Cleanup task failed")
 	}
-	log.Info().Msg("Cleanup completed")
+	if err := ctx.Err(); err != nil {
+		log.Warn().Err(err).Msg("Cleanup tasks ended before completion")
+	} else {
+		log.Info().Msg("Cleanup tasks completed")
+	}
 }

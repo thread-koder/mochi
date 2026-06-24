@@ -13,81 +13,51 @@ import (
 	"github.com/thread_koder/mochi/core/internal/config"
 	"github.com/thread_koder/mochi/core/internal/database"
 	"github.com/thread_koder/mochi/core/internal/logger"
+	"golang.org/x/sync/errgroup"
 )
 
+const namespaceSyncConcurrency = 4
+
 // SyncResources fetches cluster resources and stores a DB snapshot.
-// Each stage logs and continues so one failed resource kind does not block the rest.
-func SyncResources(ctx context.Context) error {
+// Cluster-level stages warn and continue on failure, namespace sync runs in parallel with isolated failures.
+func SyncResources(ctx context.Context) {
 	log := logger.WithComponent("kubernetes")
 
-	if err := SyncNodes(ctx); err != nil {
-		log.Warn().Err(err).Msg("Failed to sync nodes")
+	if err := syncNodes(ctx); err != nil {
+		log.Warn().Err(err).Msg("Failed to sync cluster nodes")
 	}
 
 	namespaces, err := Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		log.Warn().Err(err).Msg("Failed to list namespaces")
+		log.Warn().Err(err).Msg("Failed to list cluster namespaces")
+	} else if err := syncNamespaces(ctx, namespaces); err != nil {
+		log.Warn().Err(err).Msg("Failed to sync cluster namespaces")
 	}
-	if err := SyncNamespaces(ctx, namespaces); err != nil {
-		log.Warn().Err(err).Msg("Failed to sync namespaces")
-	}
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(namespaceSyncConcurrency)
 
 	for _, ns := range namespaces.Items {
 		if !shouldSyncNamespace(ns.Name) {
 			continue
 		}
-
-		if err := SyncDeployments(ctx, ns.Name); err != nil {
-			log.Warn().Err(err).Msg("Failed to sync deployments")
-		}
-
-		if err := SyncReplicaSets(ctx, ns.Name); err != nil {
-			log.Warn().Err(err).Msg("Failed to sync replicasets")
-		}
-
-		if err := SyncStatefulSets(ctx, ns.Name); err != nil {
-			log.Warn().Err(err).Msg("Failed to sync statefulsets")
-		}
-
-		if err := SyncDaemonSets(ctx, ns.Name); err != nil {
-			log.Warn().Err(err).Msg("Failed to sync daemonsets")
-		}
-
-		if err := SyncServices(ctx, ns.Name); err != nil {
-			log.Warn().Err(err).Msg("Failed to sync services")
-		}
-
-		if err := SyncEndpointSlices(ctx, ns.Name); err != nil {
-			log.Warn().Err(err).Msg("Failed to sync endpoint slices")
-		}
-
-		if err := SyncPods(ctx, ns.Name); err != nil {
-			log.Warn().Err(err).Msg("Failed to sync pods")
-		}
-
-		if err := SyncContainers(ctx, ns.Name); err != nil {
-			log.Warn().Err(err).Msg("Failed to sync containers")
-		}
-
+		g.Go(func() error {
+			syncNamespace(gctx, ns.Name)
+			return nil
+		})
 	}
-
-	return nil
+	_ = g.Wait()
 }
 
-// SyncNodes syncs nodes and prunes stale rows.
-func SyncNodes(ctx context.Context) error {
+func syncNodes(ctx context.Context) error {
 	log := logger.WithComponent("kubernetes")
-
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
+	start := time.Now()
+	log.Info().Msg("Syncing cluster nodes...")
 
 	nodes, err := Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list nodes: %w", err)
+		return fmt.Errorf("failed to list cluster nodes: %w", err)
 	}
-
-	log.Debug().Int("count", len(nodes.Items)).Msg("Syncing nodes...")
 
 	dbNodes := make([]*database.Node, 0, len(nodes.Items))
 	now := time.Now()
@@ -145,25 +115,22 @@ func SyncNodes(ctx context.Context) error {
 	}
 
 	if err := database.UpsertNodesBatch(ctx, dbNodes); err != nil {
-		return fmt.Errorf("failed to upsert nodes: %w", err)
+		return err
 	}
 
 	if err := database.PruneNodes(ctx, nodeUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete nodes not in current state")
+		log.Warn().Err(err).Msg("Failed to prune cluster nodes not in current state")
 	}
-	log.Debug().Int("count", len(dbNodes)).Msg("Nodes synced successfully")
+	log.Info().
+		Str("duration", time.Since(start).Round(time.Millisecond).String()).
+		Msg("Cluster nodes synced")
 	return nil
 }
 
-// SyncNamespaces syncs namespaces and prunes stale rows.
-func SyncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList) error {
+func syncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList) error {
 	log := logger.WithComponent("kubernetes")
-
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
-
-	log.Debug().Int("count", len(namespaces.Items)).Msg("Syncing namespaces...")
+	start := time.Now()
+	log.Info().Msg("Syncing cluster namespaces...")
 
 	dbNamespaces := make([]*database.Namespace, 0, len(namespaces.Items))
 	now := time.Now()
@@ -192,30 +159,56 @@ func SyncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList) error
 	}
 
 	if err := database.UpsertNamespacesBatch(ctx, dbNamespaces); err != nil {
-		return fmt.Errorf("failed to upsert namespaces: %w", err)
+		return err
 	}
 
 	if err := database.PruneNamespaces(ctx, nsUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete namespaces not in current state")
+		log.Warn().Err(err).Msg("Failed to prune cluster namespaces not in current state")
 	}
-	log.Debug().Int("count", len(dbNamespaces)).Msg("Namespaces synced successfully")
+	log.Info().
+		Str("duration", time.Since(start).Round(time.Millisecond).String()).
+		Msg("Cluster namespaces synced")
 	return nil
 }
 
-// SyncDeployments syncs deployments in one namespace and prunes stale rows.
-func SyncDeployments(ctx context.Context, namespace string) error {
+func syncNamespace(ctx context.Context, namespace string) {
 	log := logger.WithComponent("kubernetes")
+	start := time.Now()
+	log.Info().Str("namespace", namespace).Msg("Syncing namespace...")
 
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
+	kinds := []struct {
+		name string
+		fn   func(context.Context, string) error
+	}{
+		{"deployments", syncDeployments},
+		{"replicasets", syncReplicaSets},
+		{"statefulsets", syncStatefulSets},
+		{"daemonsets", syncDaemonSets},
+		{"services", syncServices},
+		{"endpoint slices", syncEndpointSlices},
+		{"pods", syncPods},
+		{"containers", syncContainers},
 	}
+	for _, kind := range kinds {
+		if err := kind.fn(ctx, namespace); err != nil {
+			log.Warn().Err(err).Str("namespace", namespace).Str("kind", kind.name).Msg("Namespace sync stopped")
+			return
+		}
+	}
+
+	log.Info().
+		Str("namespace", namespace).
+		Str("duration", time.Since(start).Round(time.Millisecond).String()).
+		Msg("Namespace synced")
+}
+
+func syncDeployments(ctx context.Context, namespace string) error {
+	log := logger.WithComponent("kubernetes")
 
 	deployments, err := Clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list deployments: %w", err)
 	}
-
-	log.Debug().Int("count", len(deployments.Items)).Msg("Syncing deployments...")
 
 	dbDeployments := make([]*database.Deployment, 0, len(deployments.Items))
 	now := time.Now()
@@ -249,30 +242,22 @@ func SyncDeployments(ctx context.Context, namespace string) error {
 	}
 
 	if err := database.UpsertDeploymentsBatch(ctx, dbDeployments); err != nil {
-		return fmt.Errorf("failed to upsert deployments: %w", err)
+		return err
 	}
 
 	if err := database.PruneDeployments(ctx, namespace, depUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to prune deployments not in current state")
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune deployments not in current state")
 	}
-	log.Debug().Int("count", len(dbDeployments)).Msg("Deployments synced successfully")
 	return nil
 }
 
-// SyncReplicaSets syncs active ReplicaSets in one namespace and prunes stale rows.
-func SyncReplicaSets(ctx context.Context, namespace string) error {
+func syncReplicaSets(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
-
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
 
 	replicasets, err := Clientset.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list replicasets: %w", err)
 	}
-
-	log.Debug().Int("count", len(replicasets.Items)).Msg("Syncing replicasets...")
 
 	dbReplicaSets := make([]*database.ReplicaSet, 0, len(replicasets.Items))
 	now := time.Now()
@@ -318,30 +303,22 @@ func SyncReplicaSets(ctx context.Context, namespace string) error {
 	}
 
 	if err := database.UpsertReplicaSetsBatch(ctx, dbReplicaSets); err != nil {
-		return fmt.Errorf("failed to upsert replicasets: %w", err)
+		return err
 	}
 
 	if err := database.PruneReplicaSets(ctx, namespace, rsUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete replicasets not in current state")
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune replicasets not in current state")
 	}
-	log.Debug().Int("count", len(dbReplicaSets)).Msg("Replicasets synced successfully")
 	return nil
 }
 
-// SyncStatefulSets syncs statefulsets in one namespace and prunes stale rows.
-func SyncStatefulSets(ctx context.Context, namespace string) error {
+func syncStatefulSets(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
-
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
 
 	statefulsets, err := Clientset.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list statefulsets: %w", err)
 	}
-
-	log.Debug().Int("count", len(statefulsets.Items)).Msg("Syncing statefulsets...")
 
 	dbStatefulSets := make([]*database.StatefulSet, 0, len(statefulsets.Items))
 	now := time.Now()
@@ -374,30 +351,22 @@ func SyncStatefulSets(ctx context.Context, namespace string) error {
 	}
 
 	if err := database.UpsertStatefulSetsBatch(ctx, dbStatefulSets); err != nil {
-		return fmt.Errorf("failed to upsert statefulsets: %w", err)
+		return err
 	}
 
 	if err := database.PruneStatefulSets(ctx, namespace, stsUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete statefulsets not in current state")
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune statefulsets not in current state")
 	}
-	log.Debug().Int("count", len(dbStatefulSets)).Msg("Statefulsets synced successfully")
 	return nil
 }
 
-// SyncDaemonSets syncs daemonsets in one namespace and prunes stale rows.
-func SyncDaemonSets(ctx context.Context, namespace string) error {
+func syncDaemonSets(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
-
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
 
 	daemonsets, err := Clientset.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list daemonsets: %w", err)
 	}
-
-	log.Debug().Int("count", len(daemonsets.Items)).Msg("Syncing daemonsets...")
 
 	dbDaemonSets := make([]*database.DaemonSet, 0, len(daemonsets.Items))
 	now := time.Now()
@@ -426,30 +395,22 @@ func SyncDaemonSets(ctx context.Context, namespace string) error {
 	}
 
 	if err := database.UpsertDaemonSetsBatch(ctx, dbDaemonSets); err != nil {
-		return fmt.Errorf("failed to upsert daemonsets: %w", err)
+		return err
 	}
 
 	if err := database.PruneDaemonSets(ctx, namespace, dsUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete daemonsets not in current state")
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune daemonsets not in current state")
 	}
-	log.Debug().Int("count", len(dbDaemonSets)).Msg("Daemonsets synced successfully")
 	return nil
 }
 
-// SyncServices syncs services in one namespace and prunes stale rows.
-func SyncServices(ctx context.Context, namespace string) error {
+func syncServices(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
-
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
 
 	services, err := Clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list services: %w", err)
 	}
-
-	log.Debug().Int("count", len(services.Items)).Msg("Syncing services...")
 
 	dbServices := make([]*database.Service, 0, len(services.Items))
 	now := time.Now()
@@ -487,30 +448,22 @@ func SyncServices(ctx context.Context, namespace string) error {
 	}
 
 	if err := database.UpsertServicesBatch(ctx, dbServices); err != nil {
-		return fmt.Errorf("failed to upsert services: %w", err)
+		return err
 	}
 
 	if err := database.PruneServices(ctx, namespace, svcUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete services not in current state")
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune services not in current state")
 	}
-	log.Debug().Int("count", len(dbServices)).Msg("Services synced successfully")
 	return nil
 }
 
-// SyncEndpointSlices syncs EndpointSlices in one namespace and prunes stale rows.
-func SyncEndpointSlices(ctx context.Context, namespace string) error {
+func syncEndpointSlices(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
-
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
 
 	endpointSlices, err := Clientset.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list endpoint slices: %w", err)
 	}
-
-	log.Debug().Int("count", len(endpointSlices.Items)).Msg("Syncing endpoint slices...")
 
 	dbEndpointSlices := make([]*database.EndpointSlice, 0, len(endpointSlices.Items))
 	now := time.Now()
@@ -551,30 +504,22 @@ func SyncEndpointSlices(ctx context.Context, namespace string) error {
 	}
 
 	if err := database.UpsertEndpointSlicesBatch(ctx, dbEndpointSlices); err != nil {
-		return fmt.Errorf("failed to upsert endpoint slices: %w", err)
+		return err
 	}
 
 	if err := database.PruneEndpointSlices(ctx, namespace, esUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete endpoint slices not in current state")
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune endpoint slices not in current state")
 	}
-	log.Debug().Int("count", len(dbEndpointSlices)).Msg("Endpoint slices synced successfully")
 	return nil
 }
 
-// SyncPods syncs pods in one namespace and prunes stale rows.
-func SyncPods(ctx context.Context, namespace string) error {
+func syncPods(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
-
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
 
 	pods, err := Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list pods: %w", err)
 	}
-
-	log.Debug().Int("count", len(pods.Items)).Msg("Syncing pods...")
 
 	dbPods := make([]*database.Pod, 0, len(pods.Items))
 	now := time.Now()
@@ -618,23 +563,17 @@ func SyncPods(ctx context.Context, namespace string) error {
 	}
 
 	if err := database.UpsertPodsBatch(ctx, dbPods); err != nil {
-		return fmt.Errorf("failed to upsert pods: %w", err)
+		return err
 	}
 
 	if err := database.PrunePods(ctx, namespace, podUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete pods not in current state")
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune pods not in current state")
 	}
-	log.Debug().Int("count", len(dbPods)).Msg("Pods synced successfully")
 	return nil
 }
 
-// SyncContainers syncs pod container specs in one namespace and prunes stale rows.
-func SyncContainers(ctx context.Context, namespace string) error {
+func syncContainers(ctx context.Context, namespace string) error {
 	log := logger.WithComponent("kubernetes")
-
-	if Clientset == nil {
-		return fmt.Errorf("kubernetes client not initialized")
-	}
 
 	pods, err := Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -699,21 +638,17 @@ func SyncContainers(ctx context.Context, namespace string) error {
 	}
 
 	if len(dbContainers) > 0 {
-		log.Debug().Int("count", len(dbContainers)).Msg("Syncing containers...")
 		if err := database.UpsertContainersBatch(ctx, dbContainers); err != nil {
-			return fmt.Errorf("failed to upsert containers: %w", err)
+			return err
 		}
-		log.Debug().Int("count", len(dbContainers)).Msg("Containers synced successfully")
 	}
 
 	if err := database.PruneContainers(ctx, namespace, podUIDs); err != nil {
-		log.Warn().Err(err).Msg("Failed to delete containers not in current state")
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune containers not in current state")
 	}
 	return nil
 }
 
-// shouldSyncNamespace returns whether a namespace should be included in the sync.
-// IncludeNamespaces takes precedence over ExcludeNamespaces for explicit allowlists.
 func shouldSyncNamespace(namespace string) bool {
 	cfg := config.AppConfig.Workers
 
@@ -728,7 +663,6 @@ func shouldSyncNamespace(namespace string) bool {
 	return true
 }
 
-// mapToJSON encodes a string map for jsonb columns.
 func mapToJSON(m map[string]string) (json.RawMessage, error) {
 	if len(m) == 0 {
 		return json.RawMessage("{}"), nil
@@ -740,7 +674,6 @@ func mapToJSON(m map[string]string) (json.RawMessage, error) {
 	return json.RawMessage(data), nil
 }
 
-// sliceToJSON encodes arbitrary slices/structs for jsonb columns.
 func sliceToJSON(s any) (json.RawMessage, error) {
 	if s == nil {
 		return json.RawMessage("[]"), nil
