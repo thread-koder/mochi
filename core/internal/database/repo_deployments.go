@@ -7,7 +7,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
-	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
 // UpsertDeploymentsBatch inserts or updates deployments by Kubernetes UID inside one transaction.
@@ -15,9 +14,6 @@ func UpsertDeploymentsBatch(ctx context.Context, deployments []*Deployment) erro
 	if len(deployments) == 0 {
 		return nil
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(deployments)).Msg("Upserting deployments batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -68,7 +64,6 @@ func UpsertDeploymentsBatch(ctx context.Context, deployments []*Deployment) erro
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(deployments)).Msg("Deployments upserted successfully")
 	return nil
 }
 

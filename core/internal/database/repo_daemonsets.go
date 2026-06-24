@@ -7,7 +7,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
-	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
 // UpsertDaemonSetsBatch inserts or updates DaemonSets by Kubernetes UID inside one transaction.
@@ -15,9 +14,6 @@ func UpsertDaemonSetsBatch(ctx context.Context, daemonsets []*DaemonSet) error {
 	if len(daemonsets) == 0 {
 		return nil
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(daemonsets)).Msg("Upserting daemonsets batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -68,7 +64,6 @@ func UpsertDaemonSetsBatch(ctx context.Context, daemonsets []*DaemonSet) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(daemonsets)).Msg("Daemonsets upserted successfully")
 	return nil
 }
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
 // UpsertServicesBatch inserts or updates Services by Kubernetes UID inside one transaction.
@@ -13,9 +12,6 @@ func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 	if len(services) == 0 {
 		return nil
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(services)).Msg("Upserting services batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -67,7 +63,6 @@ func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(services)).Msg("Services upserted successfully")
 	return nil
 }
 

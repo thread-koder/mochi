@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
 // UpsertEndpointSlicesBatch inserts or updates EndpointSlices by Kubernetes UID inside one transaction.
@@ -13,9 +12,6 @@ func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSl
 	if len(endpointSlices) == 0 {
 		return nil
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(endpointSlices)).Msg("Upserting endpoint slices batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -68,7 +64,6 @@ func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSl
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(endpointSlices)).Msg("Endpoint slices upserted successfully")
 	return nil
 }
 

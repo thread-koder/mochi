@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
 // UpsertReplicaSetsBatch inserts or updates ReplicaSets by Kubernetes UID inside one transaction.
@@ -13,9 +12,6 @@ func UpsertReplicaSetsBatch(ctx context.Context, replicasets []*ReplicaSet) erro
 	if len(replicasets) == 0 {
 		return nil
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(replicasets)).Msg("Upserting replicasets batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -68,7 +64,6 @@ func UpsertReplicaSetsBatch(ctx context.Context, replicasets []*ReplicaSet) erro
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(replicasets)).Msg("Replicasets upserted successfully")
 	return nil
 }
 

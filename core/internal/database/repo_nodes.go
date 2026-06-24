@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
 // UpsertNodesBatch inserts or updates nodes by Kubernetes UID inside one transaction.
@@ -13,9 +12,6 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 	if len(nodes) == 0 {
 		return nil
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(nodes)).Msg("Upserting nodes batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -77,7 +73,6 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(nodes)).Msg("Nodes upserted successfully")
 	return nil
 }
 

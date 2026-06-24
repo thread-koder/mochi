@@ -7,7 +7,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
-	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
 // UpsertNamespacesBatch inserts or updates namespaces by Kubernetes UID inside one transaction.
@@ -15,9 +14,6 @@ func UpsertNamespacesBatch(ctx context.Context, namespaces []*Namespace) error {
 	if len(namespaces) == 0 {
 		return nil
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(namespaces)).Msg("Upserting namespaces batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -62,7 +58,6 @@ func UpsertNamespacesBatch(ctx context.Context, namespaces []*Namespace) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(namespaces)).Msg("Namespaces upserted successfully")
 	return nil
 }
 

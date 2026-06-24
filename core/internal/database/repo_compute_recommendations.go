@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
-	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
 // InsertComputeRecommendation inserts a compute recommendation.
@@ -18,14 +17,6 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 	if rec.ID == uuid.Nil {
 		return fmt.Errorf("compute recommendation ID is required")
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("id", rec.ID.String()).
-		Str("workload_type", rec.WorkloadType).
-		Str("workload_name", rec.WorkloadName).
-		Str("namespace", rec.Namespace).
-		Msg("Inserting compute recommendation")
 
 	query := `
 		INSERT INTO compute_recommendations (
@@ -48,14 +39,8 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 		rec.CreatedAt, rec.UpdatedAt, rec.GeneratedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert compute recommendation: %w", err)
+		return fmt.Errorf("failed to execute insert compute recommendation: %w", err)
 	}
-
-	log.Debug().
-		Str("id", rec.ID.String()).
-		Str("workload_name", rec.WorkloadName).
-		Str("namespace", rec.Namespace).
-		Msg("Compute recommendation inserted successfully")
 
 	return nil
 }
@@ -114,7 +99,7 @@ func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadN
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.NewNotFound("compute_recommendation", fmt.Sprintf("%s/%s/%s", namespace, workloadType, workloadName))
 		}
-		return nil, fmt.Errorf("failed to query latest compute recommendation: %w", err)
+		return nil, fmt.Errorf("failed to query compute recommendation by workload: %w", err)
 	}
 
 	if analysisTimeRange != nil {
@@ -229,12 +214,6 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 
 // UpdateComputeRecommendationStatus sets status and updates updated_at.
 func UpdateComputeRecommendationStatus(ctx context.Context, id uuid.UUID, status string) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("id", id.String()).
-		Str("status", status).
-		Msg("Updating compute recommendation status")
-
 	query := `
 		UPDATE compute_recommendations
 		SET status = $1, updated_at = NOW()
@@ -243,17 +222,12 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id uuid.UUID, status
 
 	result, err := Pool.Exec(ctx, query, status, id)
 	if err != nil {
-		return fmt.Errorf("failed to update compute recommendation status: %w", err)
+		return fmt.Errorf("failed to execute update compute recommendation status: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
 		return apperrors.NewNotFound("compute_recommendation", id.String())
 	}
-
-	log.Debug().
-		Str("id", id.String()).
-		Str("status", status).
-		Msg("Compute recommendation status updated successfully")
 
 	return nil
 }
@@ -261,14 +235,6 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id uuid.UUID, status
 // MarkRecommendationsSuperseded changes the status of active recommendations (eg. not superseded)
 // for the same workload to superseded, excluding the applied row (excludeID).
 func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadName, namespace string, excludeID uuid.UUID) error {
-	log := logger.WithComponent("database")
-	log.Debug().
-		Str("workload_type", workloadType).
-		Str("workload_name", workloadName).
-		Str("namespace", namespace).
-		Str("exclude_id", excludeID.String()).
-		Msg("Marking recommendations as superseded")
-
 	query := `
 		UPDATE compute_recommendations
 		SET status = 'superseded', updated_at = NOW()
@@ -279,46 +245,25 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 		  AND status != 'superseded'
 	`
 
-	result, err := Pool.Exec(ctx, query, workloadType, workloadName, namespace, excludeID)
+	_, err := Pool.Exec(ctx, query, workloadType, workloadName, namespace, excludeID)
 	if err != nil {
-		return fmt.Errorf("failed to mark recommendations as superseded: %w", err)
+		return fmt.Errorf("failed to execute update compute recommendations: %w", err)
 	}
-
-	rowsAffected := result.RowsAffected()
-	log.Debug().
-		Int64("rows_affected", rowsAffected).
-		Str("workload_type", workloadType).
-		Str("workload_name", workloadName).
-		Str("namespace", namespace).
-		Msg("Recommendations marked as superseded successfully")
 
 	return nil
 }
 
 // DeleteComputeRecommendationsOlderThan deletes compute recommendations with created_at before since (retention cleanup).
 func DeleteComputeRecommendationsOlderThan(ctx context.Context, since time.Time) error {
-	log := logger.WithComponent("database")
-
 	query := `DELETE FROM compute_recommendations WHERE created_at < $1`
-	result, err := Pool.Exec(ctx, query, since)
-	if err != nil {
-		return fmt.Errorf("failed to delete old compute recommendations: %w", err)
-	}
-
-	deleted := result.RowsAffected()
-	if deleted > 0 {
-		log.Debug().Int64("count", deleted).Msg("Old compute recommendations deleted")
-	}
-
-	return nil
+	_, err := Pool.Exec(ctx, query, since)
+	return err
 }
 
 // DeleteComputeRecommendationsForDeletedWorkloads deletes compute recommendations whose workload no longer appears
 // in the synced tables: Deployment/StatefulSet/DaemonSet by name, or Pod when workload_type is Pod and
 // the pod has no owner (i.e. standalone pods).
 func DeleteComputeRecommendationsForDeletedWorkloads(ctx context.Context) error {
-	log := logger.WithComponent("database")
-
 	query := `
 		DELETE FROM compute_recommendations cr
 		WHERE NOT EXISTS (
@@ -344,15 +289,6 @@ func DeleteComputeRecommendationsForDeletedWorkloads(ctx context.Context) error 
 		)
 	`
 
-	result, err := Pool.Exec(ctx, query)
-	if err != nil {
-		return fmt.Errorf("failed to cleanup compute recommendations for deleted workloads: %w", err)
-	}
-
-	deleted := result.RowsAffected()
-	if deleted > 0 {
-		log.Debug().Int64("count", deleted).Msg("Compute recommendations cleaned up for deleted workloads")
-	}
-
-	return nil
+	_, err := Pool.Exec(ctx, query)
+	return err
 }

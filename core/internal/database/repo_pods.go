@@ -7,7 +7,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
-	"github.com/thread_koder/mochi/core/internal/logger"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -16,9 +15,6 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	if len(pods) == 0 {
 		return nil
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(pods)).Msg("Upserting pods batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -73,7 +69,6 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(pods)).Msg("Pods upserted successfully")
 	return nil
 }
 
@@ -237,7 +232,7 @@ func PrunePods(ctx context.Context, namespace string, uids []string) error {
 func getPodsByDeployment(ctx context.Context, deploymentName, namespace string) ([]*Pod, error) {
 	replicasets, err := GetReplicaSetsByDeployment(ctx, deploymentName, namespace)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get replicasets for deployment: %w", err)
+		return nil, err
 	}
 
 	if len(replicasets) == 0 {

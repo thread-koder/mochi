@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
 // UpsertContainersBatch inserts or updates containers by their (pod_uid, name) inside one transaction.
@@ -13,9 +12,6 @@ func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 	if len(containers) == 0 {
 		return nil
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(containers)).Msg("Upserting containers batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -72,7 +68,6 @@ func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(containers)).Msg("Containers upserted successfully")
 	return nil
 }
 

@@ -7,7 +7,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
-	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
 // UpsertStatefulSetsBatch inserts or updates StatefulSets by Kubernetes UID inside one transaction.
@@ -15,9 +14,6 @@ func UpsertStatefulSetsBatch(ctx context.Context, statefulsets []*StatefulSet) e
 	if len(statefulsets) == 0 {
 		return nil
 	}
-
-	log := logger.WithComponent("database")
-	log.Debug().Int("count", len(statefulsets)).Msg("Upserting statefulsets batch")
 
 	tx, err := Pool.Begin(ctx)
 	if err != nil {
@@ -67,7 +63,6 @@ func UpsertStatefulSetsBatch(ctx context.Context, statefulsets []*StatefulSet) e
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	log.Debug().Int("count", len(statefulsets)).Msg("Statefulsets upserted successfully")
 	return nil
 }
 
