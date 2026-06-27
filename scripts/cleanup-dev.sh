@@ -53,7 +53,7 @@ read -p "Do you want to remove the namespace '${NAMESPACE}'? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${YELLOW}Removing namespace...${NC}"
-    kubectl delete namespace ${NAMESPACE} --wait || true
+    kubectl delete namespace ${NAMESPACE} || true
     echo -e "${GREEN}Namespace removed${NC}"
 fi
 
