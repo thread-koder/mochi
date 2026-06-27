@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// NamespaceResponse is the payload for namespace detail pages.
 type NamespaceResponse struct {
 	Name       string          `json:"name"`
 	Phase      string          `json:"phase"`
@@ -23,14 +22,12 @@ type NamespaceResponse struct {
 	System     []StandalonePod `json:"system_pods"`
 }
 
-// NamespaceStats holds namespace-level workload and resource counts.
 type NamespaceStats struct {
 	Workloads  int `json:"workloads"`
 	Pods       int `json:"pods"`
 	Containers int `json:"containers"`
 }
 
-// Workload represents one workload row in namespace details.
 type Workload struct {
 	Type      string    `json:"type"`
 	Name      string    `json:"name"`
@@ -47,7 +44,6 @@ type StandalonePod struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// GetNamespace returns metadata, workloads, and pods for a namespace.
 func GetNamespace(c *gin.Context) {
 	namespaceName := c.Param("namespace")
 

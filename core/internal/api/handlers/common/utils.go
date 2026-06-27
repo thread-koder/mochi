@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// ParseTimeRange parses time range values like "24h", "7d", or "1h30m".
 func ParseTimeRange(timeRangeStr string) (time.Duration, error) {
 	if len(timeRangeStr) > 0 && timeRangeStr[len(timeRangeStr)-1] == 'd' {
 		daysStr := timeRangeStr[:len(timeRangeStr)-1]

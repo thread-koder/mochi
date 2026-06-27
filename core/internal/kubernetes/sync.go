@@ -18,8 +18,6 @@ import (
 
 const namespaceSyncConcurrency = 4
 
-// SyncResources fetches cluster resources and stores a DB snapshot.
-// Cluster-level stages warn and continue on failure, namespace sync runs in parallel with isolated failures.
 func SyncResources(ctx context.Context) {
 	log := logger.WithComponent("kubernetes")
 

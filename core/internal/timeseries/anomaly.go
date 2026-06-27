@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// Severity labels how far an outlier is from the baseline distribution.
 type Severity string
 
 const (
@@ -15,7 +14,6 @@ const (
 	SeverityHigh   Severity = "high"
 )
 
-// Anomaly represents one outlier detected in a series.
 type Anomaly struct {
 	Value     float64   `json:"value"`
 	Timestamp time.Time `json:"timestamp"`
@@ -24,7 +22,6 @@ type Anomaly struct {
 	Severity  Severity  `json:"severity"`
 }
 
-// AnomalyResult contains all detected anomalies and the threshold used.
 type AnomalyResult struct {
 	Anomalies    []Anomaly `json:"anomalies"`
 	AnomalyCount int       `json:"anomaly_count"`
@@ -62,7 +59,6 @@ func DetectAnomalies(dataPoints []DataPoint, thresholdMultiplier float64) (Anoma
 		deviation := math.Abs(dp.Value - stats.Mean)
 		stdDevs := deviation / stats.StdDev
 
-		// The relative guardrail avoids marking tiny absolute wiggles as anomalies.
 		isSignificant := stats.Mean == 0 || (deviation/stats.Mean) > 0.1
 
 		if deviation > threshold && isSignificant {

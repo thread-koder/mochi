@@ -23,7 +23,6 @@ type QueryOptions struct {
 	RangeDuration string
 }
 
-// QueryRange executes a PromQL range query given the query string, range, and options.
 func QueryRange(ctx context.Context, query string, r v1.Range, opts QueryOptions) (model.Value, v1.Warnings, error) {
 	result, warnings, err := API.QueryRange(ctx, query, r)
 	if err != nil {
@@ -33,7 +32,6 @@ func QueryRange(ctx context.Context, query string, r v1.Range, opts QueryOptions
 	return result, warnings, nil
 }
 
-// Query executes a PromQL instant query given the query string and timestamp.
 func Query(ctx context.Context, query string, ts time.Time) (model.Value, v1.Warnings, error) {
 	result, warnings, err := API.Query(ctx, query, ts)
 	if err != nil {
@@ -43,7 +41,6 @@ func Query(ctx context.Context, query string, ts time.Time) (model.Value, v1.War
 	return result, warnings, nil
 }
 
-// executeMatrixQuery executes a range query and enforces a matrix result type.
 func executeMatrixQuery(ctx context.Context, query string, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	result, warnings, err := QueryRange(ctx, query, r, opts)
 	if err != nil {
@@ -58,10 +55,6 @@ func executeMatrixQuery(ctx context.Context, query string, r v1.Range, opts Quer
 	return matrix, warnings, nil
 }
 
-// executeScalarQuery executes an instant query and extracts one scalar value.
-//
-// Some PromQL expressions that are scalar in intent return a one-sample vector,
-// so this function accepts both scalar and 0/1-length vector responses.
 func executeScalarQuery(ctx context.Context, query string, ts time.Time) (float64, v1.Warnings, error) {
 	result, warnings, err := Query(ctx, query, ts)
 	if err != nil {

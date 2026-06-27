@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// UpsertReplicaSetsBatch inserts or updates ReplicaSets by Kubernetes UID inside one transaction.
 func UpsertReplicaSetsBatch(ctx context.Context, replicasets []*ReplicaSet) error {
 	if len(replicasets) == 0 {
 		return nil
@@ -67,7 +66,6 @@ func UpsertReplicaSetsBatch(ctx context.Context, replicasets []*ReplicaSet) erro
 	return nil
 }
 
-// GetReplicaSetsByDeployment returns the ReplicaSets owned by the given Deployment (owner_kind/name match).
 func GetReplicaSetsByDeployment(ctx context.Context, deploymentName, namespace string) ([]*ReplicaSet, error) {
 	query := `
 		SELECT id, name, namespace, uid, replicas, ready_replicas,
@@ -105,8 +103,8 @@ func GetReplicaSetsByDeployment(ctx context.Context, deploymentName, namespace s
 	return replicasets, nil
 }
 
-// PruneReplicaSets deletes ReplicaSets whose UID is not in uids in the namespace.
-// Empty uids deletes all ReplicaSets in that namespace.
+// PruneReplicaSets deletes ReplicaSets not listed in uids.
+// Empty uids deletes every ReplicaSet in the namespace.
 func PruneReplicaSets(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM replicasets WHERE namespace = $1`, namespace)

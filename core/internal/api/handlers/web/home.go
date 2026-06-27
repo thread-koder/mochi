@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// HomeResponse is the payload for the home page.
 type HomeResponse struct {
 	ClusterName  string          `json:"cluster_name"`
 	Stats        Stats           `json:"stats"`
@@ -21,7 +20,6 @@ type HomeResponse struct {
 	Activities   []Activity      `json:"activities"`
 }
 
-// GetHome builds the dashboard response for the home page.
 func GetHome(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

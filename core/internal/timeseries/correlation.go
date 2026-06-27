@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// CorrelationStrength maps coefficient magnitude into weak, moderate, and strong.
 type CorrelationStrength string
 
 const (
@@ -16,7 +15,6 @@ const (
 	CorrelationStrengthStrong   CorrelationStrength = "strong"
 )
 
-// CorrelationDirection captures the sign of the relationship.
 type CorrelationDirection string
 
 const (
@@ -25,7 +23,6 @@ const (
 	CorrelationDirectionNone     CorrelationDirection = "none"
 )
 
-// CorrelationResult is the Pearson correlation summary for one aligned series pair.
 type CorrelationResult struct {
 	Coefficient float64              `json:"coefficient"`
 	Strength    CorrelationStrength  `json:"strength"`
@@ -33,13 +30,11 @@ type CorrelationResult struct {
 	SampleSize  int                  `json:"sample_size"`
 }
 
-// LagCorrelation stores the correlation observed at one tested lag.
 type LagCorrelation struct {
 	Lag         time.Duration     `json:"lag"`
 	Correlation CorrelationResult `json:"correlation"`
 }
 
-// CrossCorrelationResult summarizes lag exploration and the strongest relationship found.
 type CrossCorrelationResult struct {
 	MaxCorrelation  CorrelationResult `json:"max_correlation"`
 	OptimalLag      time.Duration     `json:"optimal_lag"`
@@ -98,7 +93,6 @@ func AlignDataPointsByTime(a, b []DataPoint, tolerance time.Duration) ([]DataPoi
 	return alignedA, alignedB, nil
 }
 
-// CalculatePearsonCorrelation computes Pearson r for pre-aligned time series.
 func CalculatePearsonCorrelation(a, b []DataPoint) (CorrelationResult, error) {
 	if len(a) != len(b) {
 		return CorrelationResult{}, fmt.Errorf("series must have equal length: got %d and %d", len(a), len(b))
@@ -255,7 +249,6 @@ func CalculateCrossCorrelation(a, b []DataPoint, maxLag time.Duration, lagStep t
 	}, nil
 }
 
-// shiftDataPoints copies data while shifting timestamps by offset.
 func shiftDataPoints(data []DataPoint, offset time.Duration) []DataPoint {
 	shifted := make([]DataPoint, len(data))
 	for i, dp := range data {
@@ -267,7 +260,6 @@ func shiftDataPoints(data []DataPoint, offset time.Duration) []DataPoint {
 	return shifted
 }
 
-// classifyCorrelationStrength buckets absolute coefficient magnitude.
 func classifyCorrelationStrength(coefficient float64) CorrelationStrength {
 	absCoeff := math.Abs(coefficient)
 	if absCoeff >= 0.7 {
@@ -278,7 +270,6 @@ func classifyCorrelationStrength(coefficient float64) CorrelationStrength {
 	return CorrelationStrengthWeak
 }
 
-// classifyCorrelationDirection maps coefficient sign to a readable label.
 func classifyCorrelationDirection(coefficient float64) CorrelationDirection {
 	if math.Abs(coefficient) < 0.1 {
 		return CorrelationDirectionNone

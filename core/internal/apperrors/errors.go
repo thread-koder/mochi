@@ -4,7 +4,6 @@ import (
 	"fmt"
 )
 
-// NotFoundError identifies missing domain entities.
 type NotFoundError struct {
 	Resource   string
 	Identifier string
@@ -36,7 +35,6 @@ func NewNotFound(resource, identifier string) error {
 	return &NotFoundError{Resource: resource, Identifier: identifier}
 }
 
-// NoMetricsError identifies missing telemetry for an existing scope.
 type NoMetricsError struct {
 	Scope string
 }

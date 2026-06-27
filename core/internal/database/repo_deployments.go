@@ -9,7 +9,6 @@ import (
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 )
 
-// UpsertDeploymentsBatch inserts or updates deployments by Kubernetes UID inside one transaction.
 func UpsertDeploymentsBatch(ctx context.Context, deployments []*Deployment) error {
 	if len(deployments) == 0 {
 		return nil
@@ -67,7 +66,6 @@ func UpsertDeploymentsBatch(ctx context.Context, deployments []*Deployment) erro
 	return nil
 }
 
-// GetDeploymentsByNamespace returns all the deployments in the namespace, ordered by name.
 func GetDeploymentsByNamespace(ctx context.Context, namespace string) ([]*Deployment, error) {
 	query := `
 		SELECT id, name, namespace, uid, replicas, ready_replicas, available_replicas,
@@ -104,7 +102,6 @@ func GetDeploymentsByNamespace(ctx context.Context, namespace string) ([]*Deploy
 	return deployments, nil
 }
 
-// GetDeploymentByName returns a deployment by name in the namespace.
 func GetDeploymentByName(ctx context.Context, name string, namespace string) (*Deployment, error) {
 	query := `
 		SELECT id, name, namespace, uid, replicas, ready_replicas, available_replicas,
@@ -131,8 +128,8 @@ func GetDeploymentByName(ctx context.Context, name string, namespace string) (*D
 	return &dep, nil
 }
 
-// PruneDeployments deletes deployments whose UID is not in uids in the namespace.
-// Empty uids deletes all deployments in that namespace.
+// PruneDeployments deletes deployments not listed in uids.
+// Empty uids deletes every deployment in the namespace.
 func PruneDeployments(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM deployments WHERE namespace = $1`, namespace)

@@ -5,7 +5,6 @@ import (
 	"math"
 )
 
-// Direction classifies the direction of change in a series.
 type Direction string
 
 const (
@@ -14,7 +13,6 @@ const (
 	DirectionDecreasing Direction = "decreasing"
 )
 
-// TrendResult is the output of linear trend analysis.
 type TrendResult struct {
 	Direction Direction `json:"direction"`
 	Slope     float64   `json:"slope"`
@@ -58,7 +56,6 @@ func AnalyzeTrend(dataPoints []DataPoint) (TrendResult, error) {
 	}, nil
 }
 
-// linearRegression returns slope/intercept and Pearson r for paired x/y series.
 func linearRegression(x, y []float64) (slope, intercept, correlation float64) {
 	n := len(x)
 	if n != len(y) || n == 0 {

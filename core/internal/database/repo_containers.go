@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// UpsertContainersBatch inserts or updates containers by their (pod_uid, name) inside one transaction.
 func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 	if len(containers) == 0 {
 		return nil
@@ -71,7 +70,6 @@ func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 	return nil
 }
 
-// GetContainersByPodUID returns all the containers for one pod, ordered by name.
 func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, error) {
 	query := `
 		SELECT id, name, pod_uid, pod_name, namespace, image, image_pull_policy, ports,
@@ -110,8 +108,8 @@ func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, er
 	return containers, nil
 }
 
-// PruneContainers deletes containers whose pod_uid is not in podUIDs in the namespace.
-// Empty podUIDs deletes all containers in that namespace (eg. containers that do not belong to any pod).
+// PruneContainers deletes containers not listed in podUIDs.
+// Empty podUIDs deletes every container in the namespace.
 func PruneContainers(ctx context.Context, namespace string, podUIDs []string) error {
 	if len(podUIDs) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM containers WHERE namespace = $1`, namespace)

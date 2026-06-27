@@ -11,8 +11,6 @@ import (
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 )
 
-// InsertComputeRecommendation inserts a compute recommendation.
-// AnalysisTimeRange is stored as an interval when the string parses as a duration, otherwise the column stays unset.
 func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation) error {
 	if rec.ID == uuid.Nil {
 		return fmt.Errorf("compute recommendation ID is required")
@@ -45,7 +43,6 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 	return nil
 }
 
-// GetComputeRecommendationByID returns a compute recommendation by its ID.
 func GetComputeRecommendationByID(ctx context.Context, id uuid.UUID) (*ComputeRecommendation, error) {
 	query := `
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
@@ -76,7 +73,6 @@ func GetComputeRecommendationByID(ctx context.Context, id uuid.UUID) (*ComputeRe
 	return &rec, nil
 }
 
-// GetLatestComputeRecommendation returns the newest compute recommendation for the workload by created_at.
 func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadName, namespace string) (*ComputeRecommendation, error) {
 	query := `
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
@@ -109,9 +105,6 @@ func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadN
 	return &rec, nil
 }
 
-// GetComputeRecommendations filters by optional pointer fields (nil means no filter).
-// workloadName uses ILIKE substring match. limit and offset append only when positive,
-// limit 0 means no LIMIT clause (unbounded page).
 func GetComputeRecommendations(ctx context.Context, namespace *string, status *string, mode *string, workloadType *string, workloadName *string, limit, offset int) ([]*ComputeRecommendation, int64, error) {
 	whereClause := "WHERE 1=1"
 	args := []any{}
@@ -212,7 +205,6 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 	return recommendations, total, nil
 }
 
-// UpdateComputeRecommendationStatus sets status and updates updated_at.
 func UpdateComputeRecommendationStatus(ctx context.Context, id uuid.UUID, status string) error {
 	query := `
 		UPDATE compute_recommendations
@@ -232,8 +224,6 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id uuid.UUID, status
 	return nil
 }
 
-// MarkRecommendationsSuperseded changes the status of active recommendations (eg. not superseded)
-// for the same workload to superseded, excluding the applied row (excludeID).
 func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadName, namespace string, excludeID uuid.UUID) error {
 	query := `
 		UPDATE compute_recommendations
@@ -253,16 +243,12 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 	return nil
 }
 
-// DeleteComputeRecommendationsOlderThan deletes compute recommendations with created_at before since (retention cleanup).
 func DeleteComputeRecommendationsOlderThan(ctx context.Context, since time.Time) error {
 	query := `DELETE FROM compute_recommendations WHERE created_at < $1`
 	_, err := Pool.Exec(ctx, query, since)
 	return err
 }
 
-// DeleteComputeRecommendationsForDeletedWorkloads deletes compute recommendations whose workload no longer appears
-// in the synced tables: Deployment/StatefulSet/DaemonSet by name, or Pod when workload_type is Pod and
-// the pod has no owner (i.e. standalone pods).
 func DeleteComputeRecommendationsForDeletedWorkloads(ctx context.Context) error {
 	query := `
 		DELETE FROM compute_recommendations cr

@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Node represents a Kubernetes Node metadata.
 type Node struct {
 	ID                      uuid.UUID       `json:"id" db:"id"`
 	Name                    string          `json:"name" db:"name"`
@@ -30,7 +29,6 @@ type Node struct {
 	SyncedAt                time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Namespace represents a Kubernetes Namespace metadata.
 type Namespace struct {
 	ID          uuid.UUID       `json:"id" db:"id"`
 	Name        string          `json:"name" db:"name"`
@@ -43,7 +41,6 @@ type Namespace struct {
 	SyncedAt    time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Deployment represents a Kubernetes Deployment metadata.
 type Deployment struct {
 	ID                uuid.UUID       `json:"id" db:"id"`
 	Name              string          `json:"name" db:"name"`
@@ -59,7 +56,6 @@ type Deployment struct {
 	SyncedAt          time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// ReplicaSet represents a Kubernetes ReplicaSet metadata.
 type ReplicaSet struct {
 	ID            uuid.UUID       `json:"id" db:"id"`
 	Name          string          `json:"name" db:"name"`
@@ -76,7 +72,6 @@ type ReplicaSet struct {
 	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// StatefulSet represents a Kubernetes StatefulSet metadata.
 type StatefulSet struct {
 	ID            uuid.UUID       `json:"id" db:"id"`
 	Name          string          `json:"name" db:"name"`
@@ -91,7 +86,6 @@ type StatefulSet struct {
 	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// DaemonSet represents a Kubernetes DaemonSet metadata.
 type DaemonSet struct {
 	ID                     uuid.UUID       `json:"id" db:"id"`
 	Name                   string          `json:"name" db:"name"`
@@ -107,7 +101,6 @@ type DaemonSet struct {
 	SyncedAt               time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Service represents a Kubernetes Service metadata.
 type Service struct {
 	ID          uuid.UUID       `json:"id" db:"id"`
 	Name        string          `json:"name" db:"name"`
@@ -124,7 +117,6 @@ type Service struct {
 	SyncedAt    time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// EndpointSlice represents a Kubernetes EndpointSlice metadata.
 type EndpointSlice struct {
 	ID          uuid.UUID       `json:"id" db:"id"`
 	Name        string          `json:"name" db:"name"`
@@ -142,7 +134,6 @@ type EndpointSlice struct {
 	SyncedAt    time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Pod represents a Kubernetes Pod metadata.
 type Pod struct {
 	ID            uuid.UUID       `json:"id" db:"id"`
 	Name          string          `json:"name" db:"name"`
@@ -160,7 +151,6 @@ type Pod struct {
 	SyncedAt      time.Time       `json:"synced_at" db:"synced_at"`
 }
 
-// Container represents a Kubernetes Container metadata.
 type Container struct {
 	ID              uuid.UUID       `json:"id" db:"id"`
 	Name            string          `json:"name" db:"name"`

@@ -17,13 +17,11 @@ var supportedWorkloadTypes = map[string]bool{
 	"Pod":         true,
 }
 
-// IsValidWorkloadType reports whether workloadType is Deployment, StatefulSet, DaemonSet, or Pod.
 func IsValidWorkloadType(workloadType string) bool {
 	_, ok := supportedWorkloadTypes[workloadType]
 	return ok
 }
 
-// ValidateWorkloadType rejects unsupported workload kinds on routes that require a type.
 func ValidateWorkloadType(c *gin.Context, workloadType string) bool {
 	if IsValidWorkloadType(workloadType) {
 		return true

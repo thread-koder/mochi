@@ -19,7 +19,6 @@ type Server struct {
 	cfg    *config.APIConfig
 }
 
-// NewServer builds an API server from the given API config.
 func NewServer(cfg *config.APIConfig) (*Server, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("api config is nil")
@@ -48,7 +47,6 @@ func NewServer(cfg *config.APIConfig) (*Server, error) {
 	}, nil
 }
 
-// Start begins serving HTTP requests until shutdown is requested.
 func (s *Server) Start() error {
 	log := logger.WithComponent("server")
 	log.Info().
@@ -64,7 +62,6 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Shutdown gracefully stops the HTTP server.
 func (s *Server) Shutdown(ctx context.Context) error {
 	log := logger.WithComponent("server")
 	log.Info().Msg("Shutting down server...")

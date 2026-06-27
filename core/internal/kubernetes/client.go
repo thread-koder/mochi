@@ -22,7 +22,6 @@ var (
 	RestConfig *rest.Config
 )
 
-// ClusterInfo describes the connected cluster.
 type ClusterInfo struct {
 	ServerVersion string `json:"server_version"`
 	ClusterName   string `json:"cluster_name"`
@@ -30,7 +29,6 @@ type ClusterInfo struct {
 	APIServerURL  string `json:"api_server_url"`
 }
 
-// Init configures and verifies the Kubernetes client connection.
 func Init(cfg *config.KubernetesConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("kubernetes config is nil")
@@ -91,7 +89,6 @@ func Init(cfg *config.KubernetesConfig) error {
 	return nil
 }
 
-// GetClusterInfo returns basic cluster metadata.
 func GetClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 	info := &ClusterInfo{
 		APIServerURL: RestConfig.Host,
@@ -106,7 +103,6 @@ func GetClusterInfo(ctx context.Context) (*ClusterInfo, error) {
 	return info, nil
 }
 
-// HealthCheck verifies the API server reachability with a discovery call.
 func HealthCheck(ctx context.Context) error {
 	_, err := Clientset.Discovery().ServerVersion()
 	if err != nil {

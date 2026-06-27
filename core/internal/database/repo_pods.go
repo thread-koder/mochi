@@ -10,7 +10,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// UpsertPodsBatch inserts or updates pods by Kubernetes UID inside one transaction.
 func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	if len(pods) == 0 {
 		return nil
@@ -72,7 +71,6 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	return nil
 }
 
-// GetPodByName returns a pod by name in the namespace (first match if duplicates ever exist).
 func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, phase, restart_policy,
@@ -100,7 +98,7 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 }
 
 // GetPodsByWorkload returns the pods for a workload. Deployment is special: pods are owned by
-// ReplicaSets, not the Deployment, so we walk RS -> Pod. Other kinds query owner_kind/owner_name directly.
+// ReplicaSets, so we walk RS -> Pod. Other kinds query owner_kind/owner_name directly.
 func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName string, namespace string) ([]*Pod, error) {
 	if workloadType == "Deployment" {
 		return getPodsByDeployment(ctx, workloadName, namespace)
@@ -142,7 +140,7 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 	return pods, nil
 }
 
-// GetStandalonePodsByNamespace returns the pods with no owner in the namespace.
+// GetStandalonePodsByNamespace returns the pods that are not owned by a workload controller.
 func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, phase, restart_policy,
@@ -180,7 +178,6 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 	return pods, nil
 }
 
-// GetPodsByOwnerKind returns the pods with the given owner_kind in the namespace (e.g. Node for system pods).
 func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string) ([]*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, phase, restart_policy,
@@ -218,8 +215,8 @@ func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string)
 	return pods, nil
 }
 
-// PrunePods deletes pods whose UID is not in uids in the namespace.
-// Empty uids deletes all pods in that namespace.
+// PrunePods deletes pods not listed in uids.
+// Empty uids deletes every pod in the namespace.
 func PrunePods(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM pods WHERE namespace = $1`, namespace)

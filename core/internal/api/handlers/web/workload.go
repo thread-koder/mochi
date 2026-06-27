@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// WorkloadResponse is the payload for workload detail pages.
 type WorkloadResponse struct {
 	Namespace  string        `json:"namespace"`
 	Type       string        `json:"type"`
@@ -26,13 +25,11 @@ type WorkloadResponse struct {
 	Stats      WorkloadStats `json:"stats"`
 }
 
-// WorkloadStats summarizes pod and container totals for a workload.
 type WorkloadStats struct {
 	Pods       int `json:"pods"`
 	Containers int `json:"containers"`
 }
 
-// Pod describes one pod included in workload details.
 type Pod struct {
 	Name      string    `json:"name"`
 	UID       string    `json:"uid"`
@@ -51,7 +48,6 @@ type Container struct {
 	MemoryLimit   string `json:"memory_limit"`
 }
 
-// GetWorkload returns metadata, pods, and containers for a workload.
 func GetWorkload(c *gin.Context) {
 	namespaceName := c.Param("namespace")
 	workloadType := c.Param("type")

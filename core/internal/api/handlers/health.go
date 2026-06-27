@@ -13,19 +13,16 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// HealthResponse is the payload for GET /health.
 type HealthResponse struct {
 	Status string                 `json:"status"`
 	Checks map[string]CheckResult `json:"checks"`
 }
 
-// CheckResult is one dependency health entry in the aggregated health response.
 type CheckResult struct {
 	Status string `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
 
-// Health reports aggregated service health for readiness checks.
 func Health(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -101,7 +98,6 @@ func Health(c *gin.Context) {
 	c.JSON(statusCode, response)
 }
 
-// DatabaseHealth reports database connectivity health.
 func DatabaseHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -120,7 +116,6 @@ func DatabaseHealth(c *gin.Context) {
 	})
 }
 
-// KubernetesHealth reports Kubernetes client health.
 func KubernetesHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -139,7 +134,6 @@ func KubernetesHealth(c *gin.Context) {
 	})
 }
 
-// PrometheusHealth reports Prometheus API health.
 func PrometheusHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -158,7 +152,6 @@ func PrometheusHealth(c *gin.Context) {
 	})
 }
 
-// RedisHealth reports Redis connectivity health.
 func RedisHealth(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

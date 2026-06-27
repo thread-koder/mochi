@@ -8,7 +8,6 @@ import (
 	"github.com/thread_koder/mochi/core/internal/logger"
 )
 
-// LoggingMiddleware emits structured request logs with status-dependent severity.
 func LoggingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()

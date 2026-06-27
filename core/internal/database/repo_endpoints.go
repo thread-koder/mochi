@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// UpsertEndpointSlicesBatch inserts or updates EndpointSlices by Kubernetes UID inside one transaction.
 func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSlice) error {
 	if len(endpointSlices) == 0 {
 		return nil
@@ -67,8 +66,8 @@ func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSl
 	return nil
 }
 
-// PruneEndpointSlices deletes EndpointSlices whose UID is not in uids in the namespace.
-// Empty uids deletes all EndpointSlices in that namespace.
+// PruneEndpointSlices deletes EndpointSlices not listed in uids.
+// Empty uids deletes every EndpointSlice in the namespace.
 func PruneEndpointSlices(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM endpoint_slices WHERE namespace = $1`, namespace)

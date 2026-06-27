@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// DiskMetrics holds time-aligned read/write byte rates and operation rates from Prometheus.
 type DiskMetrics struct {
 	ReadBytes  []timeseries.DataPoint `json:"read_bytes"`
 	WriteBytes []timeseries.DataPoint `json:"write_bytes"`

@@ -11,15 +11,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// AnalyzeFunc analyzes one namespace workload with its pods already resolved.
+// AnalyzeFunc is the per-workload callback each domain analyzer passes to AnalyzeWorkloads.
 type AnalyzeFunc[T any] func(ctx context.Context, kind, name, namespace string, pods []*database.Pod) (T, error)
 
-// AnalyzeWorkloads lists workloads in the namespace, resolves pods when needed, and returns
-// one result per workload from analyze. Workloads with no metrics are skipped.
-//
-// Listing is pipelined by category (Deployments, StatefulSets, etc.) so analysis can start before every
-// category has finished listing. Controller-owned workloads fetch pods in one goroutine and run analyze
-// in another so DB and Prometheus work overlap across workloads.
 func AnalyzeWorkloads[T any](
 	ctx context.Context,
 	namespace string,

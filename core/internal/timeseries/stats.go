@@ -6,14 +6,12 @@ import (
 	"sort"
 )
 
-// PercentileResult contains the percentile values.
 type PercentileResult struct {
 	P50 float64 `json:"p50"`
 	P95 float64 `json:"p95"`
 	P99 float64 `json:"p99"`
 }
 
-// StatsResult is the statistical summary derived from a data series.
 type StatsResult struct {
 	Mean       float64          `json:"mean"`
 	Median     float64          `json:"median"`
@@ -23,7 +21,6 @@ type StatsResult struct {
 	Percentile PercentileResult `json:"percentile"`
 }
 
-// CalculatePercentiles computes P50, P95, and P99 from the provided values.
 func CalculatePercentiles(values []float64) (PercentileResult, error) {
 	if len(values) == 0 {
 		return PercentileResult{}, fmt.Errorf("cannot calculate percentiles from empty dataset")
@@ -55,7 +52,6 @@ func CalculateMean(values []float64) float64 {
 	return sum / float64(len(values))
 }
 
-// CalculateStats calculates a full summary (central tendency, spread, and percentiles).
 func CalculateStats(dataPoints []DataPoint) (StatsResult, error) {
 	if len(dataPoints) == 0 {
 		return StatsResult{}, fmt.Errorf("cannot calculate stats from empty dataset")

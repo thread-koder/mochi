@@ -13,16 +13,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// AnalysisOptions controls the analysis window, Prometheus range-query resolution, and whether
-// results include raw CPU and memory series for charts.
 type AnalysisOptions struct {
 	TimeRange         time.Duration // How far back to analyze (default: 24h).
 	RangeStep         time.Duration // Step size for Prometheus range queries (default: 1m).
 	IncludeTimeSeries bool          // Whether to include raw CPU and memory series for charts (default: false).
 }
 
-// DefaultAnalysisOptions returns a 24h window with IncludeTimeSeries false and a RangeStep
-// sized for that span via SetTimeRange.
 func DefaultAnalysisOptions() AnalysisOptions {
 	opts := AnalysisOptions{
 		TimeRange:         24 * time.Hour,
@@ -45,14 +41,11 @@ func (opts AnalysisOptions) stabilitySubqueryStep() time.Duration {
 	return max(opts.RangeStep, 5*time.Minute)
 }
 
-// MinSamplesForConfidence returns the minimum number of utilization samples required
-// for a confidence score to reflect sufficient observation of the analysis window.
 func (opts AnalysisOptions) MinSamplesForConfidence() int {
 	expected := int(opts.TimeRange / opts.RangeStep)
 	return max(30, expected/4)
 }
 
-// Validate returns an error if TimeRange or RangeStep are not positive.
 func (opts AnalysisOptions) Validate() error {
 	if opts.TimeRange <= 0 {
 		return fmt.Errorf("TimeRange must be positive, got: %v", opts.TimeRange)
@@ -63,7 +56,6 @@ func (opts AnalysisOptions) Validate() error {
 	return nil
 }
 
-// ContainerAnalysis is utilization, provisioning, and stability for one container, with optional chart series.
 type ContainerAnalysis struct {
 	ContainerName string             `json:"container_name"`
 	Utilization   UtilizationResult  `json:"utilization"`
@@ -72,7 +64,6 @@ type ContainerAnalysis struct {
 	TimeSeries    *TimeSeries        `json:"time_series,omitempty"`
 }
 
-// PodAnalysis is aggregate pod-level compute signals plus per-container analyses and optional pod chart series.
 type PodAnalysis struct {
 	PodUID      string              `json:"pod_uid"`
 	PodName     string              `json:"pod_name"`
@@ -82,7 +73,6 @@ type PodAnalysis struct {
 	TimeSeries  *TimeSeries         `json:"time_series,omitempty"`
 }
 
-// WorkloadAnalysis is workload-level utilization and stability, optional per-pod analyses, and optional chart series.
 type WorkloadAnalysis struct {
 	WorkloadType string            `json:"workload_type"`
 	WorkloadName string            `json:"workload_name"`
@@ -93,7 +83,6 @@ type WorkloadAnalysis struct {
 	TimeSeries   *TimeSeries       `json:"time_series,omitempty"`
 }
 
-// NamespaceAnalysis is namespace-level utilization and stability, workload summaries, and optional chart series.
 type NamespaceAnalysis struct {
 	Namespace   string             `json:"namespace"`
 	Utilization UtilizationResult  `json:"utilization"`
@@ -102,8 +91,6 @@ type NamespaceAnalysis struct {
 	TimeSeries  *TimeSeries        `json:"time_series,omitempty"`
 }
 
-// AnalyzeContainer fetches metrics for container, derives utilization and stability, parses Kubernetes
-// resource fields from the DB row, and runs provisioning analysis.
 func AnalyzeContainer(ctx context.Context, container *database.Container, opts AnalysisOptions) (ContainerAnalysis, error) {
 	if err := opts.Validate(); err != nil {
 		return ContainerAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
@@ -153,8 +140,6 @@ func AnalyzeContainer(ctx context.Context, container *database.Container, opts A
 	return result, nil
 }
 
-// AnalyzePod runs AnalyzeContainer for each container in parallel, then attaches pod-level utilization,
-// stability, and optional chart series from pod-scoped Prometheus queries.
 func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.Container, opts AnalysisOptions) (PodAnalysis, error) {
 	if err := opts.Validate(); err != nil {
 		return PodAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
@@ -211,9 +196,6 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, containers []*database.C
 	return result, nil
 }
 
-// AnalyzeWorkload fetches workload-scoped metrics, derives workload-level utilization and stability, and
-// optionally fills Pods with per-pod analyses. When includePods is true, nested pod analyses omit chart
-// series (IncludeTimeSeries is forced off) so responses stay smaller than attaching series at every level.
 func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName string, namespace string, pods []*database.Pod, opts AnalysisOptions, includePods bool) (WorkloadAnalysis, error) {
 	if err := opts.Validate(); err != nil {
 		return WorkloadAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
@@ -280,10 +262,6 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 	return result, nil
 }
 
-// AnalyzeNamespace fetches namespace-level metrics, lists workloads (deployments, statefulsets, daemonsets,
-// standalone pods, and node-owned “system” pods), and analyzes each workload without nested per-pod trees.
-// Workload summaries never include nested chart series, only the top-level namespace result may include
-// series when opts.IncludeTimeSeries is true.
 func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOptions) (NamespaceAnalysis, error) {
 	if err := opts.Validate(); err != nil {
 		return NamespaceAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)

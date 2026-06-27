@@ -12,16 +12,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// AnalysisOptions controls the analysis window, Prometheus range-query resolution, and
-// whether results include raw receive/transmit series for charts.
 type AnalysisOptions struct {
 	TimeRange         time.Duration // How far back to analyze (default: 24h).
 	RangeStep         time.Duration // Step size for Prometheus range queries (default: 1m).
 	IncludeTimeSeries bool          // Whether to include raw receive/transmit series for charts (default: false).
 }
 
-// DefaultAnalysisOptions returns a 24h window with IncludeTimeSeries false and a RangeStep
-// sized for that span via SetTimeRange.
 func DefaultAnalysisOptions() AnalysisOptions {
 	opts := AnalysisOptions{
 		TimeRange:         24 * time.Hour,
@@ -38,7 +34,6 @@ func (opts *AnalysisOptions) SetTimeRange(timeRange time.Duration) {
 	opts.RangeStep = timeseries.RangeStepForTimeRange(timeRange)
 }
 
-// Validate returns an error if TimeRange or RangeStep are not positive.
 func (opts AnalysisOptions) Validate() error {
 	if opts.TimeRange <= 0 {
 		return fmt.Errorf("TimeRange must be positive, got: %v", opts.TimeRange)
@@ -49,7 +44,6 @@ func (opts AnalysisOptions) Validate() error {
 	return nil
 }
 
-// PodAnalysis is network utilization for one pod plus optional chart series.
 type PodAnalysis struct {
 	PodUID      string            `json:"pod_uid"`
 	PodName     string            `json:"pod_name"`
@@ -57,8 +51,6 @@ type PodAnalysis struct {
 	TimeSeries  *TimeSeries       `json:"time_series,omitempty"`
 }
 
-// WorkloadAnalysis is aggregated network utilization for a workload
-// plus optional per-pod analyses and optional chart series.
 type WorkloadAnalysis struct {
 	WorkloadType string            `json:"workload_type"`
 	WorkloadName string            `json:"workload_name"`
@@ -68,8 +60,6 @@ type WorkloadAnalysis struct {
 	TimeSeries   *TimeSeries       `json:"time_series,omitempty"`
 }
 
-// NamespaceAnalysis is namespace-level utilization plus workload analyses
-// and optional namespace chart series.
 type NamespaceAnalysis struct {
 	Namespace   string             `json:"namespace"`
 	Utilization UtilizationResult  `json:"utilization"`
@@ -77,8 +67,6 @@ type NamespaceAnalysis struct {
 	TimeSeries  *TimeSeries        `json:"time_series,omitempty"`
 }
 
-// AnalyzePod fetches network metrics for pod, summarizes utilization, and attaches
-// optional pod chart series.
 func AnalyzePod(ctx context.Context, pod *database.Pod, opts AnalysisOptions) (PodAnalysis, error) {
 	if err := opts.Validate(); err != nil {
 		return PodAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
@@ -118,10 +106,6 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, opts AnalysisOptions) (P
 	return result, nil
 }
 
-// AnalyzeWorkload fetches workload-scoped metrics, summarizes workload-level utilization,
-// attaches optional workload chart series, and optionally fills Pods with per-pod analyses.
-// When includePods is true, each pod analysis omits TimeSeries
-// so the JSON does not embed full chart series under every workload and pod.
 func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName string, namespace string, pods []*database.Pod, opts AnalysisOptions, includePods bool) (WorkloadAnalysis, error) {
 	if err := opts.Validate(); err != nil {
 		return WorkloadAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
@@ -132,7 +116,6 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 	if includePods {
 		podAnalyses = make([]PodAnalysis, len(pods))
 		podOpts := opts
-		// Heavy chart payloads: keep series only at the workload level when includePods is on.
 		podOpts.IncludeTimeSeries = false
 		for i, pod := range pods {
 			g.Go(func() error {
@@ -182,9 +165,6 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 	return result, nil
 }
 
-// AnalyzeNamespace returns namespace-wide utilization, a workload-level
-// breakdown, and attaches optional namespace chart series, Child WorkloadAnalysis
-// never include TimeSeries so responses stay smaller.
 func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOptions) (NamespaceAnalysis, error) {
 	if err := opts.Validate(); err != nil {
 		return NamespaceAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)

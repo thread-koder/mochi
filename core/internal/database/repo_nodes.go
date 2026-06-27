@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// UpsertNodesBatch inserts or updates nodes by Kubernetes UID inside one transaction.
 func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 	if len(nodes) == 0 {
 		return nil
@@ -76,8 +75,8 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 	return nil
 }
 
-// PruneNodes deletes nodes whose UID is not in uids. An empty uids slice clears the whole table,
-// which matches sync when the API returns zero nodes.
+// PruneNodes deletes nodes not listed in uids.
+// Empty uids deletes all nodes.
 func PruneNodes(ctx context.Context, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM nodes`)

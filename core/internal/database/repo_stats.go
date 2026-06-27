@@ -5,7 +5,6 @@ import (
 	"fmt"
 )
 
-// GetNamespaceCount returns the total number of namespaces.
 func GetNamespaceCount(ctx context.Context) (int, error) {
 	var count int
 	query := `SELECT COUNT(*) FROM namespaces`
@@ -16,7 +15,6 @@ func GetNamespaceCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-// GetWorkloadCount returns the total number of workloads (deployments, statefulsets, and daemonsets).
 func GetWorkloadCount(ctx context.Context) (int, error) {
 	var count int
 	query := `
@@ -32,7 +30,6 @@ func GetWorkloadCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-// GetPodCount returns the total number of pods.
 func GetPodCount(ctx context.Context) (int, error) {
 	var count int
 	query := `SELECT COUNT(*) FROM pods`
@@ -43,7 +40,6 @@ func GetPodCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-// GetPodCountByNamespace returns the total number of pods in the namespace.
 func GetPodCountByNamespace(ctx context.Context, namespace string) (int, error) {
 	var count int
 	query := `SELECT COUNT(*) FROM pods WHERE namespace = $1`
@@ -54,7 +50,6 @@ func GetPodCountByNamespace(ctx context.Context, namespace string) (int, error) 
 	return count, nil
 }
 
-// GetContainerCountByNamespace returns the total number of containers in the namespace.
 func GetContainerCountByNamespace(ctx context.Context, namespace string) (int, error) {
 	var count int
 	query := `

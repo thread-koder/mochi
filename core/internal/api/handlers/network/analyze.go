@@ -14,7 +14,6 @@ import (
 	"github.com/thread_koder/mochi/core/internal/network"
 )
 
-// AnalyzeNamespace runs network analysis for all workloads in a namespace.
 func AnalyzeNamespace(c *gin.Context) {
 	namespace := c.Param("namespace")
 	timeRangeStr := c.Query("timeRange")
@@ -59,7 +58,6 @@ func AnalyzeNamespace(c *gin.Context) {
 	c.JSON(http.StatusOK, analysis)
 }
 
-// AnalyzeWorkload runs network analysis for one workload or standalone pod.
 func AnalyzeWorkload(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")

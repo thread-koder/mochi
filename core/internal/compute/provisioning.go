@@ -12,8 +12,6 @@ type ResourceSpecs struct {
 	MemoryLimit   *float64 `json:"memory_limit"`
 }
 
-// CPUProvisioning compares observed usage to requests and limits, flags over/under provisioning,
-// scores efficiency, and confidence (predictability and data sufficiency).
 type CPUProvisioning struct {
 	RequestUtilization float64  `json:"request_utilization"`
 	LimitUtilization   float64  `json:"limit_utilization"`
@@ -25,8 +23,6 @@ type CPUProvisioning struct {
 	Confidence         float64  `json:"confidence"`
 }
 
-// MemoryProvisioning compares observed usage to requests and limits, flags over/under provisioning,
-// scores efficiency, and confidence (predictability and data sufficiency).
 type MemoryProvisioning struct {
 	RequestUtilization float64  `json:"request_utilization"`
 	LimitUtilization   float64  `json:"limit_utilization"`
@@ -38,14 +34,12 @@ type MemoryProvisioning struct {
 	Confidence         float64  `json:"confidence"`
 }
 
-// ProvisioningResult is CPU and memory provisioning side by side plus a single combined efficiency.
 type ProvisioningResult struct {
 	CPU        CPUProvisioning    `json:"cpu"`
 	Memory     MemoryProvisioning `json:"memory"`
 	Efficiency float64            `json:"efficiency"`
 }
 
-// Thresholds and floors shared by CPU and memory provisioning.
 const (
 	OptimalUtilizationMin = 0.4
 	OptimalUtilizationMax = 0.7
@@ -53,6 +47,7 @@ const (
 	CPUHeadroom    = 0.2
 	MemoryHeadroom = 0.2
 
+	// Used to skip "over provisioned" flags so we do not nag on minimum resources.
 	MinCPURequestCores    = 0.01
 	MinMemoryRequestBytes = 64 * 1024 * 1024
 
@@ -68,9 +63,6 @@ const (
 	confidenceDataFactorFloor = 0.5
 )
 
-// AnalyzeCPUProvisioning scores request/limit fit using P95 vs request, peak vs limit, and stability
-// signals. Missing request or limit is treated as under-provisioned, tiny requests at the cluster floor
-// skip "over provisioned" flags so we do not nag on minimum CPU.
 func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, stability StabilityResult, minSamples int) CPUProvisioning {
 	result := CPUProvisioning{
 		IsOverProvisioned:  false,
@@ -121,7 +113,6 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 		lowThrottling := stability.CPUThrottling > 0 && stability.CPUThrottling <= ThrottlingThreshold
 		underProvisionedDueToStability := stability.CPUThrottling > ThrottlingThreshold || stability.CPUPressure > PressureThreshold
 
-		// Skip "over provisioned" when we're at min request, only slightly throttled, or stability already says under.
 		if result.RequestUtilization < minThreshold && !atFloor && !lowThrottling && !underProvisionedDueToStability {
 			result.IsOverProvisioned = true
 		}
@@ -171,8 +162,6 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 	return result
 }
 
-// AnalyzeMemoryProvisioning mirrors AnalyzeCPUProvisioning for memory, using OptimalUtilizationMin
-// as the low bound (CPU uses a burst-aware dynamic min) and memory stability signals (OOM, failcnt, PSI).
 func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilization, stability StabilityResult, minSamples int) MemoryProvisioning {
 	result := MemoryProvisioning{
 		IsOverProvisioned:  false,
@@ -272,8 +261,6 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 	return result
 }
 
-// AnalyzeProvisioning runs CPU and memory provisioning and combines efficiency as 30% CPU / 70% memory
-// so memory pressure weighs more in a single headline score.
 func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, stability StabilityResult, minSamples int) ProvisioningResult {
 	result := ProvisioningResult{
 		CPU:    AnalyzeCPUProvisioning(specs, utilization.CPU, stability, minSamples),
@@ -322,7 +309,6 @@ func computeResourceConfidence(stats timeseries.StatsResult, sampleSize, minSamp
 	return max(0.0, min(1.0, predictability*dataFactor))
 }
 
-// burstScore measures how much P95 and peak exceed mean usage.
 func burstScore(mean, p95, peak float64) float64 {
 	if mean <= 0 {
 		return 0

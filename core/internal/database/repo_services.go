@@ -7,7 +7,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// UpsertServicesBatch inserts or updates Services by Kubernetes UID inside one transaction.
 func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 	if len(services) == 0 {
 		return nil
@@ -66,8 +65,8 @@ func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 	return nil
 }
 
-// PruneServices deletes services whose UID is not in uids in the namespace.
-// Empty uids deletes all services in that namespace.
+// PruneServices deletes services not listed in uids.
+// Empty uids deletes every service in the namespace.
 func PruneServices(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
 		_, err := Pool.Exec(ctx, `DELETE FROM services WHERE namespace = $1`, namespace)

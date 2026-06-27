@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// NetworkMetrics holds time-aligned receive/transmit byte rates plus error and drop series from Prometheus.
 type NetworkMetrics struct {
 	ReceiveBytes    []timeseries.DataPoint `json:"receive_bytes"`
 	TransmitBytes   []timeseries.DataPoint `json:"transmit_bytes"`

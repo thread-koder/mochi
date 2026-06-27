@@ -60,7 +60,7 @@ const (
 )
 
 // ApplyRecommendation patches Deployment, StatefulSet, or DaemonSet pod templates with recommended
-// requests/limits via server-side apply. Pods return an error because their spec is immutable.
+// requests/limits via server-side apply.
 func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendation) error {
 	log := logger.WithComponent("compute")
 	log.Info().

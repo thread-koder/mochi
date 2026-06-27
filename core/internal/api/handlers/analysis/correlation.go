@@ -14,7 +14,6 @@ import (
 	"github.com/thread_koder/mochi/core/internal/database"
 )
 
-// AnalyzeWorkloadCorrelations runs cross-metric correlation analysis for a workload.
 func AnalyzeWorkloadCorrelations(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")

@@ -20,7 +20,6 @@ type WorkerPool struct {
 	resourceSync *ResourceSyncWorker
 }
 
-// NewWorkerPool builds background workers based on the provided config.
 func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("worker config is nil")
@@ -37,7 +36,6 @@ func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
 	}, nil
 }
 
-// Start launches managed workers in background goroutines.
 func (wp *WorkerPool) Start() {
 	log := logger.WithComponent("workers")
 	log.Info().Msg("Starting worker pool...")
@@ -49,7 +47,6 @@ func (wp *WorkerPool) Start() {
 	log.Info().Msg("Worker pool started")
 }
 
-// Stop cancels the shared context and waits until all workers exit.
 func (wp *WorkerPool) Stop() {
 	log := logger.WithComponent("workers")
 	log.Info().Msg("Stopping worker pool")
@@ -67,7 +64,6 @@ type ResourceSyncWorker struct {
 	retentionPeriod time.Duration
 }
 
-// NewResourceSyncWorker returns a worker that syncs resources and runs cleanup tasks.
 func NewResourceSyncWorker(ctx context.Context, interval time.Duration, retentionPeriod time.Duration) *ResourceSyncWorker {
 	return &ResourceSyncWorker{
 		ctx:             ctx,
@@ -76,7 +72,6 @@ func NewResourceSyncWorker(ctx context.Context, interval time.Duration, retentio
 	}
 }
 
-// Run executes one sync immediately, then repeats on the configured interval.
 func (w *ResourceSyncWorker) Run() {
 	log := logger.WithComponent("sync-worker")
 	log.Info().
@@ -101,7 +96,6 @@ func (w *ResourceSyncWorker) Run() {
 	}
 }
 
-// sync runs one resource refresh pass and then cleanup.
 func (w *ResourceSyncWorker) sync() {
 	log := logger.WithComponent("sync-worker")
 
@@ -120,7 +114,6 @@ func (w *ResourceSyncWorker) sync() {
 	w.cleanup(syncCtx)
 }
 
-// cleanup deletes stale records after each sync pass.
 func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	log := logger.WithComponent("sync-worker")
 	since := time.Now().Add(-w.retentionPeriod)

@@ -45,8 +45,6 @@ type RecommendationConfig struct {
 	MaxIncreaseRatio               float64
 }
 
-// DefaultRecommendationConfig returns tested configurations for the recommendation engine,
-// the default recommendation mode is the burstable mode.
 func DefaultRecommendationConfig() RecommendationConfig {
 	return RecommendationConfig{
 		Mode:                             ModeBurstable,
@@ -71,7 +69,6 @@ func DefaultRecommendationConfig() RecommendationConfig {
 	}
 }
 
-// Validate returns an error if any RecommendationConfig field is outside its allowed range.
 func (config RecommendationConfig) Validate() error {
 	if config.Mode != ModeCostOptimized && config.Mode != ModeBurstable && config.Mode != ModeGuaranteed {
 		return fmt.Errorf("Mode must be one of %s, %s, or %s, got: %v", ModeCostOptimized, ModeBurstable, ModeGuaranteed, config.Mode)
@@ -133,10 +130,6 @@ func (config RecommendationConfig) Validate() error {
 	return nil
 }
 
-// CalculateCPURequestRecommendation returns proposed CPU request cores, or nil when
-// confidence is too low or when the relative change is below a noise threshold.
-// Cost-optimized mode uses a lighter stress floor when throttling and PSI are barely non-zero so we don't
-// suggest anymore reductions or increases.
 func CalculateCPURequestRecommendation(
 	currentRequest *float64,
 	utilization CPUUtilization,
@@ -247,9 +240,6 @@ func CalculateCPURequestRecommendation(
 	return &recommendedCores
 }
 
-// CalculateCPULimitRecommendation returns proposed CPU limit from peak usage and from a request multiple, or nil
-// when confidence is too low. Limit margins skip burst detection because the peak path
-// already captures spikes.
 func CalculateCPULimitRecommendation(
 	currentLimit *float64,
 	utilization CPUUtilization,
@@ -353,9 +343,6 @@ func CalculateCPULimitRecommendation(
 	return &recommendedCores
 }
 
-// CalculateMemoryRequestRecommendation mirrors the CPU request path in bytes, boosts the baseline when OOM
-// or allocation failures appear, normalizes OOM/fail rates by analysisWindow for the stress multiplier,
-// and returns nil when confidence is too low.
 func CalculateMemoryRequestRecommendation(
 	currentRequest *float64,
 	utilization MemoryUtilization,
@@ -469,8 +456,6 @@ func CalculateMemoryRequestRecommendation(
 	return &recommendedBytes
 }
 
-// CalculateMemoryLimitRecommendation is the memory version of CalculateCPULimitRecommendation and returns nil
-// when confidence is too low.
 func CalculateMemoryLimitRecommendation(
 	currentLimit *float64,
 	utilization MemoryUtilization,
@@ -603,7 +588,6 @@ func calculateCPUStressFactor(throttling float64, pressure float64) float64 {
 	return max(throttlingFactor, pressureFactor)
 }
 
-// calculateCPUThrottlingFactor maps throttled CPU share (0–1) to a gradual headroom multiplier, capped at 1.8.
 func calculateCPUThrottlingFactor(throttling float64) float64 {
 	if throttling <= 0 {
 		return 1.0
@@ -624,7 +608,6 @@ func calculateCPUThrottlingFactor(throttling float64) float64 {
 	return min(val, 1.8)
 }
 
-// calculatePSIPressureFactor maps PSI stalled share to a gradual headroom multiplier, capped at 1.8.
 func calculatePSIPressureFactor(pressure float64) float64 {
 	if pressure <= 0 {
 		return 1.0
@@ -657,7 +640,6 @@ func calculateMemoryStressFactor(
 	return stressFactor
 }
 
-// calculateMemoryOOMRateFactor maps normalized OOMs/week to a capped multiplier (max 1.8).
 func calculateMemoryOOMRateFactor(oomPerWeek float64) float64 {
 	if oomPerWeek <= 0 {
 		return 1.0
@@ -666,7 +648,6 @@ func calculateMemoryOOMRateFactor(oomPerWeek float64) float64 {
 	return min(factor, 1.8)
 }
 
-// calculateMemoryFailRateFactor maps allocation failures/week to a capped multiplier (max 1.4).
 func calculateMemoryFailRateFactor(failCntPerWeek float64) float64 {
 	if failCntPerWeek <= 0 {
 		return 1.0
@@ -722,7 +703,6 @@ func detectAndAdjustBurstyWorkload(
 	return adjustedPercentile, isBursty
 }
 
-// calculateDynamicSafetyMargin nudges the base margin from trend, variance, anomaly count, and burstiness.
 func calculateDynamicSafetyMargin(
 	baseMargin float64,
 	trend timeseries.TrendResult,
