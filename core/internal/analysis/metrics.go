@@ -13,8 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// correlationMetrics stores the metric series for the correlation analysis.
-type correlationMetrics struct {
+type CorrelationMetrics struct {
 	CPU             []timeseries.DataPoint
 	Memory          []timeseries.DataPoint
 	NetworkReceive  []timeseries.DataPoint
@@ -23,7 +22,7 @@ type correlationMetrics struct {
 	DiskWrite       []timeseries.DataPoint
 }
 
-func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, opts CorrelationOptions) (correlationMetrics, error) {
+func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, opts CorrelationOptions) (CorrelationMetrics, error) {
 	end := time.Now()
 	start := end.Add(-opts.TimeRange)
 	r := v1.Range{
@@ -110,10 +109,10 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 	})
 
 	if err := g.Wait(); err != nil {
-		return correlationMetrics{}, err
+		return CorrelationMetrics{}, err
 	}
 
-	return correlationMetrics{
+	return CorrelationMetrics{
 		CPU:             timeseries.MatrixToDataPoints(cpuMatrix),
 		Memory:          timeseries.MatrixToDataPoints(memoryMatrix),
 		NetworkReceive:  timeseries.MatrixToDataPoints(networkReceiveMatrix),

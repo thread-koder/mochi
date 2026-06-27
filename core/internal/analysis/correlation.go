@@ -12,7 +12,6 @@ import (
 	"golang.org/x/text/language"
 )
 
-// CorrelationOptions controls the analysis window and lag search bounds.
 type CorrelationOptions struct {
 	TimeRange time.Duration // How far back to analyze (default: 24h).
 	RangeStep time.Duration // Step size for Prometheus range queries (default: 1m).
@@ -20,8 +19,6 @@ type CorrelationOptions struct {
 	LagStep   time.Duration // Lag increment used while searching for MaxLag (default: 1m).
 }
 
-// DefaultCorrelationOptions returns a 24 hour window with a 1 minute range step,
-// a 5 minute max lag, and a 1 minute lag step.
 func DefaultCorrelationOptions() CorrelationOptions {
 	opts := CorrelationOptions{
 		TimeRange: 24 * time.Hour,
@@ -49,7 +46,6 @@ func (opts *CorrelationOptions) syncLagSettings() {
 	}
 }
 
-// Validate ensures that the correlation options are valid before analyzing.
 func (opts CorrelationOptions) Validate() error {
 	if opts.TimeRange <= 0 {
 		return fmt.Errorf("TimeRange must be positive, got: %v", opts.TimeRange)
@@ -66,13 +62,11 @@ func (opts CorrelationOptions) Validate() error {
 	return nil
 }
 
-// MetricPair identifies the two metrics to compare together.
 type MetricPair struct {
 	MetricA string `json:"metric_a"`
 	MetricB string `json:"metric_b"`
 }
 
-// PairCorrelation contains the computed relationship for one MetricPair.
 type PairCorrelation struct {
 	Pair           MetricPair                        `json:"pair"`
 	Correlation    timeseries.CrossCorrelationResult `json:"correlation"`
@@ -93,8 +87,6 @@ const (
 	WorkloadTypeMixed          WorkloadType = "mixed"
 )
 
-// WorkloadCorrelationResult is the final result for the workload-level
-// cross-metric correlation analysis.
 type WorkloadCorrelationResult struct {
 	WorkloadType      string            `json:"workload_type"`
 	WorkloadName      string            `json:"workload_name"`
@@ -106,7 +98,6 @@ type WorkloadCorrelationResult struct {
 	DataPointsUsed    int               `json:"data_points_used"`
 }
 
-// metricPairs defines a set of cross-metric comparisons to analyze.
 var metricPairs = []MetricPair{
 	{MetricA: "cpu", MetricB: "memory"},
 	{MetricA: "cpu", MetricB: "network_receive"},
@@ -122,8 +113,6 @@ var metricPairs = []MetricPair{
 	{MetricA: "disk_read", MetricB: "disk_write"},
 }
 
-// AnalyzeWorkloadCorrelations computes cross-metric correlations across compute,
-// network, and disk metrics for one workload.
 func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workloadName string, namespace string, pods []*database.Pod, opts CorrelationOptions) (WorkloadCorrelationResult, error) {
 	if err := opts.Validate(); err != nil {
 		return WorkloadCorrelationResult{}, fmt.Errorf("invalid correlation options: %w", err)
@@ -188,8 +177,7 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 	}, nil
 }
 
-// metricData returns the series for a given metric name.
-func metricData(metrics correlationMetrics, name string) []timeseries.DataPoint {
+func metricData(metrics CorrelationMetrics, name string) []timeseries.DataPoint {
 	switch name {
 	case "cpu":
 		return metrics.CPU
@@ -208,7 +196,6 @@ func metricData(metrics correlationMetrics, name string) []timeseries.DataPoint 
 	}
 }
 
-// interpretCorrelation summarizes strength, direction, and lag in plain text.
 func interpretCorrelation(pair MetricPair, result timeseries.CrossCorrelationResult) string {
 	coeff := result.MaxCorrelation.Coefficient
 	strength := result.MaxCorrelation.Strength
@@ -239,7 +226,6 @@ func interpretCorrelation(pair MetricPair, result timeseries.CrossCorrelationRes
 		coeff, lagStr)
 }
 
-// characterizeWorkload applies heuristic thresholds to label workload behavior.
 func characterizeWorkload(correlations []PairCorrelation) WorkloadType {
 	var cpuMemory, cpuNetRecv, cpuNetTrans, cpuDiskRead, cpuDiskWrite float64
 	var memNetRecv, netRecvDiskWrite float64
@@ -299,7 +285,6 @@ func characterizeWorkload(correlations []PairCorrelation) WorkloadType {
 	return WorkloadTypeMixed
 }
 
-// generateInsights generates human-readable insights for moderate/strong signals.
 func generateInsights(correlations []PairCorrelation) []string {
 	insights := make([]string, 0)
 
@@ -398,8 +383,6 @@ func generateInsights(correlations []PairCorrelation) []string {
 	return insights
 }
 
-// generateOptimizationHints generates tuning suggestions from characterization
-// plus a few targeted pair patterns.
 func generateOptimizationHints(workloadType WorkloadType, correlations []PairCorrelation) []string {
 	hints := make([]string, 0)
 
