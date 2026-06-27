@@ -13,19 +13,15 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// ResourceMetrics holds CPU and memory series from Prometheus range queries plus stability-related
-// signals. Range queries populate CPU and Memory. Throttling, PSI, OOM, fail counts, and restarts come
-// from instant queries and are stored as single-point slices so AnalyzeStability can treat
-// every field uniformly.
 type ResourceMetrics struct {
 	CPU            []timeseries.DataPoint `json:"cpu"`
 	Memory         []timeseries.DataPoint `json:"memory"`
-	CPUThrottling  []timeseries.DataPoint `json:"cpu_throttling,omitempty"`
-	CPUPressure    []timeseries.DataPoint `json:"cpu_pressure,omitempty"`
-	MemoryFailCnt  []timeseries.DataPoint `json:"memory_fail_cnt,omitempty"`
-	MemoryOOM      []timeseries.DataPoint `json:"memory_oom,omitempty"`
-	MemoryPressure []timeseries.DataPoint `json:"memory_pressure,omitempty"`
-	Restarts       []timeseries.DataPoint `json:"restarts,omitempty"`
+	CPUThrottling  float64                `json:"cpu_throttling,omitempty"`
+	CPUPressure    float64                `json:"cpu_pressure,omitempty"`
+	MemoryFailCnt  float64                `json:"memory_fail_cnt,omitempty"`
+	MemoryOOM      float64                `json:"memory_oom,omitempty"`
+	MemoryPressure float64                `json:"memory_pressure,omitempty"`
+	Restarts       float64                `json:"restarts,omitempty"`
 }
 
 func fetchContainerMetrics(ctx context.Context, container *database.Container, opts AnalysisOptions) (ResourceMetrics, error) {
@@ -136,12 +132,12 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 	return ResourceMetrics{
 		CPU:            timeseries.MatrixToDataPoints(cpuMatrix),
 		Memory:         timeseries.MatrixToDataPoints(memoryMatrix),
-		CPUThrottling:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuThrottling}},
-		CPUPressure:    []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuPressure}},
-		MemoryFailCnt:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: memFailCnt}},
-		MemoryOOM:      []timeseries.DataPoint{{Timestamp: time.Now(), Value: memOOM}},
-		MemoryPressure: []timeseries.DataPoint{{Timestamp: time.Now(), Value: memPressure}},
-		Restarts:       []timeseries.DataPoint{{Timestamp: time.Now(), Value: restarts}},
+		CPUThrottling:  cpuThrottling,
+		CPUPressure:    cpuPressure,
+		MemoryFailCnt:  memFailCnt,
+		MemoryOOM:      memOOM,
+		MemoryPressure: memPressure,
+		Restarts:       restarts,
 	}, nil
 }
 
@@ -252,12 +248,12 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	return ResourceMetrics{
 		CPU:            timeseries.MatrixToDataPoints(cpuMatrix),
 		Memory:         timeseries.MatrixToDataPoints(memoryMatrix),
-		CPUThrottling:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuThrottling}},
-		CPUPressure:    []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuPressure}},
-		MemoryFailCnt:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: memFailCnt}},
-		MemoryOOM:      []timeseries.DataPoint{{Timestamp: time.Now(), Value: memOOM}},
-		MemoryPressure: []timeseries.DataPoint{{Timestamp: time.Now(), Value: memPressure}},
-		Restarts:       []timeseries.DataPoint{{Timestamp: time.Now(), Value: restarts}},
+		CPUThrottling:  cpuThrottling,
+		CPUPressure:    cpuPressure,
+		MemoryFailCnt:  memFailCnt,
+		MemoryOOM:      memOOM,
+		MemoryPressure: memPressure,
+		Restarts:       restarts,
 	}, nil
 }
 
@@ -376,12 +372,12 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	return ResourceMetrics{
 		CPU:            timeseries.MatrixToDataPoints(cpuMatrix),
 		Memory:         timeseries.MatrixToDataPoints(memoryMatrix),
-		CPUThrottling:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuThrottling}},
-		CPUPressure:    []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuPressure}},
-		MemoryFailCnt:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: memFailCnt}},
-		MemoryOOM:      []timeseries.DataPoint{{Timestamp: time.Now(), Value: memOOM}},
-		MemoryPressure: []timeseries.DataPoint{{Timestamp: time.Now(), Value: memPressure}},
-		Restarts:       []timeseries.DataPoint{{Timestamp: time.Now(), Value: restarts}},
+		CPUThrottling:  cpuThrottling,
+		CPUPressure:    cpuPressure,
+		MemoryFailCnt:  memFailCnt,
+		MemoryOOM:      memOOM,
+		MemoryPressure: memPressure,
+		Restarts:       restarts,
 	}, nil
 }
 
@@ -491,11 +487,11 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	return ResourceMetrics{
 		CPU:            timeseries.MatrixToDataPoints(cpuMatrix),
 		Memory:         timeseries.MatrixToDataPoints(memoryMatrix),
-		CPUThrottling:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuThrottling}},
-		CPUPressure:    []timeseries.DataPoint{{Timestamp: time.Now(), Value: cpuPressure}},
-		MemoryFailCnt:  []timeseries.DataPoint{{Timestamp: time.Now(), Value: memFailCnt}},
-		MemoryOOM:      []timeseries.DataPoint{{Timestamp: time.Now(), Value: memOOM}},
-		MemoryPressure: []timeseries.DataPoint{{Timestamp: time.Now(), Value: memPressure}},
-		Restarts:       []timeseries.DataPoint{{Timestamp: time.Now(), Value: restarts}},
+		CPUThrottling:  cpuThrottling,
+		CPUPressure:    cpuPressure,
+		MemoryFailCnt:  memFailCnt,
+		MemoryOOM:      memOOM,
+		MemoryPressure: memPressure,
+		Restarts:       restarts,
 	}, nil
 }
