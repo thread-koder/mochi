@@ -22,15 +22,15 @@ import (
 	"github.com/spf13/viper"
 )
 
-// TLSConfig holds optional TLS settings for outbound clients (database, Prometheus, Redis, etc.).
+// TLSConfig holds TLS settings for outbound clients (database, Prometheus, Redis, etc.).
 type TLSConfig struct {
+	Enabled            bool   `mapstructure:"enabled"`
 	InsecureSkipVerify bool   `mapstructure:"insecure_skip_verify"`
 	RootCAPath         string `mapstructure:"root_ca_path"`
 	ClientCertPath     string `mapstructure:"client_cert_path"`
 	ClientKeyPath      string `mapstructure:"client_key_path"`
 }
 
-// Config is the top-level application configuration.
 type Config struct {
 	Log        LogConfig        `mapstructure:"log"`
 	API        APIConfig        `mapstructure:"api"`
@@ -41,15 +41,11 @@ type Config struct {
 	Workers    WorkerConfig     `mapstructure:"workers"`
 }
 
-// LogConfig configures application logging (level and serialization format).
-// Level must be one of debug, info, warn, error. Format must be json or console.
 type LogConfig struct {
 	Level  string `mapstructure:"level"`
 	Format string `mapstructure:"format"`
 }
 
-// APIConfig configures the HTTP API server (bind address, timeouts, Gin mode).
-// Mode must be one of debug, release, test. Durations are in seconds.
 type APIConfig struct {
 	Host         string `mapstructure:"host"`
 	Port         int    `mapstructure:"port"`
@@ -58,9 +54,6 @@ type APIConfig struct {
 	Mode         string `mapstructure:"mode"`
 }
 
-// DatabaseConfig configures the PostgreSQL client and pool.
-// SSLMode must be one of disable, require, verify-ca, verify-full. TLS applies when connecting
-// with encryption (so ssl_mode is not "disable").
 type DatabaseConfig struct {
 	Host            string    `mapstructure:"host"`
 	Port            int       `mapstructure:"port"`
@@ -75,8 +68,6 @@ type DatabaseConfig struct {
 	TLS             TLSConfig `mapstructure:"tls"`
 }
 
-// KubernetesConfig configures the Kubernetes API client (kubeconfig vs in-cluster, rate limits).
-// Empty KubeconfigPath uses the default loader rules (for example KUBECONFIG or ~/.kube/config).
 type KubernetesConfig struct {
 	KubeconfigPath string `mapstructure:"kubeconfig_path"`
 	InCluster      bool   `mapstructure:"in_cluster"`
@@ -85,15 +76,12 @@ type KubernetesConfig struct {
 	Burst          int    `mapstructure:"burst"`
 }
 
-// PrometheusConfig configures the Prometheus client base URL and timeouts.
 type PrometheusConfig struct {
 	URL     string    `mapstructure:"url"`
 	Timeout int       `mapstructure:"timeout"`
 	TLS     TLSConfig `mapstructure:"tls"`
 }
 
-// RedisConfig configures the Redis client, pool, default cache TTL, and optional TLS.
-// Database is the logical DB index (0–15). When UseTLS is true, TLS fields apply.
 type RedisConfig struct {
 	Host            string    `mapstructure:"host"`
 	Port            int       `mapstructure:"port"`
@@ -106,12 +94,9 @@ type RedisConfig struct {
 	ConnMaxLifetime int       `mapstructure:"conn_max_lifetime"`
 	ConnMaxIdleTime int       `mapstructure:"conn_max_idle_time"`
 	CacheTTL        int       `mapstructure:"cache_ttl"`
-	UseTLS          bool      `mapstructure:"use_tls"`
 	TLS             TLSConfig `mapstructure:"tls"`
 }
 
-// WorkerConfig configures background sync intervals, namespace filters, and retention for stored data.
-// If IncludeNamespaces is non-empty, only those namespaces are synced and ExcludeNamespaces is ignored.
 type WorkerConfig struct {
 	ResourceSyncInterval int      `mapstructure:"resource_sync_interval"`
 	ExcludeNamespaces    []string `mapstructure:"exclude_namespaces"`
@@ -123,8 +108,6 @@ type WorkerConfig struct {
 // Call Load before reading it. Prefer threading *Config from Load where possible.
 var AppConfig *Config
 
-// Load reads configuration from defaults, optional YAML files (MOCHI_CONFIG_FILES), and MOCHI_* env vars,
-// unmarshals into a Config, validates it, assigns AppConfig, and returns a pointer to the same value.
 func Load() (*Config, error) {
 	setDefaults()
 
@@ -173,6 +156,7 @@ func setDefaults() {
 	viper.SetDefault("database.min_idle_conns", 5)
 	viper.SetDefault("database.conn_max_lifetime", 3600)
 	viper.SetDefault("database.conn_max_idle_time", 1800)
+	viper.SetDefault("database.tls.enabled", false)
 	viper.SetDefault("database.tls.insecure_skip_verify", false)
 	viper.SetDefault("database.tls.root_ca_path", "")
 	viper.SetDefault("database.tls.client_cert_path", "")
@@ -186,6 +170,7 @@ func setDefaults() {
 
 	viper.SetDefault("prometheus.url", "http://localhost:9090")
 	viper.SetDefault("prometheus.timeout", 30)
+	viper.SetDefault("prometheus.tls.enabled", false)
 	viper.SetDefault("prometheus.tls.insecure_skip_verify", false)
 	viper.SetDefault("prometheus.tls.root_ca_path", "")
 	viper.SetDefault("prometheus.tls.client_cert_path", "")
@@ -202,7 +187,7 @@ func setDefaults() {
 	viper.SetDefault("redis.conn_max_lifetime", 3600)
 	viper.SetDefault("redis.conn_max_idle_time", 1800)
 	viper.SetDefault("redis.cache_ttl", 300)
-	viper.SetDefault("redis.use_tls", false)
+	viper.SetDefault("redis.tls.enabled", false)
 	viper.SetDefault("redis.tls.insecure_skip_verify", false)
 	viper.SetDefault("redis.tls.root_ca_path", "")
 	viper.SetDefault("redis.tls.client_cert_path", "")
@@ -243,7 +228,6 @@ func readConfigFiles(configFiles []string) error {
 	return nil
 }
 
-// Validate checks every section of configuration and returns the first error, wrapped with the section name.
 func (c *Config) Validate() error {
 	if err := c.Log.Validate(); err != nil {
 		return fmt.Errorf("log config: %w", err)
@@ -269,7 +253,6 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// Validate checks LogConfig allowed level and format values.
 func (c *LogConfig) Validate() error {
 	validLevels := map[string]bool{
 		"debug": true,
@@ -291,7 +274,6 @@ func (c *LogConfig) Validate() error {
 	return nil
 }
 
-// Validate checks APIConfig port, timeouts, and mode.
 func (c *APIConfig) Validate() error {
 	if c.Port <= 0 || c.Port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535, got: %d", c.Port)
@@ -314,7 +296,6 @@ func (c *APIConfig) Validate() error {
 	return nil
 }
 
-// Validate checks DatabaseConfig connectivity-related fields and ssl_mode.
 func (c *DatabaseConfig) Validate() error {
 	if c.Port <= 0 || c.Port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535, got: %d", c.Port)
@@ -344,10 +325,15 @@ func (c *DatabaseConfig) Validate() error {
 	if !validSSLModes[c.SSLMode] {
 		return fmt.Errorf("ssl_mode must be one of: disable, require, verify-ca, verify-full, got: %s", c.SSLMode)
 	}
+	if c.TLS.Enabled && c.SSLMode == "disable" {
+		return fmt.Errorf("tls.enabled requires ssl_mode other than disable")
+	}
+	if !c.TLS.Enabled && c.SSLMode != "disable" {
+		return fmt.Errorf("ssl_mode %q requires tls.enabled", c.SSLMode)
+	}
 	return nil
 }
 
-// Validate checks KubernetesConfig timeouts and client rate limiter settings.
 func (c *KubernetesConfig) Validate() error {
 	if c.RequestTimeout <= 0 {
 		return fmt.Errorf("request_timeout must be greater than 0, got: %d", c.RequestTimeout)
@@ -361,7 +347,6 @@ func (c *KubernetesConfig) Validate() error {
 	return nil
 }
 
-// Validate checks PrometheusConfig URL and timeout.
 func (c *PrometheusConfig) Validate() error {
 	if c.URL == "" {
 		return fmt.Errorf("url cannot be empty")
@@ -375,7 +360,6 @@ func (c *PrometheusConfig) Validate() error {
 	return nil
 }
 
-// Validate checks RedisConfig pool sizing, DB index, and TTL fields.
 func (c *RedisConfig) Validate() error {
 	if c.Port <= 0 || c.Port > 65535 {
 		return fmt.Errorf("port must be between 1 and 65535, got: %d", c.Port)
@@ -404,8 +388,6 @@ func (c *RedisConfig) Validate() error {
 	return nil
 }
 
-// Validate checks WorkerConfig intervals and retention bounds, and normalizes nil namespace slices to empty.
-// YAML or JSON null for a list would otherwise leave nil slices. Empty slices make “no filter” logic predictable.
 func (c *WorkerConfig) Validate() error {
 	if c.ResourceSyncInterval <= 0 {
 		return fmt.Errorf("resource_sync_interval must be greater than 0, got: %d", c.ResourceSyncInterval)
@@ -425,9 +407,6 @@ func (c *WorkerConfig) Validate() error {
 	return nil
 }
 
-// BuildTLSConfig builds a TLS configuration for clients from TLSConfig.
-// It optionally loads a custom root CA from RootCAPath and, when both ClientCertPath and ClientKeyPath are set,
-// loads a mutual TLS client certificate. Setting only one of the client paths is ignored here, so configure both or neither.
 func BuildTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: cfg.InsecureSkipVerify,

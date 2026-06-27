@@ -15,7 +15,6 @@ var (
 	Client *redis.Client
 )
 
-// Init configures and verifies the Redis client connection.
 func Init(cfg *config.RedisConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("redis config is nil")
@@ -36,7 +35,7 @@ func Init(cfg *config.RedisConfig) error {
 		ConnMaxIdleTime: time.Duration(cfg.ConnMaxIdleTime) * time.Second,
 	}
 
-	if cfg.UseTLS {
+	if cfg.TLS.Enabled {
 		tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
 		if err != nil {
 			return fmt.Errorf("build TLS config: %w", err)
@@ -62,14 +61,12 @@ func Init(cfg *config.RedisConfig) error {
 	return nil
 }
 
-// Close closes the Redis client if it was initialized.
 func Close() {
 	if Client != nil {
 		Client.Close()
 	}
 }
 
-// HealthCheck verifies Redis reachability with a Ping call.
 func HealthCheck(ctx context.Context) error {
 	if err := Client.Ping(ctx).Err(); err != nil {
 		return fmt.Errorf("redis health check failed: %w", err)

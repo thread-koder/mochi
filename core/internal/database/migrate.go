@@ -33,7 +33,7 @@ func Migrate(cfg *config.DatabaseConfig) error {
 		return fmt.Errorf("failed to parse database connection string for migrations: %w", err)
 	}
 
-	if cfg.SSLMode != "disable" {
+	if cfg.TLS.Enabled {
 		tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
 		if err != nil {
 			return fmt.Errorf("build TLS config: %w", err)

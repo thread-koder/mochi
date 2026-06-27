@@ -19,7 +19,6 @@ var (
 	API v1.API
 )
 
-// Init configures and verifies the Prometheus client connection.
 func Init(cfg *config.PrometheusConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("prometheus config is nil")
@@ -29,11 +28,13 @@ func Init(cfg *config.PrometheusConfig) error {
 	log.Info().Msg("Initializing client...")
 
 	transport := &http.Transport{}
-	tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
-	if err != nil {
-		return fmt.Errorf("build TLS config: %w", err)
+	if cfg.TLS.Enabled {
+		tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
+		if err != nil {
+			return fmt.Errorf("build TLS config: %w", err)
+		}
+		transport.TLSClientConfig = tlsConfig
 	}
-	transport.TLSClientConfig = tlsConfig
 
 	clientConfig := api.Config{
 		Address: cfg.URL,
@@ -68,7 +69,6 @@ func Init(cfg *config.PrometheusConfig) error {
 	return nil
 }
 
-// HealthCheck verifies the API reachability with a Buildinfo call.
 func HealthCheck(ctx context.Context) error {
 	_, err := API.Buildinfo(ctx)
 	if err != nil {

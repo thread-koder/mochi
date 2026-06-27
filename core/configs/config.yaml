@@ -23,8 +23,8 @@ database:
   min_idle_conns: 5
   conn_max_lifetime: 3600 # seconds
   conn_max_idle_time: 1800 # seconds
-  # Only used when ssl_mode is not "disable"
   tls:
+    enabled: false
     insecure_skip_verify: false
     root_ca_path: ""
     client_cert_path: ""
@@ -41,6 +41,7 @@ prometheus:
   url: "http://localhost:9090"
   timeout: 30 # seconds
   tls:
+    enabled: false
     insecure_skip_verify: false
     root_ca_path: ""
     client_cert_path: ""
@@ -58,8 +59,8 @@ redis:
   conn_max_lifetime: 3600 # seconds
   conn_max_idle_time: 1800 # seconds
   cache_ttl: 300 # seconds
-  use_tls: false
   tls:
+    enabled: false
     insecure_skip_verify: false
     root_ca_path: ""
     client_cert_path: ""

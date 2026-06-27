@@ -13,7 +13,6 @@ import (
 // Pool is the global database connection pool.
 var Pool *pgxpool.Pool
 
-// Init builds and configures the database connection pool and verifies connection.
 func Init(cfg *config.DatabaseConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("database config is nil")
@@ -34,7 +33,7 @@ func Init(cfg *config.DatabaseConfig) error {
 	poolConfig.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetime) * time.Second
 	poolConfig.MinIdleConns = int32(cfg.MinIdleConns)
 
-	if cfg.SSLMode != "disable" {
+	if cfg.TLS.Enabled {
 		tlsConfig, err := config.BuildTLSConfig(cfg.TLS)
 		if err != nil {
 			return fmt.Errorf("build TLS config: %w", err)
@@ -71,14 +70,12 @@ func Init(cfg *config.DatabaseConfig) error {
 	return nil
 }
 
-// Close closes the database connection pool if it was initialized.
 func Close() {
 	if Pool != nil {
 		Pool.Close()
 	}
 }
 
-// HealthCheck verifies the database reachability with a Ping call.
 func HealthCheck(ctx context.Context) error {
 	if err := Pool.Ping(ctx); err != nil {
 		return fmt.Errorf("database health check failed: %w", err)
