@@ -10,13 +10,11 @@ import (
 	"github.com/thread_koder/mochi/core/internal/config"
 )
 
-// Get returns the raw bytes for the given key.
-// It returns (nil, nil) when the key does not exist.
 func Get(ctx context.Context, key string) ([]byte, error) {
 	val, err := Client.Get(ctx, key).Bytes()
 	if err != nil {
 		if err == redis.Nil {
-			return nil, nil
+			return nil, err
 		}
 		return nil, fmt.Errorf("failed to get cache key %s: %w", key, err)
 	}
@@ -24,7 +22,6 @@ func Get(ctx context.Context, key string) ([]byte, error) {
 	return val, nil
 }
 
-// Set stores value at key with ttl.
 func Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	if err := Client.Set(ctx, key, value, ttl).Err(); err != nil {
 		return fmt.Errorf("failed to set cache key %s: %w", key, err)
@@ -33,7 +30,6 @@ func Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
 	return nil
 }
 
-// SetJSON marshals value as JSON and stores it at key with ttl.
 func SetJSON(ctx context.Context, key string, value any, ttl time.Duration) error {
 	data, err := json.Marshal(value)
 	if err != nil {
@@ -43,16 +39,10 @@ func SetJSON(ctx context.Context, key string, value any, ttl time.Duration) erro
 	return Set(ctx, key, data, ttl)
 }
 
-// GetJSON unmarshals cached JSON for key into dest.
-// It returns redis.Nil when the key does not exist.
 func GetJSON(ctx context.Context, key string, dest any) error {
 	data, err := Get(ctx, key)
 	if err != nil {
 		return err
-	}
-
-	if data == nil {
-		return redis.Nil
 	}
 
 	if err := json.Unmarshal(data, dest); err != nil {
@@ -62,7 +52,6 @@ func GetJSON(ctx context.Context, key string, dest any) error {
 	return nil
 }
 
-// Delete removes key from cache.
 func Delete(ctx context.Context, key string) error {
 	if err := Client.Del(ctx, key).Err(); err != nil {
 		return fmt.Errorf("failed to delete cache key %s: %w", key, err)
@@ -71,7 +60,6 @@ func Delete(ctx context.Context, key string) error {
 	return nil
 }
 
-// CacheTTL returns the configured cache TTL in seconds.
 func CacheTTL(cfg *config.RedisConfig) time.Duration {
 	return time.Duration(cfg.CacheTTL) * time.Second
 }

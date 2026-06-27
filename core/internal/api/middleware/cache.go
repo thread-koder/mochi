@@ -24,7 +24,7 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// CacheMiddleware caches successful JSON GET responses in Redis for ttl.
+// CacheMiddleware caches successful GET responses in Redis for the given TTL.
 func CacheMiddleware(ttl time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method != http.MethodGet {
@@ -36,7 +36,7 @@ func CacheMiddleware(ttl time.Duration) gin.HandlerFunc {
 
 		ctx := c.Request.Context()
 		cachedBytes, err := redis.Get(ctx, cacheKey)
-		if err == nil && cachedBytes != nil {
+		if err == nil {
 			setCacheHeaders(c, ttl, true)
 			c.Data(http.StatusOK, "application/json", cachedBytes)
 			c.Abort()
@@ -63,7 +63,6 @@ func CacheMiddleware(ttl time.Duration) gin.HandlerFunc {
 	}
 }
 
-// generateCacheKey hashes path and raw query to scope cache entries per request URL.
 func generateCacheKey(c *gin.Context) string {
 	key := c.Request.URL.Path
 	if c.Request.URL.RawQuery != "" {
@@ -74,7 +73,6 @@ func generateCacheKey(c *gin.Context) string {
 	return "api:cache:" + hex.EncodeToString(hash[:])
 }
 
-// setCacheHeaders marks responses as cache HIT or MISS for clients.
 func setCacheHeaders(c *gin.Context, ttl time.Duration, isCacheHit bool) {
 	maxAge := int(ttl.Seconds())
 	c.Header("Cache-Control", "public, max-age="+fmt.Sprintf("%d", maxAge))
