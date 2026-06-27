@@ -13,7 +13,6 @@ import (
 	"github.com/thread_koder/mochi/core/internal/redis"
 )
 
-// setupRoutes registers all public HTTP routes.
 func setupRoutes(router *gin.Engine) {
 	cacheTTL := redis.CacheTTL(&config.AppConfig.Redis)
 
@@ -44,7 +43,7 @@ func setupRoutes(router *gin.Engine) {
 			{
 				computeRecommendations.GET("/recommendations", computeHandlers.GetRecommendations)
 				computeRecommendations.GET("/recommendations/:id", computeHandlers.GetRecommendationByID)
-				computeRecommendations.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestWorkloadRecommendation)
+				computeRecommendations.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestRecommendation)
 			}
 
 			compute.POST("/recommendations/generate/:workloadType/:workloadName", computeHandlers.GenerateRecommendations)

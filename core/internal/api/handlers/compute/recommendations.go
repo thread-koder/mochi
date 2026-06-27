@@ -16,7 +16,6 @@ import (
 	"github.com/thread_koder/mochi/core/internal/database"
 )
 
-// GenerateRecommendations creates compute recommendations for a workload.
 func GenerateRecommendations(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
@@ -98,7 +97,6 @@ func GenerateRecommendations(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendation)
 }
 
-// GetRecommendations lists stored compute recommendations.
 func GetRecommendations(c *gin.Context) {
 	namespace := c.Query("namespace")
 	status := c.Query("status")
@@ -165,7 +163,6 @@ func GetRecommendations(c *gin.Context) {
 	})
 }
 
-// GetRecommendationByID returns one recommendation by ID.
 func GetRecommendationByID(c *gin.Context) {
 	idStr := c.Param("id")
 
@@ -193,8 +190,7 @@ func GetRecommendationByID(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendation)
 }
 
-// GetLatestWorkloadRecommendation returns the latest recommendation for a workload.
-func GetLatestWorkloadRecommendation(c *gin.Context) {
+func GetLatestRecommendation(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
@@ -227,7 +223,7 @@ func GetLatestWorkloadRecommendation(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendation)
 }
 
-// ApplyRecommendation applies an existing or inline recommendation to a workload.
+// ApplyRecommendation applies an existing (by ID) or inline (in request body) recommendation to a workload.
 func ApplyRecommendation(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
