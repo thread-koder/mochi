@@ -6,7 +6,6 @@ import (
 	"github.com/thread_koder/mochi/core/internal/timeseries"
 )
 
-// TimeSeries holds read/write byte-rate and operation-rate samples for charting.
 type TimeSeries struct {
 	ReadBytes  []timeseries.DataPoint `json:"read_bytes"`
 	WriteBytes []timeseries.DataPoint `json:"write_bytes"`
@@ -14,16 +13,13 @@ type TimeSeries struct {
 	WriteOps   []timeseries.DataPoint `json:"write_ops"`
 }
 
-// DirectionUtilization summarizes one disk direction (read or write) for bytes
-// or operations.
 type DirectionUtilization struct {
-	Current   float64                  `json:"current"` // latest sample (bytes/sec or ops/sec)
+	Current   float64                  `json:"current"`
 	Stats     timeseries.StatsResult   `json:"stats"`
 	Trend     timeseries.TrendResult   `json:"trend"`
 	Anomalies timeseries.AnomalyResult `json:"anomalies"`
 }
 
-// UtilizationResult joins read/write byte and operation summaries.
 type UtilizationResult struct {
 	ReadBytes  DirectionUtilization `json:"read_bytes"`
 	WriteBytes DirectionUtilization `json:"write_bytes"`
@@ -33,9 +29,6 @@ type UtilizationResult struct {
 
 const anomalyStdDevs = 4.0
 
-// AnalyzeReadBytesUtilization summarizes read byte-rate samples. Trend or
-// anomaly steps return stable or empty results when the series is too thin, so
-// stats and Current still surface.
 func AnalyzeReadBytesUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
 	if len(data) == 0 {
 		return DirectionUtilization{}, fmt.Errorf("cannot analyze read bytes utilization from empty dataset")
@@ -50,20 +43,12 @@ func AnalyzeReadBytesUtilization(data []timeseries.DataPoint) (DirectionUtilizat
 
 	trend, err := timeseries.AnalyzeTrend(data)
 	if err != nil {
-		trend = timeseries.TrendResult{
-			Direction: timeseries.DirectionStable,
-			Slope:     0,
-			Strength:  0,
-		}
+		return DirectionUtilization{}, err
 	}
 
 	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
 	if err != nil {
-		anomalies = timeseries.AnomalyResult{
-			Anomalies:    []timeseries.Anomaly{},
-			AnomalyCount: 0,
-			Threshold:    0,
-		}
+		return DirectionUtilization{}, err
 	}
 
 	return DirectionUtilization{
@@ -74,8 +59,6 @@ func AnalyzeReadBytesUtilization(data []timeseries.DataPoint) (DirectionUtilizat
 	}, nil
 }
 
-// AnalyzeWriteBytesUtilization summarizes write byte-rate samples. Thin series
-// degrade trend and anomaly fields the same way as AnalyzeReadBytesUtilization.
 func AnalyzeWriteBytesUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
 	if len(data) == 0 {
 		return DirectionUtilization{}, fmt.Errorf("cannot analyze write bytes utilization from empty dataset")
@@ -90,20 +73,12 @@ func AnalyzeWriteBytesUtilization(data []timeseries.DataPoint) (DirectionUtiliza
 
 	trend, err := timeseries.AnalyzeTrend(data)
 	if err != nil {
-		trend = timeseries.TrendResult{
-			Direction: timeseries.DirectionStable,
-			Slope:     0,
-			Strength:  0,
-		}
+		return DirectionUtilization{}, err
 	}
 
 	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
 	if err != nil {
-		anomalies = timeseries.AnomalyResult{
-			Anomalies:    []timeseries.Anomaly{},
-			AnomalyCount: 0,
-			Threshold:    0,
-		}
+		return DirectionUtilization{}, err
 	}
 
 	return DirectionUtilization{
@@ -114,8 +89,6 @@ func AnalyzeWriteBytesUtilization(data []timeseries.DataPoint) (DirectionUtiliza
 	}, nil
 }
 
-// AnalyzeReadOpsUtilization summarizes read operation-rate samples. Thin series
-// degrade trend and anomaly fields the same way as AnalyzeReadBytesUtilization.
 func AnalyzeReadOpsUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
 	if len(data) == 0 {
 		return DirectionUtilization{}, fmt.Errorf("cannot analyze read ops utilization from empty dataset")
@@ -130,20 +103,12 @@ func AnalyzeReadOpsUtilization(data []timeseries.DataPoint) (DirectionUtilizatio
 
 	trend, err := timeseries.AnalyzeTrend(data)
 	if err != nil {
-		trend = timeseries.TrendResult{
-			Direction: timeseries.DirectionStable,
-			Slope:     0,
-			Strength:  0,
-		}
+		return DirectionUtilization{}, err
 	}
 
 	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
 	if err != nil {
-		anomalies = timeseries.AnomalyResult{
-			Anomalies:    []timeseries.Anomaly{},
-			AnomalyCount: 0,
-			Threshold:    0,
-		}
+		return DirectionUtilization{}, err
 	}
 
 	return DirectionUtilization{
@@ -154,8 +119,6 @@ func AnalyzeReadOpsUtilization(data []timeseries.DataPoint) (DirectionUtilizatio
 	}, nil
 }
 
-// AnalyzeWriteOpsUtilization summarizes write operation-rate samples. Thin
-// series degrade trend and anomaly fields the same way as AnalyzeReadOpsUtilization.
 func AnalyzeWriteOpsUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
 	if len(data) == 0 {
 		return DirectionUtilization{}, fmt.Errorf("cannot analyze write ops utilization from empty dataset")
@@ -170,20 +133,12 @@ func AnalyzeWriteOpsUtilization(data []timeseries.DataPoint) (DirectionUtilizati
 
 	trend, err := timeseries.AnalyzeTrend(data)
 	if err != nil {
-		trend = timeseries.TrendResult{
-			Direction: timeseries.DirectionStable,
-			Slope:     0,
-			Strength:  0,
-		}
+		return DirectionUtilization{}, err
 	}
 
 	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
 	if err != nil {
-		anomalies = timeseries.AnomalyResult{
-			Anomalies:    []timeseries.Anomaly{},
-			AnomalyCount: 0,
-			Threshold:    0,
-		}
+		return DirectionUtilization{}, err
 	}
 
 	return DirectionUtilization{
@@ -194,8 +149,6 @@ func AnalyzeWriteOpsUtilization(data []timeseries.DataPoint) (DirectionUtilizati
 	}, nil
 }
 
-// AnalyzeUtilization fills UtilizationResult from DiskMetrics. At least one of
-// read or write byte series must be non-empty, and operation series may be empty.
 func AnalyzeUtilization(metrics DiskMetrics) (UtilizationResult, error) {
 	if len(metrics.ReadBytes) == 0 && len(metrics.WriteBytes) == 0 {
 		return UtilizationResult{}, fmt.Errorf("no metrics provided for utilization analysis")

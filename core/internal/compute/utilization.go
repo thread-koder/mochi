@@ -6,13 +6,11 @@ import (
 	"github.com/thread_koder/mochi/core/internal/timeseries"
 )
 
-// TimeSeries is raw CPU and memory series used for charting.
 type TimeSeries struct {
 	CPU    []timeseries.DataPoint `json:"cpu"`
 	Memory []timeseries.DataPoint `json:"memory"`
 }
 
-// CPUUtilization summarizes CPU usage from a time series: latest value, distribution stats, trend, and anomalies.
 type CPUUtilization struct {
 	Current    float64                  `json:"current"`
 	Stats      timeseries.StatsResult   `json:"stats"`
@@ -21,7 +19,6 @@ type CPUUtilization struct {
 	SampleSize int                      `json:"sample_size"`
 }
 
-// MemoryUtilization summarizes memory usage (bytes) from a time series: latest value, stats, trend, and anomalies.
 type MemoryUtilization struct {
 	Current    float64                  `json:"current"`
 	Stats      timeseries.StatsResult   `json:"stats"`
@@ -30,7 +27,6 @@ type MemoryUtilization struct {
 	SampleSize int                      `json:"sample_size"`
 }
 
-// UtilizationResult is CPU and memory utilization summaries for one scope (container, pod, workload, or namespace).
 type UtilizationResult struct {
 	CPU    CPUUtilization    `json:"cpu"`
 	Memory MemoryUtilization `json:"memory"`
@@ -38,8 +34,6 @@ type UtilizationResult struct {
 
 const anomalyStdDevs = 4.0
 
-// AnalyzeCPUUtilization derives stats, trend, and anomalies from CPU series. Trend and anomaly steps
-// return neutral empty results when the series is too short or noisy so callers can still use stats.
 func AnalyzeCPUUtilization(cpuData []timeseries.DataPoint) (CPUUtilization, error) {
 	if len(cpuData) == 0 {
 		return CPUUtilization{}, fmt.Errorf("cannot analyze CPU utilization from empty dataset")
@@ -54,20 +48,12 @@ func AnalyzeCPUUtilization(cpuData []timeseries.DataPoint) (CPUUtilization, erro
 
 	trend, err := timeseries.AnalyzeTrend(cpuData)
 	if err != nil {
-		trend = timeseries.TrendResult{
-			Direction: timeseries.DirectionStable,
-			Slope:     0,
-			Strength:  0,
-		}
+		return CPUUtilization{}, err
 	}
 
 	anomalies, err := timeseries.DetectAnomalies(cpuData, anomalyStdDevs)
 	if err != nil {
-		anomalies = timeseries.AnomalyResult{
-			Anomalies:    []timeseries.Anomaly{},
-			AnomalyCount: 0,
-			Threshold:    0,
-		}
+		return CPUUtilization{}, err
 	}
 
 	return CPUUtilization{
@@ -79,8 +65,6 @@ func AnalyzeCPUUtilization(cpuData []timeseries.DataPoint) (CPUUtilization, erro
 	}, nil
 }
 
-// AnalyzeMemoryUtilization derives stats, trend, and anomalies from memory series. Trend and anomaly steps
-// return neutral empty results when the series is too short or noisy so callers can still use stats.
 func AnalyzeMemoryUtilization(memoryData []timeseries.DataPoint) (MemoryUtilization, error) {
 	if len(memoryData) == 0 {
 		return MemoryUtilization{}, fmt.Errorf("cannot analyze memory utilization from empty dataset")
@@ -95,20 +79,12 @@ func AnalyzeMemoryUtilization(memoryData []timeseries.DataPoint) (MemoryUtilizat
 
 	trend, err := timeseries.AnalyzeTrend(memoryData)
 	if err != nil {
-		trend = timeseries.TrendResult{
-			Direction: timeseries.DirectionStable,
-			Slope:     0,
-			Strength:  0,
-		}
+		return MemoryUtilization{}, err
 	}
 
 	anomalies, err := timeseries.DetectAnomalies(memoryData, anomalyStdDevs)
 	if err != nil {
-		anomalies = timeseries.AnomalyResult{
-			Anomalies:    []timeseries.Anomaly{},
-			AnomalyCount: 0,
-			Threshold:    0,
-		}
+		return MemoryUtilization{}, err
 	}
 
 	return MemoryUtilization{
@@ -120,7 +96,6 @@ func AnalyzeMemoryUtilization(memoryData []timeseries.DataPoint) (MemoryUtilizat
 	}, nil
 }
 
-// AnalyzeUtilization runs CPU and/or memory analysis when the corresponding series are non-empty.
 func AnalyzeUtilization(metrics ResourceMetrics) (UtilizationResult, error) {
 	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
 		return UtilizationResult{}, fmt.Errorf("no metrics provided for utilization analysis")
