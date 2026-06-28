@@ -11,23 +11,23 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@nuxt/eslint": "1.15.2",
-    "@nuxt/icon": "2.2.2",
-    "@tailwindcss/vite": "^4.3.0",
+    "@nuxt/eslint": "1.16.0",
+    "@nuxt/icon": "2.2.4",
+    "@tailwindcss/vite": "^4.3.1",
     "@vueuse/nuxt": "14.3.0",
     "chart.js": "^4.5.1",
     "chartjs-adapter-date-fns": "^3.0.0",
-    "eslint": "^10.4.0",
-    "motion-v": "^2.2.1",
-    "nuxt": "^4.4.6",
+    "eslint": "^10.5.0",
+    "motion-v": "^2.3.0",
+    "nuxt": "^4.4.8",
     "nuxt-api-party": "3.4.2",
-    "tailwindcss": "^4.3.0",
-    "vue": "^3.5.34",
-    "vue-router": "^5.0.7"
+    "tailwindcss": "^4.3.1",
+    "vue": "^3.5.39",
+    "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@iconify-json/lucide": "^1.2.109",
+    "@iconify-json/lucide": "^1.2.114",
     "typescript": "^6.0.3"
   },
-  "packageManager": "pnpm@11.2.2+sha512.36e6621fad506178936455e70247b8808ef4ec25797a9f437a93281a020484e2607f6a469a22e982987c3dbb8866e3071514ab10a4a1749e06edcd1ec118436f"
+  "packageManager": "pnpm@11.9.0+sha512.bd682d5d03fe525ef7c9fd6780c6884d1e756ac4c9c9fe00c538782824310dcf90e3ddc4f53835f06dfaebd5085e41855e0bcbb3b60de2ac5bbab89e5036f03b"
 }
