@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-center justify-between gap-4 pt-4">
+  <div class="flex items-center justify-between gap-4">
     <!-- Results info -->
     <div class="text-sm text-on-surface-secondary">
       <span>Showing </span>

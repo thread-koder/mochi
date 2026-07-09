@@ -1,8 +1,8 @@
 <template>
-  <div class="py-12 px-6 rounded-lg bg-primary/5 border border-primary/10 text-center">
+  <div class="text-center py-6">
     <Icon
       :name="iconName"
-      class="mx-auto text-4xl text-on-surface-muted mb-4"
+      class="mx-auto text-on-surface-muted text-3xl mb-2"
     />
     <p class="text-sm font-medium text-on-surface mb-1">
       {{ title }}

@@ -1,11 +1,11 @@
 <template>
   <div class="mb-6">
-    <div class="flex space-x-4 border-b border-primary/20">
+    <div class="flex space-x-4">
       <button
         v-for="tab in tabs"
         :key="tab.id"
         type="button"
-        class="px-4 py-2 cursor-pointer transition-all"
+        class="px-4 py-2 cursor-pointer"
         :class="tabButtonClass(tab.id)"
         @click="emit('update:modelValue', tab.id)"
       >
@@ -23,7 +23,10 @@
       leave-from-class="opacity-100 scale-100"
       leave-to-class="opacity-0 scale-90"
     >
-      <div v-show="modelValue === tab.id">
+      <div
+        v-show="modelValue === tab.id"
+        class="mt-6"
+      >
         <slot :name="tab.id" />
       </div>
     </Transition>
@@ -47,7 +50,7 @@ const emit = defineEmits<{
 
 const tabButtonClass = (id: string) => {
   return props.modelValue === id
-    ? 'border-b-2 border-primary-light text-primary-light font-semibold'
-    : 'text-on-surface-muted hover:text-on-surface-subtle'
+    ? 'border-b-2 border-primary text-primary-light font-semibold'
+    : 'text-on-surface-secondary hover:text-on-surface'
 }
 </script>

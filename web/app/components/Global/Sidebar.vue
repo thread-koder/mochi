@@ -1,32 +1,29 @@
 <template>
-  <aside class="w-64 glass border-r border-primary/30 flex flex-col">
+  <aside class="w-64 bg-surface-elevated flex flex-col">
     <!-- Logo -->
-    <div class="p-6 border-b border-primary/30 flex items-center justify-between">
-      <h1
-        class="text-2xl font-bold font-heading bg-linear-to-r from-primary-light
-        via-primary to-secondary-light bg-clip-text text-transparent drop-shadow-lg"
-      >
+    <div class="px-6 pt-6 pb-4 flex items-center justify-between">
+      <h1 class="text-2xl font-bold font-heading text-on-surface">
         Mochi
       </h1>
       <UiThemeSwitcher />
     </div>
 
     <!-- Navigation -->
-    <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+    <nav class="flex-1 px-4 pb-4 pt-2 space-y-2 overflow-y-auto">
       <!-- Home Link -->
       <NuxtLink
         to="/"
-        class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-all
-          text-sm hover:bg-primary/10 hover:text-on-surface text-on-surface-subtle"
-        active-class="hover:text-primary-light hover:bg-primary/20
-         bg-primary/20 border-l-2 border-primary-light text-primary-light"
-        exact-active-class="hover:text-primary-light hover:bg-primary/20
-         bg-primary/20 border-l-2 border-primary-light text-primary-light"
+        class="flex items-center space-x-3 px-4 py-2 rounded-lg text-sm
+          text-on-surface-muted hover:bg-primary/10 hover:text-on-surface"
+        active-class="bg-primary/10 !text-primary-light
+          hover:bg-primary/10 hover:!text-primary-light"
+        exact-active-class="bg-primary/10 !text-primary-light
+          hover:bg-primary/10 hover:!text-primary-light"
       >
         <Icon
           name="lucide:house"
         />
-        <span class="font-medium">Home</span>
+        <span>Home</span>
       </NuxtLink>
 
       <!-- Namespaces List -->
@@ -57,12 +54,12 @@
           v-for="ns in data || []"
           :key="ns.name"
           :to="`/namespaces/${ns.name}`"
-          class="flex items-center justify-between px-4 py-2 rounded-lg transition-all
-           text-sm hover:bg-primary/10 hover:text-on-surface text-on-surface-muted"
-          active-class="bg-primary/20 hover:bg-primary/20 border-l-2 border-primary-light
-           text-primary-light hover:text-primary-light font-medium"
-          exact-active-class="bg-primary/20 hover:bg-primary/20 border-l-2 border-primary-light
-           text-primary-light hover:text-primary-light font-medium"
+          class="flex items-center justify-between px-4 py-2 rounded-lg text-sm
+           text-on-surface-muted hover:bg-primary/10 hover:text-on-surface"
+          active-class="bg-primary/10 !text-primary-light
+           hover:bg-primary/10 hover:!text-primary-light"
+          exact-active-class="bg-primary/10 !text-primary-light
+           hover:bg-primary/10 hover:!text-primary-light"
         >
           <span>{{ ns.name }}</span>
           <span
@@ -80,12 +77,12 @@
       >
         <NuxtLink
           to="/recommendations/compute"
-          class="block px-4 py-2 rounded-lg transition-all
-           text-sm hover:bg-primary/10 hover:text-on-surface text-on-surface-muted"
-          active-class="bg-primary/20 border-l-2 border-primary-light
-           text-primary-light hover:bg-primary/20 hover:text-primary-light font-medium"
-          exact-active-class="bg-primary/20 border-l-2 border-primary-light
-           text-primary-light hover:bg-primary/20 hover:text-primary-light font-medium"
+          class="block px-4 py-2 rounded-lg text-sm
+           text-on-surface-muted hover:bg-primary/10 hover:text-on-surface"
+          active-class="bg-primary/10 !text-primary-light
+           hover:bg-primary/10 hover:!text-primary-light"
+          exact-active-class="bg-primary/10 !text-primary-light
+           hover:bg-primary/10 hover:!text-primary-light"
         >
           Compute
         </NuxtLink>

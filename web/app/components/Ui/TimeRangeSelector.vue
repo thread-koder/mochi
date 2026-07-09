@@ -24,7 +24,7 @@
           v-model="customInputValue"
           type="text"
           placeholder="e.g., 2h, 48h, 5d"
-          class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-2
+          class="bg-surface-elevated border border-on-surface-muted/20 rounded-lg px-3 py-2
            text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50 w-32"
           @keyup.enter="applyCustom"
         >

@@ -1,14 +1,13 @@
 <template>
   <button
-    class="theme-switcher cursor-pointer flex items-center justify-center
-      transition-all duration-500 hover:rotate-12 hover:scale-110"
-    :class="{ 'rotate-180': colorMode === 'dark' }"
+    class="cursor-pointer flex items-center justify-center p-1 rounded-lg
+      text-on-surface-muted hover:text-primary transition-colors"
     aria-label="Toggle theme"
     @click="toggleMode()"
   >
     <Icon
       :name="colorMode === 'dark' ? 'lucide:moon' : 'lucide:sun'"
-      class="text-2xl text-primary-light"
+      class="text-xl"
     />
   </button>
 </template>

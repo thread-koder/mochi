@@ -7,7 +7,7 @@
     <button
       ref="triggerRef"
       type="button"
-      class="bg-surface-elevated border border-primary/20 rounded-lg px-3 py-2
+      class="bg-surface-elevated border border-on-surface-muted/20 rounded-lg px-3 py-2
        text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50
        min-w-[140px] text-left flex items-center justify-between gap-2 cursor-pointer"
       :class="modelValue ? 'text-on-surface' : ''"
@@ -36,13 +36,13 @@
         <div
           v-if="isOpen"
           ref="dropdownRef"
-          class="fixed z-9999 glass rounded-lg border border-primary/20 shadow-lg overflow-hidden"
+          class="fixed z-9999 panel rounded-lg border border-on-surface-muted/20 shadow-lg overflow-hidden"
           :style="dropdownStyle"
         >
           <!-- Search Input -->
           <div
             v-if="searchable"
-            class="p-2 border-b border-primary/10"
+            class="p-2 border-b border-on-surface-muted/10"
           >
             <div class="relative">
               <Icon
@@ -54,7 +54,7 @@
                 v-model="searchQuery"
                 type="text"
                 :placeholder="searchPlaceholder"
-                class="w-full bg-surface-elevated border border-primary/20 rounded-lg px-8 py-2
+                class="w-full bg-surface-elevated border border-on-surface-muted/20 rounded-lg px-8 py-2
                  text-sm text-on-surface-secondary placeholder:text-on-surface-muted
                  focus:outline-none focus:border-primary/50"
               >
@@ -67,9 +67,10 @@
             <button
               v-if="nullOption"
               type="button"
-              class="w-full px-3 py-2 text-sm text-left transition-colors
-               hover:bg-primary/10 hover:text-on-surface cursor-pointer"
-              :class="modelValue === null ? 'bg-primary/20 text-primary-light' : 'text-on-surface-secondary'"
+              class="w-full px-3 py-2 text-sm text-left transition-colors cursor-pointer"
+              :class="modelValue === null
+                ? 'bg-primary/20 text-primary-light hover:bg-primary/25'
+                : 'text-on-surface-secondary hover:bg-primary/10 hover:text-on-surface'"
               @click="selectNull"
             >
               {{ nullOption }}
@@ -84,9 +85,10 @@
               v-for="option in filteredOptions"
               :key="optionValue(option)"
               type="button"
-              class="w-full px-3 py-2 text-sm text-left transition-colors
-               hover:bg-primary/10 hover:text-on-surface cursor-pointer"
-              :class="isSelected(option) ? 'bg-primary/20 text-primary-light' : 'text-on-surface-secondary'"
+              class="w-full px-3 py-2 text-sm text-left transition-colors cursor-pointer"
+              :class="isSelected(option)
+                ? 'bg-primary/20 text-primary-light hover:bg-primary/25'
+                : 'text-on-surface-secondary hover:bg-primary/10 hover:text-on-surface'"
               @click="selectOption(option)"
             >
               {{ optionLabel(option) }}

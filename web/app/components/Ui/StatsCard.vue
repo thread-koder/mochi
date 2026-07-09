@@ -1,20 +1,17 @@
 <template>
-  <UiMagnetic class="glass hover:border-primary/50 rounded-xl p-6 magnetic-card">
-    <div class="flex items-center justify-between mb-4">
+  <UiMagnetic class="panel p-4 magnetic-card">
+    <div class="flex items-center justify-between mb-2">
       <h3 class="text-on-surface-secondary text-sm">
         {{ title }}
       </h3>
       <Icon
         v-if="icon"
         :name="icon"
-        class="text-xl"
+        class="text-lg text-primary-light"
       />
     </div>
-    <p
-      class="text-3xl font-bold"
-      :class="color"
-    >
-      {{ displayValue }}{{ trailing }}
+    <p class="text-2xl font-bold text-on-surface">
+      {{ displayValue }}
     </p>
   </UiMagnetic>
 </template>
@@ -24,8 +21,6 @@ const props = defineProps<{
   title: string
   value: number
   icon?: string
-  color: string
-  trailing?: string
 }>()
 
 const displayValue = ref(0)
