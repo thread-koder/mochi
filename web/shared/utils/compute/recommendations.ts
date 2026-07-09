@@ -1,4 +1,4 @@
-export type RecommendationFieldState = 'change' | 'new' | 'unchanged' | 'empty'
+type RecommendationFieldState = 'change' | 'new' | 'unchanged' | 'empty'
 
 const hasValue = (value: string | null | undefined): boolean => {
   return value != null && value !== ''

@@ -20,7 +20,7 @@ export const RECOMMENDATION_MODE_OPTIONS: {
   {
     value: 'burstable',
     label: 'Burstable',
-    description: 'P95-based sizing with burst headroom (limit > request). Recommended default.',
+    description: 'P95-based sizing with burst headroom (limit > request).',
     icon: 'lucide:activity',
   },
   {

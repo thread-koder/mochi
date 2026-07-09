@@ -1,8 +1,3 @@
-/**
- * Formats a byte value to a human-readable string.
- * @param value - The byte value to format.
- * @returns A human-readable string.
- */
 export const formatBytes = (value?: number): string => {
   if (value === undefined || isNaN(value)) {
     return 'N/A'
@@ -24,11 +19,6 @@ export const formatBytes = (value?: number): string => {
   return `${size.toFixed(2)} ${units[unitIndex]}`
 }
 
-/**
- * Formats a value to a percentage.
- * @param value - The value to format.
- * @returns A percentage string.
- */
 export const formatPercentage = (value: number): string => {
   if (isNaN(value)) {
     return 'N/A'
@@ -36,11 +26,6 @@ export const formatPercentage = (value: number): string => {
   return `${(value * 100).toFixed(1)}%`
 }
 
-/**
- * Formats a change percentage to a human-readable string.
- * @param percent - The change percentage to format.
- * @returns A human-readable string.
- */
 export const formatChangePercent = (percent: number | null | undefined): string => {
   if (percent === null || percent === undefined) {
     return ''

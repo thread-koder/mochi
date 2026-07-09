@@ -1,8 +1,3 @@
-/**
- * Returns a time ago string for a given timestamp.
- * @param timestamp - The timestamp to format.
- * @returns A human-readable time ago string.
- */
 export const timeAgo = (timestamp: string) => {
   const date = new Date(timestamp)
   const now = new Date()
@@ -28,11 +23,6 @@ export const timeAgo = (timestamp: string) => {
   return date.toLocaleDateString()
 }
 
-/**
- * Formats a duration string to a human-readable format.
- * @param duration - The duration string to format.
- * @returns A human-readable duration string.
- */
 export const formatDuration = (duration: string): string => {
   const hoursMatch = duration.match(/(\d+)h/)
   const minutesMatch = duration.match(/(\d+)m/)
@@ -56,4 +46,12 @@ export const formatDuration = (duration: string): string => {
   }
 
   return duration
+}
+
+export const timestampsDiffer = (first: string, second?: string): boolean => {
+  if (!second) {
+    return false
+  }
+
+  return new Date(first).getTime() !== new Date(second).getTime()
 }
