@@ -2,14 +2,10 @@ type ScoreColorOptions = {
   highThreshold?: number
   midThreshold?: number
   type?: 'text' | 'bg'
+  /** When true, higher values are worse (neutral → warning → error). */
+  invert?: boolean
 }
 
-/**
- * Returns the color for the score.
- * @param value - The score value (0-1).
- * @param options - The options for the score color.
- * @returns A Tailwind CSS class string.
- */
 export const scoreColor = (
   value: number | undefined | null,
   options?: ScoreColorOptions,
@@ -23,14 +19,20 @@ export const scoreColor = (
   }
 
   if (type === 'text') {
+    if (options?.invert) {
+      if (value > highThreshold) return 'text-error-light'
+      if (value > midThreshold) return 'text-warning-light'
+      return 'text-on-surface'
+    }
+
     if (value >= highThreshold) return 'text-success-light'
     if (value >= midThreshold) return 'text-warning-light'
     return 'text-error-light'
   }
   else {
-    if (value >= highThreshold) return 'bg-success-light'
-    if (value >= midThreshold) return 'bg-warning-light'
-    return 'bg-error-light'
+    if (value >= highThreshold) return 'bg-success'
+    if (value >= midThreshold) return 'bg-warning'
+    return 'bg-error'
   }
 }
 
@@ -39,12 +41,6 @@ type ScoreBadgeOptions = {
   midThreshold?: number
 }
 
-/**
- * Returns the combined bg/text classes for the score badge.
- * @param value - The score value (0-1).
- * @param options - The options for the score color.
- * @returns A Tailwind CSS class string.
- */
 export const scoreBadgeClass = (
   value: number | undefined | null,
   options?: ScoreBadgeOptions,
@@ -56,18 +52,14 @@ export const scoreBadgeClass = (
     return 'bg-on-surface-muted/20 text-on-surface-muted border-on-surface-muted/30'
   }
 
-  if (value >= highThreshold) return 'bg-success-light/20 text-success-light border-success-light/30'
-  if (value >= midThreshold) return 'bg-warning-light/20 text-warning-light border-warning-light/30'
-  return 'bg-error-light/20 text-error-light border-error-light/30'
+  if (value >= highThreshold) return 'bg-success/20 text-success-light border-success/30'
+  if (value >= midThreshold) return 'bg-warning/20 text-warning-light border-warning/30'
+  return 'bg-error/20 text-error-light border-error/30'
 }
 
 /**
  * Returns an empty string if not on the client-side.
- * Chart.js cannot use Tailwind classes, so we read :root CSS variables.
  * Design tokens are expected to use modern CSS syntax (e.g. oklch), not bare hex.
- * @param variableName - The name of the CSS variable to resolve.
- * @param opacity - The opacity to apply to the color.
- * @returns The resolved color string.
  */
 export const cssVariableColor = (variableName: string, opacity?: number): string => {
   if (!import.meta.client) return ''
