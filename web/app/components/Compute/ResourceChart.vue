@@ -71,21 +71,13 @@ const initChart = () => {
   // Avoids using chart.js's "grace" feature, which can cause fill artifacts
   const yMax = maxValue > 0 ? maxValue * 1.1 : 1
 
-  const borderColor = isCPU
-    ? cssVariableColor('--color-primary-light')
-    : cssVariableColor('--color-secondary-light')
-  const bgColor = isCPU
-    ? cssVariableColor('--color-primary-light', 0.1)
-    : cssVariableColor('--color-secondary-light', 0.1)
-  const gridColor = isCPU
-    ? cssVariableColor('--color-primary', 0.1)
-    : cssVariableColor('--color-secondary', 0.1)
+  const borderColor = cssVariableColor('--color-primary-light')
+  const bgColor = cssVariableColor('--color-primary-light', 0.1)
+  const gridColor = cssVariableColor('--color-primary-light', 0.1)
   const textColor = cssVariableColor('--color-on-surface-secondary')
 
   const tooltipBgColor = cssVariableColor('--color-surface-elevated')
-  const tooltipBorderColor = isCPU
-    ? cssVariableColor('--color-primary', 0.3)
-    : cssVariableColor('--color-secondary', 0.3)
+  const tooltipBorderColor = cssVariableColor('--color-primary-light', 0.3)
   const tooltipBodyColor = cssVariableColor('--color-on-surface')
 
   chartInstance = new Chart(ctx, {
