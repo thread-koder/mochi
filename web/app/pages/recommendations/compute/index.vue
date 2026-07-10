@@ -1,18 +1,11 @@
 <template>
   <div class="p-8">
     <!-- Header -->
-    <div class="mb-8">
+    <div class="mb-6">
       <UiBreadcrumb :items="breadcrumbs" />
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <h1 class="text-4xl font-bold font-heading mb-2">
-            Compute Recommendations
-          </h1>
-          <p class="text-on-surface-secondary">
-            Review and manage resource optimization recommendations for your workloads
-          </p>
-        </div>
-      </div>
+      <h1 class="text-4xl font-bold font-heading mb-2">
+        Compute Recommendations
+      </h1>
     </div>
 
     <!-- Filter Bar -->

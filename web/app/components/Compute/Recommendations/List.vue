@@ -1,5 +1,5 @@
 <template>
-  <div class="glass rounded-xl p-6">
+  <div class="panel p-4">
     <!-- Error state -->
     <UiAlert
       v-if="error"
@@ -11,11 +11,11 @@
     <!-- Loading state -->
     <div
       v-else-if="pending"
-      class="py-12 flex flex-col items-center justify-center gap-3 text-on-surface-secondary"
+      class="py-6 flex flex-col items-center justify-center gap-2 text-on-surface-secondary"
     >
       <Icon
         name="lucide:loader-circle"
-        class="text-3xl animate-spin"
+        class="text-2xl animate-spin"
       />
       <p class="text-sm font-medium">
         Loading recommendations...
@@ -39,7 +39,7 @@
         <thead>
           <tr class="border-b border-primary/20 text-sm text-on-surface-secondary">
             <th
-              class="text-left py-2 px-4 cursor-pointer select-none hover:text-primary-light transition-colors"
+              class="text-left py-2 px-4 cursor-pointer select-none hover:text-on-surface transition-colors"
               @click="setSort('namespace')"
             >
               <span class="inline-flex items-center gap-1">
@@ -52,7 +52,7 @@
               </span>
             </th>
             <th
-              class="text-left py-2 px-4 cursor-pointer select-none hover:text-primary-light transition-colors"
+              class="text-left py-2 px-4 cursor-pointer select-none hover:text-on-surface transition-colors"
               @click="setSort('workload_name')"
             >
               <span class="inline-flex items-center gap-1">
@@ -65,7 +65,7 @@
               </span>
             </th>
             <th
-              class="text-left py-2 px-4 cursor-pointer select-none hover:text-primary-light transition-colors"
+              class="text-left py-2 px-4 cursor-pointer select-none hover:text-on-surface transition-colors"
               @click="setSort('workload_type')"
             >
               <span class="inline-flex items-center gap-1">
@@ -78,7 +78,7 @@
               </span>
             </th>
             <th
-              class="text-left py-2 px-4 cursor-pointer select-none hover:text-primary-light transition-colors"
+              class="text-left py-2 px-4 cursor-pointer select-none hover:text-on-surface transition-colors"
               @click="setSort('status')"
             >
               <span class="inline-flex items-center gap-1">
@@ -91,7 +91,7 @@
               </span>
             </th>
             <th
-              class="text-left py-2 px-4 cursor-pointer select-none hover:text-primary-light transition-colors"
+              class="text-left py-2 px-4 cursor-pointer select-none hover:text-on-surface transition-colors"
               @click="setSort('mode')"
             >
               <span class="inline-flex items-center gap-1">
@@ -104,7 +104,7 @@
               </span>
             </th>
             <th
-              class="text-left py-2 px-4 cursor-pointer select-none hover:text-primary-light transition-colors"
+              class="text-left py-2 px-4 cursor-pointer select-none hover:text-on-surface transition-colors"
               @click="setSort('confidence')"
             >
               <span class="inline-flex items-center gap-1">
@@ -117,7 +117,7 @@
               </span>
             </th>
             <th
-              class="text-left py-2 px-4 cursor-pointer select-none hover:text-primary-light transition-colors"
+              class="text-left py-2 px-4 cursor-pointer select-none hover:text-on-surface transition-colors"
               @click="setSort('created_at')"
             >
               <span class="inline-flex items-center gap-1">
@@ -135,17 +135,19 @@
           <tr
             v-for="record in sortedRecords"
             :key="record.id"
-            class="border-b border-primary/20 hover:bg-primary/10 transition-all cursor-pointer"
+            class="border-b border-primary/10 hover:bg-primary/10 transition-all cursor-pointer last:border-b-0"
             @click="navigateToDetail(record.id)"
           >
             <td class="py-3 px-4">
               <span class="text-on-surface text-sm">{{ record.namespace }}</span>
             </td>
             <td class="py-3 px-4">
-              <span class="text-primary-light font-medium text-sm">{{ record.workload_name }}</span>
+              <span class="text-on-surface font-medium text-sm">{{ record.workload_name }}</span>
             </td>
             <td class="py-3 px-4">
-              <span class="px-2 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
+              <span
+                class="badge-neutral px-2 py-1 rounded-full text-xs font-medium border"
+              >
                 {{ workloadTypeLabel(record.workload_type) }}
               </span>
             </td>
@@ -158,7 +160,9 @@
               </span>
             </td>
             <td class="py-3 px-4">
-              <span class="px-2 py-1 rounded-full text-xs font-medium bg-secondary/20 text-secondary-light border border-secondary/30">
+              <span
+                class="badge-neutral px-2 py-1 rounded-full text-xs font-medium border"
+              >
                 {{ recommendationModeLabel(record.recommendation_mode) }}
               </span>
             </td>
@@ -181,6 +185,7 @@
     <!-- Pagination -->
     <UiPagination
       v-if="!error && !pending && total > 0"
+      class="mt-4"
       :current-page="currentPage"
       :total-pages="totalPages"
       :total="total"
@@ -197,6 +202,7 @@ import {
 } from '#shared/constants/compute/recommendations'
 import { workloadTypeLabel } from '#shared/constants/workload'
 import { recommendationStatusBadgeClass } from '#shared/utils/compute/color'
+import { scoreBadgeClass } from '#shared/utils/color'
 import type { RecommendationsResponse, RecommendationRecord } from '#shared/types/compute'
 import type { FilterState } from '~/components/Compute/Recommendations/FilterBar.vue'
 
