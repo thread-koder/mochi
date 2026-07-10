@@ -1,18 +1,16 @@
 <template>
-  <div class="mt-6">
+  <div>
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
       <UiStatsCard
         title="Pods"
         :value="workloadData?.stats.pods ?? 0"
         icon="lucide:rocket"
-        color="text-primary-light"
       />
       <UiStatsCard
         title="Containers"
         :value="workloadData?.stats.containers ?? 0"
         icon="lucide:container"
-        color="text-secondary-light"
       />
     </div>
 

@@ -8,25 +8,33 @@
     <div class="space-y-6">
       <!-- Recommendation Mode Selection -->
       <div>
-        <label class="text-sm font-medium text-on-surface-secondary mb-3 block">
-          Recommendation Mode
-        </label>
+        <div class="flex items-center justify-between flex-wrap gap-4 mb-3">
+          <label class="font-medium text-on-surface-secondary">
+            Recommendation Mode
+          </label>
+          <div
+            role="group"
+            aria-label="Analysis period"
+          >
+            <UiTimeRangeSelector v-model="timeRange" />
+          </div>
+        </div>
         <div class="grid grid-cols-1 gap-3">
           <button
             v-for="mode in RECOMMENDATION_MODE_OPTIONS"
             :key="mode.value"
-            class="flex items-start gap-4 p-4 rounded-lg border-2 transition-all text-left
+            class="flex items-start gap-4 p-4 rounded-lg text-left
              hover:bg-primary/5 cursor-pointer"
             :class="selectedMode === mode.value
-              ? 'border-primary-light bg-primary/10'
-              : 'border-primary/20 bg-surface-elevated'"
+              ? 'ring-2 ring-primary bg-primary/5'
+              : 'ring-1 ring-primary/20 bg-surface-elevated'"
             @click="selectedMode = mode.value as RecommendationMode"
           >
             <div
               class="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center
                transition-colors self-center text-primary-light"
               :class="selectedMode === mode.value
-                ? 'bg-primary-light/20'
+                ? 'bg-primary/20'
                 : 'bg-primary/10'"
             >
               <Icon
@@ -55,14 +63,6 @@
         </div>
       </div>
 
-      <!-- Time Range Selector -->
-      <div>
-        <label class="text-sm font-medium text-on-surface-secondary mb-3 block">
-          Analysis Time Range
-        </label>
-        <UiTimeRangeSelector v-model="timeRange" />
-      </div>
-
       <!-- Error State -->
       <Transition
         enter-active-class="transition ease-out duration-200"
@@ -81,7 +81,7 @@
       </Transition>
 
       <!-- Action Buttons -->
-      <div class="flex items-center justify-end gap-3 pt-4 border-t border-primary/20">
+      <div class="flex items-center justify-end gap-3">
         <button
           class="px-4 py-2 rounded-lg text-sm font-medium text-on-surface-secondary
            hover:bg-primary/10 hover:text-on-surface transition-all cursor-pointer"

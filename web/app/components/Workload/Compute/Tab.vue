@@ -1,12 +1,14 @@
 <template>
-  <div class="mt-6">
-    <!-- Action Bar -->
-    <div class="glass rounded-xl p-4 mb-6">
-      <div class="flex items-center justify-between flex-wrap gap-4">
-        <div class="flex items-center gap-4 flex-wrap">
-          <label class="text-sm text-on-surface-secondary">
-            Analysis Time Range:
-          </label>
+  <div>
+    <div class="flex items-center justify-between flex-wrap gap-4 mb-4">
+      <h2 class="text-2xl font-bold font-heading">
+        Summary
+      </h2>
+      <div class="flex items-center gap-3 flex-wrap">
+        <div
+          role="group"
+          aria-label="Analysis period"
+        >
           <UiTimeRangeSelector v-model="timeRange" />
         </div>
         <button
@@ -26,10 +28,13 @@
     <!-- Loading State -->
     <div
       v-if="analysisPending"
-      class="text-center py-12"
+      class="py-6 flex flex-col items-center justify-center gap-2 text-on-surface-secondary"
     >
-      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-light" />
-      <p class="mt-4 text-on-surface-secondary">
+      <Icon
+        name="lucide:loader-circle"
+        class="text-2xl animate-spin"
+      />
+      <p class="text-sm font-medium">
         Analyzing workload...
       </p>
     </div>
@@ -52,40 +57,38 @@
         :utilization="analysis.utilization"
         :stability="analysis.stability"
       />
-
       <!-- Resource Utilization Charts -->
-      <div
-        v-if="analysis.time_series"
-        class="glass rounded-xl p-6"
-      >
+      <section v-if="analysis.time_series">
         <h2 class="text-2xl font-bold font-heading mb-4">
           Resource Utilization
         </h2>
-        <div class="space-y-6">
-          <!-- CPU Chart -->
-          <div>
-            <h3 class="text-xl font-semibold font-heading mb-2 text-primary-light">
-              CPU Utilization Over Time
-            </h3>
-            <ComputeResourceChart
-              :data="analysis.time_series.cpu"
-              type="cpu"
-              title="CPU Utilization"
-            />
-          </div>
-          <!-- Memory Chart -->
-          <div>
-            <h3 class="text-xl font-semibold font-heading mb-2 text-secondary-light">
-              Memory Utilization Over Time
-            </h3>
-            <ComputeResourceChart
-              :data="analysis.time_series.memory"
-              type="memory"
-              title="Memory Utilization"
-            />
+        <div class="panel p-4">
+          <div class="space-y-6">
+            <!-- CPU Chart -->
+            <div>
+              <h3 class="text-lg font-semibold font-heading mb-2 text-on-surface">
+                CPU Utilization Over Time
+              </h3>
+              <ComputeResourceChart
+                :data="analysis.time_series.cpu"
+                type="cpu"
+                title="CPU Utilization"
+              />
+            </div>
+            <!-- Memory Chart -->
+            <div>
+              <h3 class="text-lg font-semibold font-heading mb-2 text-on-surface">
+                Memory Utilization Over Time
+              </h3>
+              <ComputeResourceChart
+                :data="analysis.time_series.memory"
+                type="memory"
+                title="Memory Utilization"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- Pods Breakdown -->
       <WorkloadComputePodsBreakdown :pods="analysis.pods" />
@@ -138,6 +141,7 @@ const generatedRecommendation = ref<Recommendation | null>(null)
 
 const executeAnalysis = async () => {
   analysisPending.value = true
+  analysisError.value = null
   try {
     analysis.value = await $api<WorkloadAnalysis>(`/api/v1/compute/analyze/workloads/${props.workloadType}/${props.workloadName}?namespace=${props.namespace}&timeRange=${timeRange.value}`)
   }

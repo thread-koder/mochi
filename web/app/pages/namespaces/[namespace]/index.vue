@@ -1,23 +1,11 @@
 <template>
   <div class="p-8">
     <!-- Header -->
-    <div class="mb-4">
+    <div class="mb-6">
       <UiBreadcrumb :items="breadcrumbs" />
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <h1 class="text-4xl font-bold font-heading mb-2">
-            {{ data?.name }}
-          </h1>
-          <div class="flex items-center space-x-2">
-            <span
-              class="px-3 py-1 rounded-full text-xs font-medium border"
-              :class="phaseBadgeClass"
-            >
-              {{ data?.phase }}
-            </span>
-          </div>
-        </div>
-      </div>
+      <h1 class="text-4xl font-bold font-heading">
+        {{ data?.name }}
+      </h1>
     </div>
 
     <UiTabs
@@ -66,11 +54,4 @@ if (error.value) {
     fatal: true,
   })
 }
-
-const phaseBadgeClass = computed(() => {
-  if (data.value?.phase === 'Active') {
-    return 'bg-success/20 text-success-light border-success/30'
-  }
-  return 'bg-on-surface-muted/20 text-on-surface-secondary border-on-surface-muted/30'
-})
 </script>

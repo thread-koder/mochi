@@ -40,7 +40,7 @@
             <tr
               v-for="rec in recommendation?.recommendations"
               :key="rec.container_name"
-              class="border-b border-primary/10 hover:bg-primary/5 transition-colors"
+              class="border-b border-primary/10 last:border-b-0"
             >
               <td class="py-4 px-4">
                 <span class="font-medium text-on-surface">
@@ -101,7 +101,7 @@
       </Transition>
 
       <!-- Action Buttons -->
-      <div class="flex items-center justify-end gap-3 pt-4 border-t border-primary/20">
+      <div class="flex items-center justify-end gap-3">
         <button
           v-if="applied || !hasRecommendations"
           class="px-4 py-2 rounded-lg text-sm font-medium text-primary-light bg-primary/20

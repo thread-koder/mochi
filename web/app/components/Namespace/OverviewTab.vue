@@ -1,24 +1,21 @@
 <template>
-  <div class="mt-6">
+  <div>
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <UiStatsCard
         title="Workloads"
         :value="nsData?.stats.workloads ?? 0"
         icon="lucide:server"
-        color="text-primary-light"
       />
       <UiStatsCard
         title="Pods"
         :value="nsData?.stats.pods ?? 0"
         icon="lucide:rocket"
-        color="text-secondary-light"
       />
       <UiStatsCard
         title="Containers"
         :value="nsData?.stats.containers ?? 0"
         icon="lucide:container"
-        color="text-tertiary-light"
       />
     </div>
 
@@ -34,8 +31,6 @@
       :pods="nsData.standalone_pods"
       :namespace="nsData.name"
       title="Standalone Pods"
-      badge-label="Standalone"
-      badge-class="bg-secondary/20 text-secondary-light border-secondary-light/30"
     />
 
     <!-- System Pods -->
@@ -44,8 +39,6 @@
       :pods="nsData.system_pods"
       :namespace="nsData.name"
       title="System Pods"
-      badge-label="System"
-      badge-class="bg-warning/20 text-warning-light border-warning-light/30"
     />
   </div>
 </template>

@@ -1,29 +1,17 @@
 <template>
   <div class="p-8">
     <!-- Header -->
-    <div class="mb-4">
+    <div class="mb-6">
       <UiBreadcrumb :items="breadcrumbs" />
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <h1 class="text-4xl font-bold font-heading mb-2">
-            {{ data?.name }}
-          </h1>
-          <div class="flex items-center space-x-2 flex-wrap">
-            <span class="px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
-              {{ workloadTypeLabel(data?.type ?? '') }}
-            </span>
-            <span
-              v-if="data?.type !== 'Pod'"
-              class="px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30"
-            >
-              {{ data?.ready }}/{{ data?.replicas }} Replicas
-            </span>
-            <span class="px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary-light border border-primary/30">
-              Created {{ timeAgo(data?.created_at ?? '') }}
-            </span>
-          </div>
-        </div>
-      </div>
+      <h1 class="text-4xl font-bold font-heading mb-2">
+        {{ data?.name }}
+      </h1>
+      <p
+        v-if="headerSubline"
+        class="text-sm text-on-surface-muted"
+      >
+        {{ headerSubline }}
+      </p>
     </div>
 
     <UiTabs
@@ -76,4 +64,20 @@ if (error.value) {
     fatal: true,
   })
 }
+
+const headerSubline = computed(() => {
+  if (!data.value) {
+    return undefined
+  }
+
+  const parts = [workloadTypeLabel(data.value.type)]
+
+  if (data.value.type !== 'Pod') {
+    parts.push(`${data.value.ready}/${data.value.replicas} replicas`)
+  }
+
+  parts.push(`Created ${timeAgo(data.value.created_at)}`)
+
+  return parts.join(' · ')
+})
 </script>
