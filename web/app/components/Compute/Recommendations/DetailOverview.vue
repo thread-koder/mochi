@@ -21,14 +21,8 @@
           <dt class="text-sm text-on-surface-secondary mb-0.5">
             Namespace
           </dt>
-          <dd class="m-0">
-            <NuxtLink
-              :to="`/namespaces/${recommendation.namespace}`"
-              class="text-sm font-semibold text-on-surface-secondary hover:text-on-surface transition-colors"
-              @click.stop
-            >
-              {{ recommendation.namespace }}
-            </NuxtLink>
+          <dd class="m-0 text-sm font-semibold text-on-surface">
+            {{ recommendation.namespace }}
           </dd>
         </div>
       </dl>
