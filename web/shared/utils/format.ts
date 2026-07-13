@@ -1,5 +1,5 @@
-export const formatBytes = (value?: number): string => {
-  if (value === undefined || isNaN(value)) {
+export const formatBytes = (value?: number | null): string => {
+  if (value === undefined || value === null || isNaN(value)) {
     return 'N/A'
   }
 

@@ -1,4 +1,4 @@
-export const formatCPU = (value?: number): string => {
+export const formatCPU = (value?: number | null): string => {
   if (value === undefined || value === null || isNaN(value)) {
     return 'N/A'
   }

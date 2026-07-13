@@ -81,8 +81,8 @@ interface UtilizationResult {
 interface CPUProvisioning {
   request_utilization: number
   limit_utilization: number
-  current_request?: number | null
-  current_limit?: number | null
+  current_request: number | null
+  current_limit: number | null
   is_over_provisioned: boolean
   is_under_provisioned: boolean
   efficiency: number
@@ -92,8 +92,8 @@ interface CPUProvisioning {
 interface MemoryProvisioning {
   request_utilization: number
   limit_utilization: number
-  current_request?: number | null
-  current_limit?: number | null
+  current_request: number | null
+  current_limit: number | null
   is_over_provisioned: boolean
   is_under_provisioned: boolean
   efficiency: number
@@ -138,7 +138,7 @@ interface NamespaceAnalysis {
   utilization: UtilizationResult
   stability: StabilityResult
   time_series?: TimeSeries
-  workloads?: WorkloadAnalysis[]
+  workloads: WorkloadAnalysis[]
 }
 
 type ResourceProvisioning = CPUProvisioning | MemoryProvisioning

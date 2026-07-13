@@ -1,21 +1,21 @@
 type RecommendationMode = 'cost_optimized' | 'burstable' | 'guaranteed'
 
 interface CPURecommendation {
-  current_request?: string | null
-  recommended_request?: string | null
-  request_change_percent?: number | null
-  current_limit?: string | null
-  recommended_limit?: string | null
-  limit_change_percent?: number | null
+  current_request: string | null
+  recommended_request: string | null
+  request_change_percent: number | null
+  current_limit: string | null
+  recommended_limit: string | null
+  limit_change_percent: number | null
 }
 
 interface MemoryRecommendation {
-  current_request?: string | null
-  recommended_request?: string | null
-  request_change_percent?: number | null
-  current_limit?: string | null
-  recommended_limit?: string | null
-  limit_change_percent?: number | null
+  current_request: string | null
+  recommended_request: string | null
+  request_change_percent: number | null
+  current_limit: string | null
+  recommended_limit: string | null
+  limit_change_percent: number | null
 }
 
 interface ContainerRecommendation {
@@ -39,13 +39,12 @@ interface RecommendationRecord {
   workload_type: string
   workload_name: string
   namespace: string
-  recommendation_mode: string
+  recommendation_mode: RecommendationMode
   recommendations: ContainerRecommendation[]
   status: string
-  analysis_time_range?: string
+  analysis_time_range: string
   created_at: string
-  updated_at?: string
-  generated_at?: string
+  updated_at: string
 }
 
 interface RecommendationsResponse {
