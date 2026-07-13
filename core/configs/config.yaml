@@ -33,6 +33,7 @@ database:
 kubernetes:
   kubeconfig_path: "" # empty: default discovery (~/.kube/config or KUBECONFIG)
   in_cluster: false # true for in-cluster client config
+  cluster_name: "Kubernetes Cluster"
   request_timeout: 30 # seconds
   qps: 50
   burst: 100

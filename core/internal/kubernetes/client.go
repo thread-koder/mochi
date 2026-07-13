@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"time"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -21,13 +20,6 @@ var (
 	// RestConfig is the global client configuration used by Clientset.
 	RestConfig *rest.Config
 )
-
-type ClusterInfo struct {
-	ServerVersion string `json:"server_version"`
-	ClusterName   string `json:"cluster_name"`
-	ContextName   string `json:"context_name"`
-	APIServerURL  string `json:"api_server_url"`
-}
 
 func Init(cfg *config.KubernetesConfig) error {
 	if cfg == nil {
@@ -64,8 +56,7 @@ func Init(cfg *config.KubernetesConfig) error {
 		return fmt.Errorf("no kubeconfig path provided and not running in-cluster")
 	}
 
-	RestConfig.Timeout = time.Duration(cfg.RequestTimeout) * time.Second
-
+	RestConfig.Timeout = cfg.RequestTimeoutDuration()
 	RestConfig.QPS = float32(cfg.QPS)
 	RestConfig.Burst = cfg.Burst
 
@@ -87,20 +78,6 @@ func Init(cfg *config.KubernetesConfig) error {
 		Msg("Connection established")
 
 	return nil
-}
-
-func GetClusterInfo(ctx context.Context) (*ClusterInfo, error) {
-	info := &ClusterInfo{
-		APIServerURL: RestConfig.Host,
-	}
-
-	version, err := Clientset.Discovery().ServerVersion()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get server version: %w", err)
-	}
-	info.ServerVersion = version.String()
-
-	return info, nil
 }
 
 func HealthCheck(ctx context.Context) error {

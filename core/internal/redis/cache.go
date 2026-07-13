@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/thread_koder/mochi/core/internal/config"
 )
 
 func Get(ctx context.Context, key string) ([]byte, error) {
@@ -58,8 +57,4 @@ func Delete(ctx context.Context, key string) error {
 	}
 
 	return nil
-}
-
-func CacheTTL(cfg *config.RedisConfig) time.Duration {
-	return time.Duration(cfg.CacheTTL) * time.Second
 }

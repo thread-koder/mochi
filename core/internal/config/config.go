@@ -7,8 +7,7 @@
 //
 // If MOCHI_CONFIG_FILES is unset or empty, no YAML is loaded. Only defaults and environment variables apply.
 // The core/configs/config.yaml file in the repository is a reference layout until you point
-// MOCHI_CONFIG_FILES at it (or another file). Load assigns AppConfig for callers that read
-// the global config after startup.
+// MOCHI_CONFIG_FILES at it (or another file).
 package config
 
 import (
@@ -17,7 +16,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -54,6 +55,14 @@ type APIConfig struct {
 	Mode         string `mapstructure:"mode"`
 }
 
+func (c *APIConfig) ReadTimeoutDuration() time.Duration {
+	return time.Duration(c.ReadTimeout) * time.Second
+}
+
+func (c *APIConfig) WriteTimeoutDuration() time.Duration {
+	return time.Duration(c.WriteTimeout) * time.Second
+}
+
 type DatabaseConfig struct {
 	Host            string    `mapstructure:"host"`
 	Port            int       `mapstructure:"port"`
@@ -68,18 +77,35 @@ type DatabaseConfig struct {
 	TLS             TLSConfig `mapstructure:"tls"`
 }
 
+func (c *DatabaseConfig) ConnMaxLifetimeDuration() time.Duration {
+	return time.Duration(c.ConnMaxLifetime) * time.Second
+}
+
+func (c *DatabaseConfig) ConnMaxIdleTimeDuration() time.Duration {
+	return time.Duration(c.ConnMaxIdleTime) * time.Second
+}
+
 type KubernetesConfig struct {
 	KubeconfigPath string `mapstructure:"kubeconfig_path"`
 	InCluster      bool   `mapstructure:"in_cluster"`
+	ClusterName    string `mapstructure:"cluster_name"`
 	RequestTimeout int    `mapstructure:"request_timeout"`
 	QPS            int    `mapstructure:"qps"`
 	Burst          int    `mapstructure:"burst"`
+}
+
+func (c *KubernetesConfig) RequestTimeoutDuration() time.Duration {
+	return time.Duration(c.RequestTimeout) * time.Second
 }
 
 type PrometheusConfig struct {
 	URL     string    `mapstructure:"url"`
 	Timeout int       `mapstructure:"timeout"`
 	TLS     TLSConfig `mapstructure:"tls"`
+}
+
+func (c *PrometheusConfig) TimeoutDuration() time.Duration {
+	return time.Duration(c.Timeout) * time.Second
 }
 
 type RedisConfig struct {
@@ -97,6 +123,18 @@ type RedisConfig struct {
 	TLS             TLSConfig `mapstructure:"tls"`
 }
 
+func (c *RedisConfig) ConnMaxLifetimeDuration() time.Duration {
+	return time.Duration(c.ConnMaxLifetime) * time.Second
+}
+
+func (c *RedisConfig) ConnMaxIdleTimeDuration() time.Duration {
+	return time.Duration(c.ConnMaxIdleTime) * time.Second
+}
+
+func (c *RedisConfig) CacheTTLDuration() time.Duration {
+	return time.Duration(c.CacheTTL) * time.Second
+}
+
 type WorkerConfig struct {
 	ResourceSyncInterval int      `mapstructure:"resource_sync_interval"`
 	ExcludeNamespaces    []string `mapstructure:"exclude_namespaces"`
@@ -104,9 +142,25 @@ type WorkerConfig struct {
 	Retention            int      `mapstructure:"retention"`
 }
 
-// AppConfig holds the configuration from the last successful Load.
-// Call Load before reading it. Prefer threading *Config from Load where possible.
-var AppConfig *Config
+func (c *WorkerConfig) ResourceSyncIntervalDuration() time.Duration {
+	return time.Duration(c.ResourceSyncInterval) * time.Second
+}
+
+func (c *WorkerConfig) RetentionDuration() time.Duration {
+	return time.Duration(c.Retention) * 24 * time.Hour
+}
+
+func (c *WorkerConfig) ShouldSyncNamespace(namespace string) bool {
+	if len(c.IncludeNamespaces) > 0 {
+		return slices.Contains(c.IncludeNamespaces, namespace)
+	}
+
+	if len(c.ExcludeNamespaces) > 0 {
+		return !slices.Contains(c.ExcludeNamespaces, namespace)
+	}
+
+	return true
+}
 
 func Load() (*Config, error) {
 	setDefaults()
@@ -132,7 +186,6 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
-	AppConfig = &config
 	return &config, nil
 }
 
@@ -164,6 +217,7 @@ func setDefaults() {
 
 	viper.SetDefault("kubernetes.kubeconfig_path", "")
 	viper.SetDefault("kubernetes.in_cluster", false)
+	viper.SetDefault("kubernetes.cluster_name", "Kubernetes Cluster")
 	viper.SetDefault("kubernetes.request_timeout", 30)
 	viper.SetDefault("kubernetes.qps", 50)
 	viper.SetDefault("kubernetes.burst", 100)
@@ -343,6 +397,9 @@ func (c *KubernetesConfig) Validate() error {
 	}
 	if c.Burst <= 0 {
 		return fmt.Errorf("burst must be greater than 0, got: %d", c.Burst)
+	}
+	if c.ClusterName == "" {
+		return fmt.Errorf("cluster_name cannot be empty")
 	}
 	return nil
 }

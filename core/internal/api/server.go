@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/core/internal/api/middleware"
@@ -16,28 +15,28 @@ import (
 type Server struct {
 	router *gin.Engine
 	server *http.Server
-	cfg    *config.APIConfig
+	cfg    *config.Config
 }
 
-func NewServer(cfg *config.APIConfig) (*Server, error) {
+func NewServer(cfg *config.Config) (*Server, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("api config is nil")
+		return nil, fmt.Errorf("config is nil")
 	}
 
-	gin.SetMode(cfg.Mode)
+	gin.SetMode(cfg.API.Mode)
 
 	router := gin.New()
 
 	router.Use(gin.Recovery())
 	router.Use(middleware.LoggingMiddleware())
 
-	setupRoutes(router)
+	setupRoutes(router, cfg)
 
 	server := &http.Server{
-		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Addr:         fmt.Sprintf("%s:%d", cfg.API.Host, cfg.API.Port),
 		Handler:      router,
-		ReadTimeout:  time.Duration(cfg.ReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(cfg.WriteTimeout) * time.Second,
+		ReadTimeout:  cfg.API.ReadTimeoutDuration(),
+		WriteTimeout: cfg.API.WriteTimeoutDuration(),
 	}
 
 	return &Server{
@@ -50,9 +49,9 @@ func NewServer(cfg *config.APIConfig) (*Server, error) {
 func (s *Server) Start() error {
 	log := logger.WithComponent("server")
 	log.Info().
-		Str("host", s.cfg.Host).
-		Int("port", s.cfg.Port).
-		Str("mode", s.cfg.Mode).
+		Str("host", s.cfg.API.Host).
+		Int("port", s.cfg.API.Port).
+		Str("mode", s.cfg.API.Mode).
 		Msg("Server listening...")
 
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

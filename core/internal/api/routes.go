@@ -10,11 +10,10 @@ import (
 	webHandlers "github.com/thread_koder/mochi/core/internal/api/handlers/web"
 	"github.com/thread_koder/mochi/core/internal/api/middleware"
 	"github.com/thread_koder/mochi/core/internal/config"
-	"github.com/thread_koder/mochi/core/internal/redis"
 )
 
-func setupRoutes(router *gin.Engine) {
-	cacheTTL := redis.CacheTTL(&config.AppConfig.Redis)
+func setupRoutes(router *gin.Engine, cfg *config.Config) {
+	cacheTTL := cfg.Redis.CacheTTLDuration()
 
 	router.GET("/health", handlers.Health)
 	router.GET("/health/database", handlers.DatabaseHealth)
@@ -24,7 +23,7 @@ func setupRoutes(router *gin.Engine) {
 
 	v1 := router.Group("/api/v1")
 	{
-		v1.GET("/home", webHandlers.GetHome)
+		v1.GET("/home", webHandlers.GetHome(cfg.Kubernetes.ClusterName))
 		v1.GET("/namespaces", webHandlers.GetNamespaces)
 		v1.GET("/namespaces/:namespace", webHandlers.GetNamespace)
 		v1.GET("/workloads/:namespace/:type/:name", webHandlers.GetWorkload)

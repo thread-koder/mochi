@@ -31,8 +31,8 @@ func Init(cfg *config.RedisConfig) error {
 		MaxRetries:      cfg.MaxRetries,
 		PoolSize:        cfg.PoolSize,
 		MinIdleConns:    cfg.MinIdleConns,
-		ConnMaxLifetime: time.Duration(cfg.ConnMaxLifetime) * time.Second,
-		ConnMaxIdleTime: time.Duration(cfg.ConnMaxIdleTime) * time.Second,
+		ConnMaxLifetime: cfg.ConnMaxLifetimeDuration(),
+		ConnMaxIdleTime: cfg.ConnMaxIdleTimeDuration(),
 	}
 
 	if cfg.TLS.Enabled {

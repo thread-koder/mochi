@@ -25,14 +25,12 @@ func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
 		return nil, fmt.Errorf("worker config is nil")
 	}
 
-	syncInterval := time.Duration(cfg.ResourceSyncInterval) * time.Second
-	retentionPeriod := time.Duration(cfg.Retention) * 24 * time.Hour
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &WorkerPool{
 		ctx:          ctx,
 		cancel:       cancel,
-		resourceSync: NewResourceSyncWorker(ctx, syncInterval, retentionPeriod),
+		resourceSync: NewResourceSyncWorker(ctx, cfg),
 	}, nil
 }
 
@@ -59,27 +57,28 @@ func (wp *WorkerPool) Stop() {
 
 // ResourceSyncWorker periodically syncs Kubernetes resources into the database.
 type ResourceSyncWorker struct {
-	ctx             context.Context
-	interval        time.Duration
-	retentionPeriod time.Duration
+	ctx context.Context
+	cfg *config.WorkerConfig
 }
 
-func NewResourceSyncWorker(ctx context.Context, interval time.Duration, retentionPeriod time.Duration) *ResourceSyncWorker {
+func NewResourceSyncWorker(ctx context.Context, cfg *config.WorkerConfig) *ResourceSyncWorker {
 	return &ResourceSyncWorker{
-		ctx:             ctx,
-		interval:        interval,
-		retentionPeriod: retentionPeriod,
+		ctx: ctx,
+		cfg: cfg,
 	}
 }
 
 func (w *ResourceSyncWorker) Run() {
 	log := logger.WithComponent("sync-worker")
+	interval := w.cfg.ResourceSyncIntervalDuration()
+	retentionPeriod := w.cfg.RetentionDuration()
+
 	log.Info().
-		Str("interval", fmt.Sprintf("%ds", int(w.interval.Seconds()))).
-		Str("retention", fmt.Sprintf("%dd", int(w.retentionPeriod.Hours()/24))).
+		Str("interval", fmt.Sprintf("%ds", int(interval.Seconds()))).
+		Str("retention", fmt.Sprintf("%dd", int(retentionPeriod.Hours()/24))).
 		Msg("Starting resource sync worker...")
 
-	ticker := time.NewTicker(w.interval)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	// Run one pass on startup so data is available before the first ticker interval.
@@ -104,7 +103,7 @@ func (w *ResourceSyncWorker) sync() {
 	defer cancel()
 
 	log.Info().Msg("Starting resource sync pass...")
-	kubernetes.SyncResources(syncCtx)
+	kubernetes.SyncResources(syncCtx, w.cfg)
 	if err := syncCtx.Err(); err != nil {
 		log.Warn().Err(err).Msg("Resource sync pass ended before completion")
 	} else {
@@ -116,7 +115,7 @@ func (w *ResourceSyncWorker) sync() {
 
 func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	log := logger.WithComponent("sync-worker")
-	since := time.Now().Add(-w.retentionPeriod)
+	since := time.Now().Add(-w.cfg.RetentionDuration())
 
 	log.Info().Msg("Starting cleanup tasks...")
 	if err := database.DeleteComputeRecommendationsOlderThan(ctx, since); err != nil {

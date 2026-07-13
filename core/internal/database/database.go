@@ -29,8 +29,8 @@ func Init(cfg *config.DatabaseConfig) error {
 	}
 
 	poolConfig.MaxConns = int32(cfg.MaxConnections)
-	poolConfig.MaxConnIdleTime = time.Duration(cfg.ConnMaxIdleTime) * time.Second
-	poolConfig.MaxConnLifetime = time.Duration(cfg.ConnMaxLifetime) * time.Second
+	poolConfig.MaxConnIdleTime = cfg.ConnMaxIdleTimeDuration()
+	poolConfig.MaxConnLifetime = cfg.ConnMaxLifetimeDuration()
 	poolConfig.MinIdleConns = int32(cfg.MinIdleConns)
 
 	if cfg.TLS.Enabled {

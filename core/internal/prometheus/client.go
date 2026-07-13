@@ -40,7 +40,7 @@ func Init(cfg *config.PrometheusConfig) error {
 		Address: cfg.URL,
 		Client: &http.Client{
 			Transport: transport,
-			Timeout:   time.Duration(cfg.Timeout) * time.Second,
+			Timeout:   cfg.TimeoutDuration(),
 		},
 	}
 

@@ -79,7 +79,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to create worker pool")
 	}
 
-	server, err := api.NewServer(&cfg.API)
+	server, err := api.NewServer(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to create API server")
 	}
