@@ -326,7 +326,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 func ParseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
 	specs := ResourceSpecs{}
 
-	if container.CPURequest != nil && *container.CPURequest != "" {
+	if container.CPURequest != nil {
 		qty, err := resource.ParseQuantity(*container.CPURequest)
 		if err != nil {
 			return ResourceSpecs{}, fmt.Errorf("failed to parse CPU request: %w", err)
@@ -334,7 +334,7 @@ func ParseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
 		specs.CPURequest = new(qty.AsFloat64Slow())
 	}
 
-	if container.CPULimit != nil && *container.CPULimit != "" {
+	if container.CPULimit != nil {
 		qty, err := resource.ParseQuantity(*container.CPULimit)
 		if err != nil {
 			return ResourceSpecs{}, fmt.Errorf("failed to parse CPU limit: %w", err)
@@ -342,7 +342,7 @@ func ParseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
 		specs.CPULimit = new(qty.AsFloat64Slow())
 	}
 
-	if container.MemoryRequest != nil && *container.MemoryRequest != "" {
+	if container.MemoryRequest != nil {
 		qty, err := resource.ParseQuantity(*container.MemoryRequest)
 		if err != nil {
 			return ResourceSpecs{}, fmt.Errorf("failed to parse memory request: %w", err)
@@ -350,7 +350,7 @@ func ParseContainerSpecs(container *database.Container) (ResourceSpecs, error) {
 		specs.MemoryRequest = new(float64(qty.Value()))
 	}
 
-	if container.MemoryLimit != nil && *container.MemoryLimit != "" {
+	if container.MemoryLimit != nil {
 		qty, err := resource.ParseQuantity(*container.MemoryLimit)
 		if err != nil {
 			return ResourceSpecs{}, fmt.Errorf("failed to parse memory limit: %w", err)

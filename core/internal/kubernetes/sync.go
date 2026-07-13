@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -18,7 +17,7 @@ import (
 
 const namespaceSyncConcurrency = 4
 
-func SyncResources(ctx context.Context) {
+func SyncResources(ctx context.Context, workerCfg *config.WorkerConfig) {
 	log := logger.WithComponent("kubernetes")
 
 	if err := syncNodes(ctx); err != nil {
@@ -28,7 +27,7 @@ func SyncResources(ctx context.Context) {
 	namespaces, err := Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to list cluster namespaces")
-	} else if err := syncNamespaces(ctx, namespaces); err != nil {
+	} else if err := syncNamespaces(ctx, namespaces, workerCfg); err != nil {
 		log.Warn().Err(err).Msg("Failed to sync cluster namespaces")
 	}
 
@@ -36,7 +35,7 @@ func SyncResources(ctx context.Context) {
 	g.SetLimit(namespaceSyncConcurrency)
 
 	for _, ns := range namespaces.Items {
-		if !shouldSyncNamespace(ns.Name) {
+		if !workerCfg.ShouldSyncNamespace(ns.Name) {
 			continue
 		}
 		g.Go(func() error {
@@ -94,14 +93,14 @@ func syncNodes(ctx context.Context) error {
 			UID:                     nodeUID,
 			InternalIP:              internalIP,
 			ExternalIP:              externalIP,
-			OSImage:                 &node.Status.NodeInfo.OSImage,
-			KernelVersion:           &node.Status.NodeInfo.KernelVersion,
-			ContainerRuntimeVersion: &node.Status.NodeInfo.ContainerRuntimeVersion,
-			KubeletVersion:          &node.Status.NodeInfo.KubeletVersion,
-			CPUCapacity:             &cpuCapacityStr,
-			MemoryCapacity:          &memoryCapacityStr,
-			CPUAllocatable:          &cpuAllocatableStr,
-			MemoryAllocatable:       &memoryAllocatableStr,
+			OSImage:                 node.Status.NodeInfo.OSImage,
+			KernelVersion:           node.Status.NodeInfo.KernelVersion,
+			ContainerRuntimeVersion: node.Status.NodeInfo.ContainerRuntimeVersion,
+			KubeletVersion:          node.Status.NodeInfo.KubeletVersion,
+			CPUCapacity:             cpuCapacityStr,
+			MemoryCapacity:          memoryCapacityStr,
+			CPUAllocatable:          cpuAllocatableStr,
+			MemoryAllocatable:       memoryAllocatableStr,
 			Labels:                  labelsJSON,
 			Annotations:             annotationsJSON,
 			Conditions:              conditionsJSON,
@@ -125,7 +124,7 @@ func syncNodes(ctx context.Context) error {
 	return nil
 }
 
-func syncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList) error {
+func syncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList, workerCfg *config.WorkerConfig) error {
 	log := logger.WithComponent("kubernetes")
 	start := time.Now()
 	log.Info().Msg("Syncing cluster namespaces...")
@@ -135,7 +134,7 @@ func syncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList) error
 
 	nsUIDs := make([]string, 0, len(namespaces.Items))
 	for _, ns := range namespaces.Items {
-		if !shouldSyncNamespace(ns.Name) {
+		if !workerCfg.ShouldSyncNamespace(ns.Name) {
 			continue
 		}
 		nsUID := string(ns.UID)
@@ -422,18 +421,12 @@ func syncServices(ctx context.Context, namespace string) error {
 		selectorJSON, _ := mapToJSON(svc.Spec.Selector)
 		portsJSON, _ := sliceToJSON(svc.Spec.Ports)
 
-		clusterIP := svc.Spec.ClusterIP
-		var clusterIPPtr *string
-		if clusterIP != "" {
-			clusterIPPtr = new(clusterIP)
-		}
-
 		dbService := &database.Service{
 			Name:        svc.Name,
 			Namespace:   svc.Namespace,
 			UID:         svcUID,
 			Type:        string(svc.Spec.Type),
-			ClusterIP:   clusterIPPtr,
+			ClusterIP:   optionalString(svc.Spec.ClusterIP),
 			Ports:       portsJSON,
 			Selector:    selectorJSON,
 			Labels:      labelsJSON,
@@ -536,7 +529,6 @@ func syncPods(ctx context.Context, namespace string) error {
 			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Deployment).
 		}
 
-		restartPolicy := string(pod.Spec.RestartPolicy)
 		var node *string
 		if pod.Spec.NodeName != "" {
 			node = new(pod.Spec.NodeName)
@@ -548,7 +540,7 @@ func syncPods(ctx context.Context, namespace string) error {
 			UID:           podUID,
 			Node:          node,
 			Phase:         string(pod.Status.Phase),
-			RestartPolicy: &restartPolicy,
+			RestartPolicy: optionalString(string(pod.Spec.RestartPolicy)),
 			Labels:        labelsJSON,
 			Annotations:   annotationsJSON,
 			OwnerKind:     ownerKind,
@@ -590,7 +582,6 @@ func syncContainers(ctx context.Context, namespace string) error {
 
 		for _, container := range pod.Spec.Containers {
 			var cpuRequest, cpuLimit, memoryRequest, memoryLimit *string
-			var imagePullPolicy *string
 
 			if container.Resources.Requests != nil {
 				if cpu := container.Resources.Requests[corev1.ResourceCPU]; !cpu.IsZero() {
@@ -609,10 +600,6 @@ func syncContainers(ctx context.Context, namespace string) error {
 				}
 			}
 
-			if container.ImagePullPolicy != "" {
-				imagePullPolicy = new(string(container.ImagePullPolicy))
-			}
-
 			portsJSON, _ := sliceToJSON(container.Ports)
 
 			dbContainer := &database.Container{
@@ -621,7 +608,7 @@ func syncContainers(ctx context.Context, namespace string) error {
 				PodName:         podName,
 				Namespace:       namespace,
 				Image:           container.Image,
-				ImagePullPolicy: imagePullPolicy,
+				ImagePullPolicy: optionalString(string(container.ImagePullPolicy)),
 				Ports:           portsJSON,
 				CPURequest:      cpuRequest,
 				CPULimit:        cpuLimit,
@@ -647,18 +634,11 @@ func syncContainers(ctx context.Context, namespace string) error {
 	return nil
 }
 
-func shouldSyncNamespace(namespace string) bool {
-	cfg := config.AppConfig.Workers
-
-	if len(cfg.IncludeNamespaces) > 0 {
-		return slices.Contains(cfg.IncludeNamespaces, namespace)
+func optionalString(s string) *string {
+	if s == "" {
+		return nil
 	}
-
-	if len(cfg.ExcludeNamespaces) > 0 {
-		return !slices.Contains(cfg.ExcludeNamespaces, namespace)
-	}
-
-	return true
+	return new(s)
 }
 
 func mapToJSON(m map[string]string) (json.RawMessage, error) {

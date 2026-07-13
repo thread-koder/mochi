@@ -15,8 +15,8 @@ type ResourceSpecs struct {
 type CPUProvisioning struct {
 	RequestUtilization float64  `json:"request_utilization"`
 	LimitUtilization   float64  `json:"limit_utilization"`
-	CurrentRequest     *float64 `json:"current_request,omitempty"`
-	CurrentLimit       *float64 `json:"current_limit,omitempty"`
+	CurrentRequest     *float64 `json:"current_request"`
+	CurrentLimit       *float64 `json:"current_limit"`
 	IsOverProvisioned  bool     `json:"is_over_provisioned"`
 	IsUnderProvisioned bool     `json:"is_under_provisioned"`
 	Efficiency         float64  `json:"efficiency"`
@@ -26,8 +26,8 @@ type CPUProvisioning struct {
 type MemoryProvisioning struct {
 	RequestUtilization float64  `json:"request_utilization"`
 	LimitUtilization   float64  `json:"limit_utilization"`
-	CurrentRequest     *float64 `json:"current_request,omitempty"`
-	CurrentLimit       *float64 `json:"current_limit,omitempty"`
+	CurrentRequest     *float64 `json:"current_request"`
+	CurrentLimit       *float64 `json:"current_limit"`
 	IsOverProvisioned  bool     `json:"is_over_provisioned"`
 	IsUnderProvisioned bool     `json:"is_under_provisioned"`
 	Efficiency         float64  `json:"efficiency"`

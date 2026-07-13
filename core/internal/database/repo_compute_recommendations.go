@@ -16,25 +16,21 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 		return fmt.Errorf("compute recommendation ID is required")
 	}
 
+	if _, err := time.ParseDuration(rec.AnalysisTimeRange); err != nil {
+		return fmt.Errorf("invalid analysis time range %q: %w", rec.AnalysisTimeRange, err)
+	}
+
 	query := `
 		INSERT INTO compute_recommendations (
 			id, workload_type, workload_name, namespace, recommendation_mode,
-			recommendations, status, analysis_time_range, created_at, updated_at, generated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			recommendations, status, analysis_time_range, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
-
-	var analysisTimeRange *time.Duration
-	if rec.AnalysisTimeRange != "" {
-		duration, err := time.ParseDuration(rec.AnalysisTimeRange)
-		if err == nil {
-			analysisTimeRange = &duration
-		}
-	}
 
 	_, err := Pool.Exec(ctx, query,
 		rec.ID, rec.WorkloadType, rec.WorkloadName, rec.Namespace, rec.RecommendationMode,
-		rec.Recommendations, rec.Status, analysisTimeRange,
-		rec.CreatedAt, rec.UpdatedAt, rec.GeneratedAt,
+		rec.Recommendations, rec.Status, rec.AnalysisTimeRange,
+		rec.CreatedAt, rec.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to execute insert compute recommendation: %w", err)
@@ -46,18 +42,17 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 func GetComputeRecommendationByID(ctx context.Context, id uuid.UUID) (*ComputeRecommendation, error) {
 	query := `
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
-		       recommendations, status, analysis_time_range, created_at, updated_at, generated_at
+		       recommendations, status, analysis_time_range, created_at, updated_at
 		FROM compute_recommendations
 		WHERE id = $1
 	`
 
 	var rec ComputeRecommendation
-	var analysisTimeRange *time.Duration
 
 	err := Pool.QueryRow(ctx, query, id).Scan(
 		&rec.ID, &rec.WorkloadType, &rec.WorkloadName, &rec.Namespace,
 		&rec.RecommendationMode, &rec.Recommendations, &rec.Status,
-		&analysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt, &rec.GeneratedAt,
+		&rec.AnalysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -66,17 +61,13 @@ func GetComputeRecommendationByID(ctx context.Context, id uuid.UUID) (*ComputeRe
 		return nil, fmt.Errorf("failed to query compute recommendation by ID: %w", err)
 	}
 
-	if analysisTimeRange != nil {
-		rec.AnalysisTimeRange = analysisTimeRange.String()
-	}
-
 	return &rec, nil
 }
 
 func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadName, namespace string) (*ComputeRecommendation, error) {
 	query := `
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
-		       recommendations, status, analysis_time_range, created_at, updated_at, generated_at
+		       recommendations, status, analysis_time_range, created_at, updated_at
 		FROM compute_recommendations
 		WHERE namespace = $1 AND workload_type = $2 AND workload_name = $3
 		ORDER BY created_at DESC
@@ -84,22 +75,17 @@ func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadN
 	`
 
 	var rec ComputeRecommendation
-	var analysisTimeRange *time.Duration
 
 	err := Pool.QueryRow(ctx, query, namespace, workloadType, workloadName).Scan(
 		&rec.ID, &rec.WorkloadType, &rec.WorkloadName, &rec.Namespace,
 		&rec.RecommendationMode, &rec.Recommendations, &rec.Status,
-		&analysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt, &rec.GeneratedAt,
+		&rec.AnalysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.NewNotFound("compute_recommendation", fmt.Sprintf("%s/%s/%s", namespace, workloadType, workloadName))
 		}
 		return nil, fmt.Errorf("failed to query compute recommendation by workload: %w", err)
-	}
-
-	if analysisTimeRange != nil {
-		rec.AnalysisTimeRange = analysisTimeRange.String()
 	}
 
 	return &rec, nil
@@ -149,7 +135,7 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 
 	selectQuery := fmt.Sprintf(`
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
-		       recommendations, status, analysis_time_range, created_at, updated_at, generated_at
+		       recommendations, status, analysis_time_range, created_at, updated_at
 		FROM compute_recommendations
 		%s
 		ORDER BY created_at DESC
@@ -180,19 +166,14 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 	recommendations := make([]*ComputeRecommendation, 0)
 	for rows.Next() {
 		var rec ComputeRecommendation
-		var analysisTimeRange *time.Duration
 
 		err := rows.Scan(
 			&rec.ID, &rec.WorkloadType, &rec.WorkloadName, &rec.Namespace,
 			&rec.RecommendationMode, &rec.Recommendations, &rec.Status,
-			&analysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt, &rec.GeneratedAt,
+			&rec.AnalysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to scan compute recommendation: %w", err)
-		}
-
-		if analysisTimeRange != nil {
-			rec.AnalysisTimeRange = analysisTimeRange.String()
 		}
 
 		recommendations = append(recommendations, &rec)

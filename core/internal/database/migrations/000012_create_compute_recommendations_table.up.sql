@@ -8,10 +8,9 @@ CREATE TABLE IF NOT EXISTS compute_recommendations (
     recommendations JSONB NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'applied', 'rejected', 'superseded')),
-    analysis_time_range INTERVAL,
+    analysis_time_range VARCHAR(50) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    generated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_compute_recommendations_workload 

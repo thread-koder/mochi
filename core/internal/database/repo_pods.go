@@ -147,7 +147,7 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
-		WHERE namespace = $1 AND (owner_kind IS NULL OR owner_kind = '')
+		WHERE namespace = $1 AND owner_kind IS NULL
 		ORDER BY name
 	`
 

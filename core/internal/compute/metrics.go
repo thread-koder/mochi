@@ -16,12 +16,12 @@ import (
 type ResourceMetrics struct {
 	CPU            []timeseries.DataPoint `json:"cpu"`
 	Memory         []timeseries.DataPoint `json:"memory"`
-	CPUThrottling  float64                `json:"cpu_throttling,omitempty"`
-	CPUPressure    float64                `json:"cpu_pressure,omitempty"`
-	MemoryFailCnt  float64                `json:"memory_fail_cnt,omitempty"`
-	MemoryOOM      float64                `json:"memory_oom,omitempty"`
-	MemoryPressure float64                `json:"memory_pressure,omitempty"`
-	Restarts       float64                `json:"restarts,omitempty"`
+	CPUThrottling  float64                `json:"cpu_throttling"`
+	CPUPressure    float64                `json:"cpu_pressure"`
+	MemoryFailCnt  float64                `json:"memory_fail_cnt"`
+	MemoryOOM      float64                `json:"memory_oom"`
+	MemoryPressure float64                `json:"memory_pressure"`
+	Restarts       float64                `json:"restarts"`
 }
 
 func fetchContainerMetrics(ctx context.Context, container *database.Container, opts AnalysisOptions) (ResourceMetrics, error) {

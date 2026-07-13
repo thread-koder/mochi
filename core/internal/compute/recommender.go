@@ -367,7 +367,6 @@ func NewComputeRecommendationRecord(rec Recommendation) (*database.ComputeRecomm
 		AnalysisTimeRange:  rec.AnalysisTimeRange,
 		CreatedAt:          now,
 		UpdatedAt:          now,
-		GeneratedAt:        now,
 	}, nil
 }
 
@@ -501,7 +500,7 @@ func calculateChangePercentFromStrings(currentStr, recommendedStr *string) *floa
 	}
 
 	var curVal float64
-	if currentStr != nil && *currentStr != "" {
+	if currentStr != nil {
 		q, err := resource.ParseQuantity(*currentStr)
 		if err == nil {
 			curVal = q.AsFloat64Slow()

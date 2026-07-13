@@ -277,13 +277,6 @@ func ApplyRecommendation(c *gin.Context) {
 			return
 		}
 
-		if len(bodyRec.Recommendations) == 0 {
-			err = fmt.Errorf("recommendations field is required")
-			c.Error(err)
-			common.WriteValidationError(c, "missing_recommendations", "recommendations is required and cannot be empty.")
-			return
-		}
-
 		recommendation, err = compute.NewComputeRecommendationRecord(bodyRec)
 		if err != nil {
 			c.Error(err)
