@@ -11,7 +11,9 @@
         <UiSearchableSelect
           v-model="filters.namespace"
           :options="namespaceOptions"
-          placeholder="All Namespaces"
+          :placeholder="namespacePlaceholder"
+          :empty-message="namespaceEmptyMessage"
+          :disabled="namespacesPending"
           search-placeholder="Search namespaces..."
           null-option="All Namespaces"
         />
@@ -93,148 +95,37 @@
         class="flex items-center gap-3 flex-wrap"
       >
         <!-- Active Filter Badges -->
-        <div class="flex items-center gap-2 flex-wrap flex-1">
-          <Transition
-            enter-active-class="transition ease-out duration-200"
-            enter-from-class="opacity-0 scale-90"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition ease-in duration-150"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-90"
+        <TransitionGroup
+          tag="div"
+          class="flex items-center gap-2 flex-wrap flex-1"
+          enter-active-class="transition ease-out duration-200"
+          enter-from-class="opacity-0 scale-90"
+          enter-to-class="opacity-100 scale-100"
+          leave-active-class="transition ease-in duration-150"
+          leave-from-class="opacity-100 scale-100"
+          leave-to-class="opacity-0 scale-90"
+        >
+          <span
+            v-for="filter in activeFilters"
+            :key="filter.key"
+            class="badge-neutral inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border"
           >
-            <span
-              v-if="filters.namespace"
-              class="badge-neutral inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border"
+            <Icon
+              :name="filter.icon"
+              class="text-xs shrink-0"
+            />
+            <span>{{ filter.label }}</span>
+            <button
+              class="text-on-surface-muted hover:text-on-surface transition-colors shrink-0 flex items-center cursor-pointer"
+              @click="clearFilter(filter.key)"
             >
               <Icon
-                name="lucide:layers"
-                class="text-xs shrink-0"
+                name="lucide:x"
+                class="text-xs"
               />
-              <span>{{ filters.namespace }}</span>
-              <button
-                class="text-on-surface-muted hover:text-on-surface transition-colors shrink-0 flex items-center cursor-pointer"
-                @click="filters.namespace = null"
-              >
-                <Icon
-                  name="lucide:x"
-                  class="text-xs"
-                />
-              </button>
-            </span>
-          </Transition>
-          <Transition
-            enter-active-class="transition ease-out duration-200"
-            enter-from-class="opacity-0 scale-90"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition ease-in duration-150"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-90"
-          >
-            <span
-              v-if="filters.status"
-              class="badge-neutral inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border"
-            >
-              <Icon
-                name="lucide:circle-check"
-                class="text-xs shrink-0"
-              />
-              <span>{{ recommendationStatusLabel(filters.status) }}</span>
-              <button
-                class="text-on-surface-muted hover:text-on-surface transition-colors shrink-0 flex items-center cursor-pointer"
-                @click="filters.status = null"
-              >
-                <Icon
-                  name="lucide:x"
-                  class="text-xs"
-                />
-              </button>
-            </span>
-          </Transition>
-          <Transition
-            enter-active-class="transition ease-out duration-200"
-            enter-from-class="opacity-0 scale-90"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition ease-in duration-150"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-90"
-          >
-            <span
-              v-if="filters.mode"
-              class="badge-neutral inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border"
-            >
-              <Icon
-                name="lucide:settings"
-                class="text-xs shrink-0"
-              />
-              <span>{{ recommendationModeLabel(filters.mode) }}</span>
-              <button
-                class="text-on-surface-muted hover:text-on-surface transition-colors shrink-0 flex items-center cursor-pointer"
-                @click="filters.mode = null"
-              >
-                <Icon
-                  name="lucide:x"
-                  class="text-xs"
-                />
-              </button>
-            </span>
-          </Transition>
-          <Transition
-            enter-active-class="transition ease-out duration-200"
-            enter-from-class="opacity-0 scale-90"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition ease-in duration-150"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-90"
-          >
-            <span
-              v-if="filters.workloadType"
-              class="badge-neutral inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border"
-            >
-              <Icon
-                name="lucide:server"
-                class="text-xs shrink-0"
-              />
-              <span>{{ workloadTypeLabel(filters.workloadType) }}</span>
-              <button
-                class="text-on-surface-muted hover:text-on-surface transition-colors shrink-0 flex items-center cursor-pointer"
-                @click="filters.workloadType = null"
-              >
-                <Icon
-                  name="lucide:x"
-                  class="text-xs"
-                />
-              </button>
-            </span>
-          </Transition>
-          <Transition
-            enter-active-class="transition ease-out duration-200"
-            enter-from-class="opacity-0 scale-90"
-            enter-to-class="opacity-100 scale-100"
-            leave-active-class="transition ease-in duration-150"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-90"
-          >
-            <span
-              v-if="filters.workloadName"
-              class="badge-neutral inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border"
-            >
-              <Icon
-                name="lucide:search"
-                class="text-xs shrink-0"
-              />
-              <span>{{ filters.workloadName }}</span>
-              <button
-                class="text-on-surface-muted hover:text-on-surface transition-colors shrink-0 flex items-center cursor-pointer"
-                @click="filters.workloadName = null"
-              >
-                <Icon
-                  name="lucide:x"
-                  class="text-xs"
-                />
-              </button>
-            </span>
-          </Transition>
-        </div>
+            </button>
+          </span>
+        </TransitionGroup>
 
         <!-- Clear All Button -->
         <button
@@ -272,10 +163,6 @@ export interface FilterState {
   workloadName: string | null
 }
 
-const props = defineProps<{
-  namespaces?: Namespace[]
-}>()
-
 const filters = defineModel<FilterState>({
   required: true,
   default: () => ({
@@ -285,6 +172,34 @@ const filters = defineModel<FilterState>({
     workloadType: null,
     workloadName: null,
   }),
+})
+
+const { parseError } = useApiError()
+const { data: namespaces, error: namespacesError, pending: namespacesPending }
+  = useApiData<Namespace[]>('/api/v1/namespaces', { lazy: true })
+
+const namespaceOptions = computed(() => {
+  return (namespaces.value ?? []).map((ns: Namespace) => ns.name)
+})
+
+const namespacePlaceholder = computed(() => {
+  if (namespacesPending.value) {
+    return 'Loading namespaces...'
+  }
+  if (namespacesError.value) {
+    return 'Namespaces unavailable'
+  }
+  return 'All Namespaces'
+})
+
+const namespaceEmptyMessage = computed(() => {
+  if (namespacesPending.value) {
+    return 'Loading namespaces...'
+  }
+  if (namespacesError.value) {
+    return parseError(namespacesError.value, 'Failed to load namespaces').message
+  }
+  return 'No namespaces found'
 })
 
 const workloadNameInput = ref<string>('')
@@ -303,15 +218,53 @@ watch(() => filters.value.workloadName, (value) => {
   }
 }, { immediate: true })
 
-const namespaceOptions = computed(() => {
-  return props.namespaces?.map((ns: Namespace) => ns.name) || []
+const hasActiveFilters = computed(() => activeFilters.value.length > 0)
+
+const activeFilters = computed(() => {
+  const badges: { key: keyof FilterState, icon: string, label: string }[] = []
+
+  if (filters.value.namespace) {
+    badges.push({
+      key: 'namespace',
+      icon: 'lucide:layers',
+      label: filters.value.namespace,
+    })
+  }
+  if (filters.value.status) {
+    badges.push({
+      key: 'status',
+      icon: 'lucide:circle-check',
+      label: recommendationStatusLabel(filters.value.status),
+    })
+  }
+  if (filters.value.mode) {
+    badges.push({
+      key: 'mode',
+      icon: 'lucide:settings',
+      label: recommendationModeLabel(filters.value.mode),
+    })
+  }
+  if (filters.value.workloadType) {
+    badges.push({
+      key: 'workloadType',
+      icon: 'lucide:server',
+      label: workloadTypeLabel(filters.value.workloadType),
+    })
+  }
+  if (filters.value.workloadName) {
+    badges.push({
+      key: 'workloadName',
+      icon: 'lucide:search',
+      label: filters.value.workloadName,
+    })
+  }
+
+  return badges
 })
 
-const hasActiveFilters = computed(() => {
-  return !!(filters.value.namespace
-    || filters.value.status || filters.value.mode
-    || filters.value.workloadType || filters.value.workloadName)
-})
+const clearFilter = (key: keyof FilterState) => {
+  filters.value[key] = null
+}
 
 const clearFilters = () => {
   filters.value = {

@@ -5,7 +5,7 @@
     </h2>
     <div class="panel p-4">
       <UiEmptyState
-        v-if="!pods || pods.length === 0"
+        v-if="pods.length === 0"
         icon="lucide:layers"
         title="No pods found"
         description="This workload doesn't have any pods running."
@@ -39,6 +39,6 @@
 import type { Pod } from '#shared/types/workload'
 
 defineProps<{
-  pods?: Pod[]
+  pods: Pod[]
 }>()
 </script>

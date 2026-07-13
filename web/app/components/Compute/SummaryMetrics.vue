@@ -10,7 +10,7 @@
           Current
         </p>
         <p class="text-on-surface text-2xl font-bold">
-          {{ formatCPU(utilization?.cpu?.current) }}
+          {{ formatCPU(utilization.cpu.current) }}
         </p>
       </div>
       <div class="grid grid-cols-2 gap-3 text-sm">
@@ -19,7 +19,7 @@
             Mean
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatCPU(utilization?.cpu?.stats?.mean) }}
+            {{ formatCPU(utilization.cpu.stats.mean) }}
           </p>
         </div>
         <div>
@@ -27,7 +27,7 @@
             Median
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatCPU(utilization?.cpu?.stats?.median) }}
+            {{ formatCPU(utilization.cpu.stats.median) }}
           </p>
         </div>
         <div>
@@ -35,7 +35,7 @@
             P95
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatCPU(utilization?.cpu?.stats?.percentile?.p95) }}
+            {{ formatCPU(utilization.cpu.stats.percentile.p95) }}
           </p>
         </div>
         <div>
@@ -43,14 +43,14 @@
             Max
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatCPU(utilization?.cpu?.stats?.max) }}
+            {{ formatCPU(utilization.cpu.stats.max) }}
           </p>
         </div>
       </div>
       <div class="flex items-center gap-2 pt-2">
         <span class="text-sm text-on-surface-secondary">Trend:</span>
         <span
-          v-if="utilization?.cpu?.trend?.direction === 'increasing'"
+          v-if="utilization.cpu.trend.direction === 'increasing'"
           class="flex items-center gap-1 text-sm text-error-light"
         >
           <Icon
@@ -60,7 +60,7 @@
           <span>Increasing</span>
         </span>
         <span
-          v-else-if="utilization?.cpu?.trend?.direction === 'decreasing'"
+          v-else-if="utilization.cpu.trend.direction === 'decreasing'"
           class="flex items-center gap-1 text-sm text-success-light"
         >
           <Icon
@@ -83,10 +83,10 @@
       <div class="flex items-center gap-2">
         <span class="text-sm text-on-surface-secondary">Anomalies:</span>
         <span
-          v-if="(utilization?.cpu?.anomalies?.anomaly_count ?? 0) > 0"
+          v-if="utilization.cpu.anomalies.anomaly_count > 0"
           class="text-sm font-medium text-error-light"
         >
-          {{ utilization?.cpu?.anomalies?.anomaly_count ?? 0 }} detected
+          {{ utilization.cpu.anomalies.anomaly_count }} detected
         </span>
         <span
           v-else
@@ -107,7 +107,7 @@
           Current
         </p>
         <p class="text-on-surface text-2xl font-bold">
-          {{ formatBytes(utilization?.memory?.current) }}
+          {{ formatBytes(utilization.memory.current) }}
         </p>
       </div>
       <div class="grid grid-cols-2 gap-3 text-sm">
@@ -116,7 +116,7 @@
             Mean
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatBytes(utilization?.memory?.stats?.mean) }}
+            {{ formatBytes(utilization.memory.stats.mean) }}
           </p>
         </div>
         <div>
@@ -124,7 +124,7 @@
             Median
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatBytes(utilization?.memory?.stats?.median) }}
+            {{ formatBytes(utilization.memory.stats.median) }}
           </p>
         </div>
         <div>
@@ -132,7 +132,7 @@
             P95
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatBytes(utilization?.memory?.stats?.percentile?.p95) }}
+            {{ formatBytes(utilization.memory.stats.percentile.p95) }}
           </p>
         </div>
         <div>
@@ -140,14 +140,14 @@
             Max
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatBytes(utilization?.memory?.stats?.max) }}
+            {{ formatBytes(utilization.memory.stats.max) }}
           </p>
         </div>
       </div>
       <div class="flex items-center gap-2 pt-2">
         <span class="text-sm text-on-surface-secondary">Trend:</span>
         <span
-          v-if="utilization?.memory?.trend?.direction === 'increasing'"
+          v-if="utilization.memory.trend.direction === 'increasing'"
           class="flex items-center gap-1 text-sm text-error-light"
         >
           <Icon
@@ -157,7 +157,7 @@
           <span>Increasing</span>
         </span>
         <span
-          v-else-if="utilization?.memory?.trend?.direction === 'decreasing'"
+          v-else-if="utilization.memory.trend.direction === 'decreasing'"
           class="flex items-center gap-1 text-sm text-success-light"
         >
           <Icon
@@ -180,10 +180,10 @@
       <div class="flex items-center gap-2">
         <span class="text-sm text-on-surface-secondary">Anomalies:</span>
         <span
-          v-if="(utilization?.memory?.anomalies?.anomaly_count ?? 0) > 0"
+          v-if="utilization.memory.anomalies.anomaly_count > 0"
           class="text-sm font-medium text-error-light"
         >
-          {{ utilization?.memory?.anomalies?.anomaly_count ?? 0 }} detected
+          {{ utilization.memory.anomalies.anomaly_count }} detected
         </span>
         <span
           v-else
@@ -205,9 +205,9 @@
         </p>
         <p
           class="text-2xl font-bold"
-          :class="scoreColor(stability?.stability_score, { midThreshold: 0.6, type: 'text' })"
+          :class="scoreColor(stability.stability_score, { midThreshold: 0.6, type: 'text' })"
         >
-          {{ formatPercentage(stability?.stability_score ?? 0) }}
+          {{ formatPercentage(stability.stability_score) }}
         </p>
       </div>
       <div class="grid grid-cols-2 gap-3 text-sm">
@@ -216,7 +216,7 @@
             CPU Throttling
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatPercentage(stability?.cpu_throttling ?? 0) }}
+            {{ formatPercentage(stability.cpu_throttling) }}
           </p>
         </div>
         <div>
@@ -224,7 +224,7 @@
             CPU Pressure
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatPercentage(stability?.cpu_pressure ?? 0) }}
+            {{ formatPercentage(stability.cpu_pressure) }}
           </p>
         </div>
         <div>
@@ -232,7 +232,7 @@
             Memory Fail
           </p>
           <p class="text-on-surface font-medium">
-            {{ stability?.memory_fail_cnt ?? 0 }}
+            {{ stability.memory_fail_cnt }}
           </p>
         </div>
         <div>
@@ -240,7 +240,7 @@
             Memory Pressure
           </p>
           <p class="text-on-surface font-medium">
-            {{ formatPercentage(stability?.memory_pressure ?? 0) }}
+            {{ formatPercentage(stability.memory_pressure) }}
           </p>
         </div>
       </div>
@@ -248,18 +248,18 @@
         <span class="text-sm text-on-surface-secondary">OOM:</span>
         <span
           class="text-sm font-medium"
-          :class="(stability?.memory_oom ?? 0) > 0 ? 'text-error-light' : 'text-on-surface'"
+          :class="stability.memory_oom > 0 ? 'text-error-light' : 'text-on-surface'"
         >
-          {{ stability?.memory_oom ?? 0 }}
+          {{ stability.memory_oom }}
         </span>
       </div>
       <div class="flex items-center gap-2">
         <span class="text-sm text-on-surface-secondary">Restarts:</span>
         <span
           class="text-sm font-medium py-1 rounded"
-          :class="(stability?.restarts ?? 0) > 0 ? 'text-error-light' : 'text-on-surface'"
+          :class="stability.restarts > 0 ? 'text-error-light' : 'text-on-surface'"
         >
-          {{ stability?.restarts ?? 0 }}
+          {{ stability.restarts }}
         </span>
       </div>
     </div>
@@ -271,7 +271,7 @@ import { formatCPU } from '#shared/utils/compute/format'
 import type { UtilizationResult, StabilityResult } from '#shared/types/compute'
 
 defineProps<{
-  utilization?: UtilizationResult
-  stability?: StabilityResult
+  utilization: UtilizationResult
+  stability: StabilityResult
 }>()
 </script>

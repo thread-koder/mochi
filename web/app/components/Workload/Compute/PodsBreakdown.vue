@@ -162,15 +162,13 @@ import { formatCPU } from '#shared/utils/compute/format'
 import type { PodAnalysis } from '#shared/types/compute'
 
 const props = defineProps<{
-  pods?: PodAnalysis[]
+  pods: PodAnalysis[]
 }>()
 
 const sortMetric = ref<string>('p95')
 const sortResource = ref<string>('cpu')
 
 const filteredPods = computed(() => {
-  if (!props.pods) return []
-
   return props.pods.slice().sort((a, b) => {
     const aValue = utilizationSortMetricValue(a.utilization, sortMetric.value, sortResource.value)
     const bValue = utilizationSortMetricValue(b.utilization, sortMetric.value, sortResource.value)

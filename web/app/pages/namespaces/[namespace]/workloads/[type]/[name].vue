@@ -2,14 +2,13 @@
   <div class="p-8">
     <!-- Header -->
     <div class="mb-6">
-      <UiBreadcrumb :items="breadcrumbs" />
+      <UiBreadcrumb
+        :items="breadcrumbs"
+      />
       <h1 class="text-4xl font-bold font-heading mb-2">
-        {{ data?.name }}
+        {{ workload.name }}
       </h1>
-      <p
-        v-if="headerSubline"
-        class="text-sm text-on-surface-muted"
-      >
+      <p class="text-sm text-on-surface-muted">
         {{ headerSubline }}
       </p>
     </div>
@@ -19,13 +18,13 @@
       :tabs="tabs"
     >
       <template #overview>
-        <WorkloadOverviewTab :workload-data="data" />
+        <WorkloadOverviewTab :workload="workload" />
       </template>
       <template #compute>
         <WorkloadComputeTab
-          :namespace="data?.namespace ?? ''"
-          :workload-type="data?.type ?? ''"
-          :workload-name="data?.name ?? ''"
+          :namespace="workload.namespace"
+          :workload-type="workload.type"
+          :workload-name="workload.name"
           :is-active="activeTab === 'compute'"
         />
       </template>
@@ -40,19 +39,9 @@ import type { WorkloadResponse } from '#shared/types/workload'
 const route = useRoute()
 const { namespace, type, name } = route.params
 
-const tabs = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'compute', label: 'Compute' },
-]
-const activeTab = ref('overview')
-
-const breadcrumbs = computed(() => [
-  { label: 'Home', to: '/' },
-  { label: String(namespace), to: `/namespaces/${namespace}` },
-  { label: data.value?.name ?? String(name) },
-])
-
-const { data, error } = await useApiData<WorkloadResponse>(`/api/v1/workloads/${namespace}/${type}/${name}`)
+const { data: workloadData, error } = await useApiData<WorkloadResponse>(
+  `/api/v1/workloads/${namespace}/${type}/${name}`,
+)
 
 const { parseError } = useApiError()
 if (error.value) {
@@ -65,19 +54,30 @@ if (error.value) {
   })
 }
 
-const headerSubline = computed(() => {
-  if (!data.value) {
-    return undefined
-  }
+if (!workloadData.value) {
+  throw createError({
+    statusCode: 404,
+    message: 'Workload not found',
+    fatal: true,
+  })
+}
+const workload = workloadData.value
 
-  const parts = [workloadTypeLabel(data.value.type)]
+const breadcrumbs = [
+  { label: 'Home', to: '/' },
+  { label: workload.namespace, to: `/namespaces/${workload.namespace}` },
+  { label: workload.name },
+]
 
-  if (data.value.type !== 'Pod') {
-    parts.push(`${data.value.ready}/${data.value.replicas} replicas`)
-  }
+const headerSubline = [
+  workloadTypeLabel(workload.type),
+  ...(workload.type !== 'Pod' ? [`${workload.ready}/${workload.replicas} replicas`] : []),
+  `Created ${timeAgo(workload.created_at)}`,
+].join(' · ')
 
-  parts.push(`Created ${timeAgo(data.value.created_at)}`)
-
-  return parts.join(' · ')
-})
+const tabs = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'compute', label: 'Compute' },
+]
+const activeTab = ref('overview')
 </script>

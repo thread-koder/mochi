@@ -45,13 +45,13 @@
           {{ parseError(error, 'Failed to load namespaces').message }}
         </div>
         <div
-          v-else-if="!data || data.length === 0"
+          v-else-if="namespaces && namespaces.length === 0"
           class="text-xs text-on-surface-muted px-4 py-2"
         >
           No namespaces found
         </div>
         <NuxtLink
-          v-for="ns in data || []"
+          v-for="ns in namespaces"
           :key="ns.name"
           :to="`/namespaces/${ns.name}`"
           class="flex items-center justify-between px-4 py-2 rounded-lg text-sm
@@ -96,8 +96,8 @@ import type { Namespace } from '#shared/types/namespace'
 
 const { parseError } = useApiError()
 
-const { data, pending, error }
-  = await useApiData<Namespace[]>('/api/v1/namespaces')
+const { data: namespaces, error, pending }
+  = useApiData<Namespace[]>('/api/v1/namespaces', { lazy: true })
 
 const phaseColor = (phase: string) => {
   return phase.toLowerCase() === 'active' ? 'bg-success' : 'bg-warning'

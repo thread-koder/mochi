@@ -39,7 +39,7 @@
             {{ recommendationModeLabel(recommendation.recommendation_mode) }}
           </dd>
         </div>
-        <div v-if="recommendation.analysis_time_range">
+        <div>
           <dt class="text-sm text-on-surface-secondary mb-0.5">
             Analysis Period
           </dt>

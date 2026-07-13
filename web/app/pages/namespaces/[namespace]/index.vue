@@ -2,9 +2,11 @@
   <div class="p-8">
     <!-- Header -->
     <div class="mb-6">
-      <UiBreadcrumb :items="breadcrumbs" />
+      <UiBreadcrumb
+        :items="breadcrumbs"
+      />
       <h1 class="text-4xl font-bold font-heading">
-        {{ data?.name }}
+        {{ namespace.name }}
       </h1>
     </div>
 
@@ -13,11 +15,11 @@
       :tabs="tabs"
     >
       <template #overview>
-        <NamespaceOverviewTab :ns-data="data" />
+        <NamespaceOverviewTab :namespace="namespace" />
       </template>
       <template #compute>
         <NamespaceComputeTab
-          :namespace="data?.name ?? ''"
+          :namespace="namespace.name"
           :is-active="activeTab === 'compute'"
         />
       </template>
@@ -28,21 +30,11 @@
 <script setup lang="ts">
 import type { NamespaceResponse } from '#shared/types/namespace'
 
-const { namespace } = useRoute().params
+const { namespace: namespaceName } = useRoute().params
 
-const tabs = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'compute', label: 'Compute' },
-]
-const activeTab = ref('overview')
-
-const breadcrumbs = computed(() => [
-  { label: 'Home', to: '/' },
-  { label: 'Namespaces', to: `/namespaces/${namespace}` },
-  { label: data.value?.name ?? String(namespace) },
-])
-
-const { data, error } = await useApiData<NamespaceResponse>(`/api/v1/namespaces/${namespace}`)
+const { data: namespaceData, error } = await useApiData<NamespaceResponse>(
+  `/api/v1/namespaces/${namespaceName}`,
+)
 
 const { parseError } = useApiError()
 if (error.value) {
@@ -54,4 +46,25 @@ if (error.value) {
     fatal: true,
   })
 }
+
+if (!namespaceData.value) {
+  throw createError({
+    statusCode: 404,
+    message: 'Namespace not found',
+    fatal: true,
+  })
+}
+const namespace = namespaceData.value
+
+const breadcrumbs = [
+  { label: 'Home', to: '/' },
+  { label: 'Namespaces', to: `/namespaces/${namespace.name}` },
+  { label: namespace.name },
+]
+
+const tabs = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'compute', label: 'Compute' },
+]
+const activeTab = ref('overview')
 </script>

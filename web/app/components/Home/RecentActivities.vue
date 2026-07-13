@@ -5,7 +5,7 @@
     </h2>
 
     <div
-      v-if="!activities || activities.length === 0"
+      v-if="activities.length === 0"
       class="panel p-4"
     >
       <UiEmptyState
@@ -49,7 +49,7 @@
 import type { Activity } from '#shared/types/home'
 
 defineProps<{
-  activities?: Activity[]
+  activities: Activity[]
 }>()
 
 const activityIcon = (type: string) => {

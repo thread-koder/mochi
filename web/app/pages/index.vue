@@ -5,42 +5,38 @@
       <h1 class="text-4xl font-bold font-heading mb-2">
         Welcome to Mochi
       </h1>
-      <p
-        v-if="data?.cluster_name"
-        class="text-sm text-on-surface-muted"
-      >
-        Cluster: {{ data.cluster_name }}
+      <p class="text-sm text-on-surface-muted">
+        Cluster: {{ home.cluster_name }}
       </p>
-      <HomeHealthStatus :health-checks="data?.health_checks" />
+      <HomeHealthStatus :health-checks="home.health_checks" />
     </div>
 
-    <!-- Quick Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <UiStatsCard
         title="Total Namespaces"
-        :value="data?.stats.namespaces ?? 0"
+        :value="home.stats.namespaces"
         icon="lucide:layers"
       />
       <UiStatsCard
         title="Total Workloads"
-        :value="data?.stats.workloads ?? 0"
+        :value="home.stats.workloads"
         icon="lucide:server"
       />
       <UiStatsCard
         title="Total Pods"
-        :value="data?.stats.pods ?? 0"
+        :value="home.stats.pods"
         icon="lucide:rocket"
       />
     </div>
 
-    <HomeRecentActivities :activities="data?.activities" />
+    <HomeRecentActivities :activities="home.activities" />
   </div>
 </template>
 
 <script setup lang="ts">
 import type { HomeResponse } from '#shared/types/home'
 
-const { data, error } = await useApiData<HomeResponse>('/api/v1/home')
+const { data: homeData, error } = await useApiData<HomeResponse>('/api/v1/home')
 
 const { parseError } = useApiError()
 if (error.value) {
@@ -52,4 +48,13 @@ if (error.value) {
     fatal: true,
   })
 }
+
+if (!homeData.value) {
+  throw createError({
+    statusCode: 404,
+    message: 'Home data not found',
+    fatal: true,
+  })
+}
+const home = homeData.value
 </script>

@@ -16,7 +16,7 @@
 
       <!-- Recommendations Table -->
       <div
-        v-else
+        v-else-if="recommendation"
         class="overflow-x-auto"
       >
         <table class="w-full">
@@ -38,7 +38,7 @@
           </thead>
           <tbody>
             <tr
-              v-for="rec in recommendation?.recommendations"
+              v-for="rec in recommendation.recommendations"
               :key="rec.container_name"
               class="border-b border-primary/10 last:border-b-0"
             >
@@ -156,7 +156,7 @@ const error = ref<FetchError | null>(null)
 const { parseError } = useApiError()
 
 const hasRecommendations = computed(
-  () => (props.recommendation?.recommendations?.length ?? 0) > 0,
+  () => props.recommendation && props.recommendation.recommendations.length > 0,
 )
 
 const close = () => {

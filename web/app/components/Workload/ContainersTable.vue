@@ -5,7 +5,7 @@
     </h2>
     <div class="panel p-4">
       <UiEmptyState
-        v-if="!containers || containers.length === 0"
+        v-if="containers.length === 0"
         icon="lucide:box"
         title="No containers found"
         description="This workload doesn't have any containers."
@@ -73,6 +73,6 @@
 import type { Container } from '#shared/types/workload'
 
 defineProps<{
-  containers?: Container[]
+  containers: Container[]
 }>()
 </script>

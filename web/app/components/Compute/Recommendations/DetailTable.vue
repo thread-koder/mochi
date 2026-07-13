@@ -75,6 +75,6 @@ const props = defineProps<{
 }>()
 
 const hasRecommendations = computed(
-  () => (props.recommendations?.length ?? 0) > 0,
+  () => props.recommendations.length > 0,
 )
 </script>

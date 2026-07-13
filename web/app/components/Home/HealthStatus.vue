@@ -25,7 +25,7 @@
 import type { HomeResponse } from '#shared/types/home'
 
 const props = defineProps<{
-  healthChecks?: HomeResponse['health_checks']
+  healthChecks: HomeResponse['health_checks']
 }>()
 
 const checks = [
@@ -38,7 +38,7 @@ const checks = [
 const healthIndicators = computed(() =>
   checks.map(check => ({
     name: check.name,
-    status: props.healthChecks?.[check.key] ?? false,
+    status: props.healthChecks[check.key],
   })),
 )
 

@@ -1,24 +1,19 @@
 <template>
   <div>
-    <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
       <UiStatsCard
         title="Pods"
-        :value="workloadData?.stats.pods ?? 0"
+        :value="workload.stats.pods"
         icon="lucide:rocket"
       />
       <UiStatsCard
         title="Containers"
-        :value="workloadData?.stats.containers ?? 0"
+        :value="workload.stats.containers"
         icon="lucide:container"
       />
     </div>
-
-    <!-- Pods List -->
-    <WorkloadPodsList :pods="workloadData?.pods" />
-
-    <!-- Containers Table -->
-    <WorkloadContainersTable :containers="workloadData?.containers" />
+    <WorkloadPodsList :pods="workload.pods" />
+    <WorkloadContainersTable :containers="workload.containers" />
   </div>
 </template>
 
@@ -26,6 +21,6 @@
 import type { WorkloadResponse } from '#shared/types/workload'
 
 defineProps<{
-  workloadData?: WorkloadResponse
+  workload: WorkloadResponse
 }>()
 </script>

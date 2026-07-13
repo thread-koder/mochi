@@ -5,7 +5,7 @@
     </h2>
     <div class="panel p-4">
       <UiEmptyState
-        v-if="!pods || pods.length === 0"
+        v-if="pods.length === 0"
         icon="lucide:layers"
         title="No pods found"
         :description="`No ${title.toLowerCase()} found in this namespace.`"
@@ -43,7 +43,7 @@
 import type { StandalonePod } from '#shared/types/namespace'
 
 defineProps<{
-  pods?: StandalonePod[]
+  pods: StandalonePod[]
   namespace: string
   title: string
 }>()

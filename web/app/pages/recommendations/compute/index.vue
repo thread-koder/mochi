@@ -8,19 +8,12 @@
       </h1>
     </div>
 
-    <!-- Filter Bar -->
-    <ComputeRecommendationsFilterBar
-      v-model="filters"
-      :namespaces="namespaces"
-    />
-
-    <!-- Recommendations List -->
+    <ComputeRecommendationsFilterBar v-model="filters" />
     <ComputeRecommendationsList :filters="filters" />
   </div>
 </template>
 
 <script setup lang="ts">
-import type { Namespace } from '#shared/types/namespace'
 import type { FilterState } from '~/components/Compute/Recommendations/FilterBar.vue'
 
 const breadcrumbs = [
@@ -36,6 +29,4 @@ const filters = ref<FilterState>({
   workloadType: null,
   workloadName: null,
 })
-
-const { data: namespaces } = await useApiData<Namespace[]>('/api/v1/namespaces')
 </script>

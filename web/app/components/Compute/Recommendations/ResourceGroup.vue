@@ -29,7 +29,7 @@
           {{ field.recommended ?? 'N/A' }}
         </span>
         <span
-          v-if="field.changePercent !== null && field.changePercent !== undefined"
+          v-if="field.changePercent != null"
           class="ml-2 text-xs text-on-surface-muted"
         >
           ({{ formatChangePercent(field.changePercent) }})

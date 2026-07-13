@@ -9,8 +9,10 @@
       type="button"
       class="bg-surface-elevated border border-on-surface-muted/20 rounded-lg px-3 py-2
        text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50
-       min-w-[140px] text-left flex items-center justify-between gap-2 cursor-pointer"
+       min-w-[140px] text-left flex items-center justify-between gap-2 cursor-pointer
+       disabled:opacity-50 disabled:cursor-not-allowed"
       :class="modelValue ? 'text-on-surface' : ''"
+      :disabled="disabled"
       @click="toggleDropdown"
     >
       <span class="truncate">
@@ -79,7 +81,7 @@
               v-if="filteredOptions.length === 0"
               class="px-3 py-2 text-sm text-on-surface-muted text-center"
             >
-              No options found
+              {{ emptyMessage }}
             </div>
             <button
               v-for="option in filteredOptions"
@@ -107,6 +109,8 @@ interface Props {
   searchPlaceholder?: string
   nullOption?: string
   searchable?: boolean
+  disabled?: boolean
+  emptyMessage?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -114,6 +118,8 @@ const props = withDefaults(defineProps<Props>(), {
   searchPlaceholder: 'Search...',
   nullOption: undefined,
   searchable: true,
+  disabled: false,
+  emptyMessage: 'No options found',
 })
 
 const modelValue = defineModel<string | null>({ required: true })
@@ -175,6 +181,10 @@ const displayValue = computed(() => {
 })
 
 const toggleDropdown = () => {
+  if (props.disabled) {
+    return
+  }
+
   isOpen.value = !isOpen.value
   if (isOpen.value) {
     triggerBounding.update()

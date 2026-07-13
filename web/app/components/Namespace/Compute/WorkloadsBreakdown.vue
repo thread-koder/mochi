@@ -188,7 +188,7 @@ import { formatCPU } from '#shared/utils/compute/format'
 import type { WorkloadAnalysis } from '#shared/types/compute'
 
 const props = defineProps<{
-  workloads?: WorkloadAnalysis[]
+  workloads: WorkloadAnalysis[]
   namespace: string
 }>()
 
@@ -197,8 +197,6 @@ const sortResource = ref<string>('cpu')
 const filterType = ref<string | null>(null)
 
 const filteredWorkloads = computed(() => {
-  if (!props.workloads) return []
-
   const workloads = filterType.value
     ? props.workloads.filter(w => w.workload_type === filterType.value)
     : [...props.workloads]

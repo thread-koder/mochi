@@ -160,12 +160,12 @@
                   <div class="flex flex-col items-center gap-1">
                     <span
                       class="text-xs px-2 py-1 rounded-full font-medium border"
-                      :class="scoreBadgeClass(container.stability?.stability_score)"
+                      :class="scoreBadgeClass(container.stability.stability_score)"
                     >
-                      {{ formatPercentage(container.stability?.stability_score ?? 0) }}
+                      {{ formatPercentage(container.stability.stability_score) }}
                     </span>
                     <div
-                      v-if="(container.stability?.restarts ?? 0) > 0 || (container.stability?.memory_oom ?? 0) > 0"
+                      v-if="container.stability.restarts > 0 || container.stability.memory_oom > 0"
                       class="flex items-center gap-1 text-xs text-error-light"
                     >
                       <Icon
@@ -195,13 +195,11 @@
                     class="py-4 px-4"
                   >
                     <div class="grid grid-cols-3 gap-6">
-                      <!-- CPU Provisioning -->
                       <div class="space-y-3">
                         <h4 class="text-sm font-semibold text-on-surface mb-3">
                           CPU Provisioning
                         </h4>
                         <div class="space-y-2">
-                          <!-- Efficiency -->
                           <div>
                             <div class="flex items-center justify-between mb-1">
                               <span class="text-xs text-on-surface-secondary">Efficiency</span>
@@ -226,35 +224,30 @@
                               />
                             </div>
                           </div>
-                          <!-- Current Request -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Current Request</span>
                             <span class="text-xs font-medium text-on-surface">
-                              {{ formatCPU(container.provisioning.cpu.current_request ?? undefined) }}
+                              {{ formatCPU(container.provisioning.cpu.current_request) }}
                             </span>
                           </div>
-                          <!-- Request Utilization -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Request Utilization</span>
                             <span class="text-xs font-medium text-on-surface">
                               {{ formatPercentage(container.provisioning.cpu.request_utilization) }}
                             </span>
                           </div>
-                          <!-- Current Limit -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Current Limit</span>
                             <span class="text-xs font-medium text-on-surface">
-                              {{ formatCPU(container.provisioning.cpu.current_limit ?? undefined) }}
+                              {{ formatCPU(container.provisioning.cpu.current_limit) }}
                             </span>
                           </div>
-                          <!-- Limit Utilization -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Limit Utilization</span>
                             <span class="text-xs font-medium text-on-surface">
                               {{ formatPercentage(container.provisioning.cpu.limit_utilization) }}
                             </span>
                           </div>
-                          <!-- Status Badge -->
                           <div class="flex items-center justify-between pt-1">
                             <span class="text-xs text-on-surface-secondary">Status</span>
                             <span
@@ -266,13 +259,11 @@
                           </div>
                         </div>
                       </div>
-                      <!-- Memory Provisioning -->
                       <div class="space-y-3">
                         <h4 class="text-sm font-semibold text-on-surface mb-3">
                           Memory Provisioning
                         </h4>
                         <div class="space-y-2">
-                          <!-- Efficiency -->
                           <div>
                             <div class="flex items-center justify-between mb-1">
                               <span class="text-xs text-on-surface-secondary">Efficiency</span>
@@ -297,35 +288,30 @@
                               />
                             </div>
                           </div>
-                          <!-- Current Request -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Current Request</span>
                             <span class="text-xs font-medium text-on-surface">
-                              {{ formatBytes(container.provisioning.memory.current_request ?? undefined) }}
+                              {{ formatBytes(container.provisioning.memory.current_request) }}
                             </span>
                           </div>
-                          <!-- Request Utilization -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Request Utilization</span>
                             <span class="text-xs font-medium text-on-surface">
                               {{ formatPercentage(container.provisioning.memory.request_utilization) }}
                             </span>
                           </div>
-                          <!-- Current Limit -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Current Limit</span>
                             <span class="text-xs font-medium text-on-surface">
-                              {{ formatBytes(container.provisioning.memory.current_limit ?? undefined) }}
+                              {{ formatBytes(container.provisioning.memory.current_limit) }}
                             </span>
                           </div>
-                          <!-- Limit Utilization -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Limit Utilization</span>
                             <span class="text-xs font-medium text-on-surface">
                               {{ formatPercentage(container.provisioning.memory.limit_utilization) }}
                             </span>
                           </div>
-                          <!-- Status Badge -->
                           <div class="flex items-center justify-between pt-1">
                             <span class="text-xs text-on-surface-secondary">Status</span>
                             <span
@@ -337,109 +323,101 @@
                           </div>
                         </div>
                       </div>
-                      <!-- Stability Details -->
                       <div class="space-y-3">
                         <h4 class="text-sm font-semibold text-on-surface mb-3">
                           Stability Metrics
                         </h4>
                         <div class="space-y-2">
-                          <!-- Stability Score -->
                           <div>
                             <div class="flex items-center justify-between mb-1">
                               <span class="text-xs text-on-surface-secondary">Health Score</span>
                               <span
                                 class="text-xs font-medium"
                                 :class="scoreColor(
-                                  container.stability?.stability_score,
+                                  container.stability.stability_score,
                                   { midThreshold: 0.6, type: 'text' },
                                 )"
                               >
-                                {{ formatPercentage(container.stability?.stability_score ?? 0) }}
+                                {{ formatPercentage(container.stability.stability_score) }}
                               </span>
                             </div>
                             <div class="w-full bg-surface-elevated rounded-full h-2">
                               <div
                                 class="h-2 rounded-full transition-all"
                                 :class="scoreColor(
-                                  container.stability?.stability_score,
+                                  container.stability.stability_score,
                                   { midThreshold: 0.6, type: 'bg' },
                                 )"
                                 :style="{ width: progressBarWidth(container.stability.stability_score) }"
                               />
                             </div>
                           </div>
-                          <!-- CPU Throttling -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">CPU Throttling</span>
                             <span
                               class="text-xs font-medium"
                               :class="scoreColor(
-                                container.stability?.cpu_throttling ?? 0,
+                                container.stability.cpu_throttling,
                                 { invert: true, highThreshold: 0.1, midThreshold: 0.05, type: 'text' },
                               )"
                             >
-                              {{ formatPercentage(container.stability?.cpu_throttling ?? 0) }}
+                              {{ formatPercentage(container.stability.cpu_throttling) }}
                             </span>
                           </div>
-                          <!-- CPU Pressure -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">CPU Pressure</span>
                             <span
                               class="text-xs font-medium"
                               :class="scoreColor(
-                                container.stability?.cpu_pressure ?? 0,
+                                container.stability.cpu_pressure,
                                 { invert: true, highThreshold: 0.2, midThreshold: 0.1, type: 'text' },
                               )"
                             >
-                              {{ formatPercentage(container.stability?.cpu_pressure ?? 0) }}
+                              {{ formatPercentage(container.stability.cpu_pressure) }}
                             </span>
                           </div>
-                          <!-- Memory Fail Count -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Memory Fail</span>
                             <span
                               class="text-xs font-medium"
                               :class="scoreColor(
-                                container.stability?.memory_fail_cnt ?? 0,
+                                container.stability.memory_fail_cnt,
                                 { invert: true, highThreshold: 1, midThreshold: 0.5, type: 'text' },
                               )"
                             >
-                              {{ container.stability?.memory_fail_cnt ?? 0 }}
+                              {{ container.stability.memory_fail_cnt }}
                             </span>
                           </div>
-                          <!-- Memory Pressure -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Memory Pressure</span>
                             <span
                               class="text-xs font-medium"
                               :class="scoreColor(
-                                container.stability?.memory_pressure ?? 0,
+                                container.stability.memory_pressure,
                                 { invert: true, highThreshold: 0.1, midThreshold: 0.05, type: 'text' },
                               )"
                             >
-                              {{ formatPercentage(container.stability?.memory_pressure ?? 0) }}
+                              {{ formatPercentage(container.stability.memory_pressure) }}
                             </span>
                           </div>
-                          <!-- Memory OOM -->
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">
                               Memory OOM
                             </span>
                             <span
                               class="text-xs font-medium"
-                              :class="(container.stability?.memory_oom ?? 0) > 0 ? 'text-error-light' : 'text-on-surface'"
+                              :class="container.stability.memory_oom > 0 ? 'text-error-light' : 'text-on-surface'"
                             >
-                              {{ container.stability?.memory_oom ?? 0 }}
+                              {{ container.stability.memory_oom }}
                             </span>
                           </div>
-                          <!-- Restarts -->
                           <div class="flex items-center justify-between pt-1">
                             <span class="text-xs text-on-surface-secondary">Restarts</span>
                             <span
                               class="text-xs font-medium"
-                              :class="(container.stability?.restarts ?? 0) > 0 ? 'text-error-light' : 'text-on-surface'"
+                              :class="container.stability.restarts > 0 ? 'text-error-light' : 'text-on-surface'"
                             >
-                              {{ container.stability?.restarts ?? 0 }}
+                              {{ container.stability.restarts }}
                             </span>
                           </div>
                         </div>
@@ -466,18 +444,15 @@ import { formatCPU } from '#shared/utils/compute/format'
 import type { PodAnalysis, ContainerAnalysis, ResourceProvisioning } from '#shared/types/compute'
 
 const props = defineProps<{
-  pods?: PodAnalysis[]
+  pods: PodAnalysis[]
 }>()
 
 const sortMetric = ref<string>('p95')
 const sortResource = ref<string>('cpu')
 
 const filteredContainers = computed(() => {
-  if (!props.pods?.length) return []
-
   const containers: Array<ContainerAnalysis & { pod_name: string }> = []
   for (const pod of props.pods) {
-    if (!pod.containers?.length) continue
     for (const container of pod.containers) {
       containers.push({
         ...container,

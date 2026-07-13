@@ -5,7 +5,7 @@
     </h2>
     <div class="panel p-4">
       <UiEmptyState
-        v-if="!workloads || workloads.length === 0"
+        v-if="workloads.length === 0"
         icon="lucide:server"
         title="No workloads found"
         description="This namespace doesn't have any workloads yet."
@@ -44,7 +44,7 @@ import { workloadTypeLabel } from '#shared/constants/workload'
 import type { Workload } from '#shared/types/namespace'
 
 defineProps<{
-  workloads?: Workload[]
+  workloads: Workload[]
   namespace: string
 }>()
 </script>

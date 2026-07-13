@@ -229,10 +229,9 @@ const queryString = computed(() => buildQuery(props.filters, currentPage.value))
 
 const { parseError } = useApiError()
 
-const { data: recommendations, pending, error } = useLazyAsyncData<RecommendationsResponse>(
-  () => `compute-recommendations-${queryString.value}`,
-  () => $api(`/api/v1/compute/recommendations?${queryString.value}`),
-  { watch: [queryString] },
+const { data: recommendations, pending, error } = useApiData<RecommendationsResponse>(
+  () => `/api/v1/compute/recommendations?${queryString.value}`,
+  { lazy: true, watch: [queryString] },
 )
 
 const records = computed(() => recommendations.value?.recommendations ?? [])
@@ -244,9 +243,9 @@ watch(() => props.filters, () => {
 }, { deep: true })
 
 const averageConfidence = (record: RecommendationRecord): number => {
-  const recs = record.recommendations ?? []
+  const recs = record.recommendations
   if (recs.length === 0) return 0
-  const sum = recs.reduce((acc, r) => acc + (r.confidence ?? 0), 0)
+  const sum = recs.reduce((acc, r) => acc + r.confidence, 0)
   return sum / recs.length
 }
 

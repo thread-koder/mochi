@@ -52,19 +52,16 @@
       v-else-if="analysis"
       class="space-y-6"
     >
-      <!-- Summary Metrics -->
       <ComputeSummaryMetrics
         :utilization="analysis.utilization"
         :stability="analysis.stability"
       />
-      <!-- Resource Utilization Charts -->
       <section v-if="analysis.time_series">
         <h2 class="text-2xl font-bold font-heading mb-4">
           Resource Utilization
         </h2>
         <div class="panel p-4">
           <div class="space-y-6">
-            <!-- CPU Chart -->
             <div>
               <h3 class="text-lg font-semibold font-heading mb-2 text-on-surface">
                 CPU Utilization Over Time
@@ -75,7 +72,6 @@
                 title="CPU Utilization"
               />
             </div>
-            <!-- Memory Chart -->
             <div>
               <h3 class="text-lg font-semibold font-heading mb-2 text-on-surface">
                 Memory Utilization Over Time
@@ -89,16 +85,11 @@
           </div>
         </div>
       </section>
-
-      <!-- Pods Breakdown -->
       <WorkloadComputePodsBreakdown :pods="analysis.pods" />
-
-      <!-- Containers Breakdown -->
       <WorkloadComputeContainersBreakdown :pods="analysis.pods" />
     </div>
 
     <ClientOnly>
-      <!-- Generate Recommendation Modal -->
       <WorkloadComputeGenerateRec
         v-model="showGenerateModal"
         :namespace="props.namespace"
@@ -107,8 +98,6 @@
         :default-time-range="timeRange"
         @generated="onRecommendationGenerated"
       />
-
-      <!-- Recommendation Results Modal -->
       <WorkloadComputeRecResult
         v-model="showResultModal"
         :recommendation="generatedRecommendation"

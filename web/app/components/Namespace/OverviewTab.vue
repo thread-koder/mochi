@@ -1,43 +1,36 @@
 <template>
   <div>
-    <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       <UiStatsCard
         title="Workloads"
-        :value="nsData?.stats.workloads ?? 0"
+        :value="namespace.stats.workloads"
         icon="lucide:server"
       />
       <UiStatsCard
         title="Pods"
-        :value="nsData?.stats.pods ?? 0"
+        :value="namespace.stats.pods"
         icon="lucide:rocket"
       />
       <UiStatsCard
         title="Containers"
-        :value="nsData?.stats.containers ?? 0"
+        :value="namespace.stats.containers"
         icon="lucide:container"
       />
     </div>
-
-    <!-- Workloads List -->
     <NamespaceWorkloadsList
-      :workloads="nsData?.workloads"
-      :namespace="nsData?.name ?? ''"
+      :workloads="namespace.workloads"
+      :namespace="namespace.name"
     />
-
-    <!-- Standalone Pods -->
     <NamespacePodsList
-      v-if="nsData?.standalone_pods && nsData.standalone_pods.length > 0"
-      :pods="nsData.standalone_pods"
-      :namespace="nsData.name"
+      v-if="namespace.standalone_pods.length > 0"
+      :pods="namespace.standalone_pods"
+      :namespace="namespace.name"
       title="Standalone Pods"
     />
-
-    <!-- System Pods -->
     <NamespacePodsList
-      v-if="nsData?.system_pods && nsData.system_pods.length > 0"
-      :pods="nsData.system_pods"
-      :namespace="nsData.name"
+      v-if="namespace.system_pods.length > 0"
+      :pods="namespace.system_pods"
+      :namespace="namespace.name"
       title="System Pods"
     />
   </div>
@@ -47,6 +40,6 @@
 import type { NamespaceResponse } from '#shared/types/namespace'
 
 defineProps<{
-  nsData?: NamespaceResponse
+  namespace: NamespaceResponse
 }>()
 </script>
