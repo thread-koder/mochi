@@ -31,8 +31,6 @@ type RecommendationConfig struct {
 	CostOptimizedMemoryRequestMargin float64
 	CostOptimizedMemoryLimitMargin   float64
 
-	MinCPURequest          float64
-	MinMemoryRequest       int64
 	MinConfidenceThreshold float64
 	BurstThreshold         float64
 
@@ -56,8 +54,6 @@ func DefaultRecommendationConfig() RecommendationConfig {
 		CostOptimizedCPULimitMargin:      1.2,
 		CostOptimizedMemoryRequestMargin: 1.15,
 		CostOptimizedMemoryLimitMargin:   1.2,
-		MinCPURequest:                    0.01,
-		MinMemoryRequest:                 64 * 1024 * 1024,
 		MinConfidenceThreshold:           0.8,
 		BurstThreshold:                   1.6,
 		LimitMultiplier:                  1.5,
@@ -96,12 +92,6 @@ func (config RecommendationConfig) Validate() error {
 	}
 	if config.CostOptimizedMemoryLimitMargin <= 0 {
 		return fmt.Errorf("CostOptimizedMemoryLimitMargin must be positive, got: %v", config.CostOptimizedMemoryLimitMargin)
-	}
-	if config.MinCPURequest < 0 {
-		return fmt.Errorf("MinCPURequest must be non-negative, got: %v", config.MinCPURequest)
-	}
-	if config.MinMemoryRequest < 0 {
-		return fmt.Errorf("MinMemoryRequest must be non-negative, got: %v", config.MinMemoryRequest)
 	}
 	if config.MinConfidenceThreshold < 0 || config.MinConfidenceThreshold > 1 {
 		return fmt.Errorf("MinConfidenceThreshold must be between 0 and 1, got: %v", config.MinConfidenceThreshold)
@@ -199,7 +189,7 @@ func CalculateCPURequestRecommendation(
 		recommendedCores = max(recommendedCores, meanBased)
 	}
 
-	recommendedCores = max(recommendedCores, config.MinCPURequest)
+	recommendedCores = max(recommendedCores, MinCPURequestCores)
 
 	if (stability.CPUThrottling > 0 || stability.CPUPressure > 0) && currentRequest != nil && *currentRequest > 0 {
 		var minRequestFromStress float64
@@ -303,7 +293,7 @@ func CalculateCPULimitRecommendation(
 	var limitFromRequest float64
 	if effectiveRequest != nil && *effectiveRequest > 0 {
 		var multiplier float64
-		if *effectiveRequest <= config.MinCPURequest {
+		if *effectiveRequest <= MinCPURequestCores {
 			multiplier = 1.0
 		} else {
 			switch config.Mode {
@@ -320,7 +310,7 @@ func CalculateCPULimitRecommendation(
 
 	recommendedCores := max(limitFromPeak, limitFromRequest)
 
-	recommendedCores = max(recommendedCores, config.MinCPURequest)
+	recommendedCores = max(recommendedCores, MinCPURequestCores)
 
 	if effectiveRequest != nil && recommendedCores < *effectiveRequest {
 		recommendedCores = *effectiveRequest
@@ -422,7 +412,7 @@ func CalculateMemoryRequestRecommendation(
 		recommendedBytes = max(recommendedBytes, meanBased)
 	}
 
-	recommendedBytes = max(recommendedBytes, float64(config.MinMemoryRequest))
+	recommendedBytes = max(recommendedBytes, float64(MinMemoryRequestBytes))
 
 	if (stability.MemoryOOM > 0 || stability.MemoryFailCnt > 0) && currentRequest != nil && *currentRequest > 0 {
 		minRequestFromOOM := *currentRequest * stressFactor
@@ -525,7 +515,7 @@ func CalculateMemoryLimitRecommendation(
 	var limitFromRequest float64
 	if effectiveRequest != nil && *effectiveRequest > 0 {
 		var multiplier float64
-		if *effectiveRequest <= float64(config.MinMemoryRequest) {
+		if *effectiveRequest <= float64(MinMemoryRequestBytes) {
 			multiplier = 1.0
 		} else {
 			switch config.Mode {
@@ -542,7 +532,7 @@ func CalculateMemoryLimitRecommendation(
 
 	recommendedBytes := max(limitFromPeak, limitFromRequest)
 
-	recommendedBytes = max(recommendedBytes, float64(config.MinMemoryRequest))
+	recommendedBytes = max(recommendedBytes, float64(MinMemoryRequestBytes))
 
 	if effectiveRequest != nil && recommendedBytes < *effectiveRequest {
 		recommendedBytes = *effectiveRequest

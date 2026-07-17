@@ -48,17 +48,17 @@ func AnalyzeStability(metrics ResourceMetrics) StabilityResult {
 	totalPenalty += eventCountPenalty(result.MemoryFailCnt, maxPenaltyMemoryFailCnt, memoryFailCountAtMax)
 	totalPenalty += eventCountPenalty(result.Restarts, maxPenaltyRestarts, restartsCountAtMax)
 
-	if result.CPUThrottling > 0.05 {
-		penalty := (result.CPUThrottling - 0.05) * 2.0
+	if result.CPUThrottling > ThrottlingThreshold {
+		penalty := (result.CPUThrottling - ThrottlingThreshold) * 2.0
 		totalPenalty += min(penalty, maxPenaltyCPUThrottling)
 	}
 
-	if result.CPUPressure > 0.1 {
-		penalty := (result.CPUPressure - 0.1) * 0.5
+	if result.CPUPressure > PressureThreshold {
+		penalty := (result.CPUPressure - PressureThreshold) * 0.5
 		totalPenalty += min(penalty, maxPenaltyCPUPressure)
 	}
-	if result.MemoryPressure > 0.1 {
-		penalty := (result.MemoryPressure - 0.1) * 1.0
+	if result.MemoryPressure > PressureThreshold {
+		penalty := (result.MemoryPressure - PressureThreshold) * 1.0
 		totalPenalty += min(penalty, maxPenaltyMemoryPressure)
 	}
 

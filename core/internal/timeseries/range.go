@@ -2,6 +2,7 @@ package timeseries
 
 import "time"
 
+// Prometheus max allowed points per query.
 const maxRangePoints = 11000
 
 // RangeStepForTimeRange returns an appropriate Prometheus range-query step for the given time range.
