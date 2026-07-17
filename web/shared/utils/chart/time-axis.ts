@@ -1,7 +1,6 @@
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 const ONE_YEAR_MS = 365 * ONE_DAY_MS
 
-const TWO_HOURS_SEC = 2 * 60 * 60
 const TWENTY_TWO_HOURS_SEC = 22 * 60 * 60
 const TWENTY_EIGHT_DAYS_SEC = 28 * 24 * 60 * 60
 
@@ -24,7 +23,7 @@ const formatTimeAxisLabel = (
       hour12: false,
     })
   }
-  if (secPerTick <= TWO_HOURS_SEC || rangeMs <= ONE_DAY_MS) {
+  if (secPerTick <= TWENTY_TWO_HOURS_SEC || rangeMs <= ONE_DAY_MS) {
     if (date.getHours() === 0 && date.getMinutes() === 0) {
       return date.toLocaleString('en-US', {
         month: 'short',
@@ -32,15 +31,6 @@ const formatTimeAxisLabel = (
       })
     }
     return date.toLocaleString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
-  }
-  if (secPerTick <= TWENTY_TWO_HOURS_SEC) {
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
