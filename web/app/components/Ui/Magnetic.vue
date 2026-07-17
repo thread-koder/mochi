@@ -17,7 +17,7 @@ const [scope, animate] = useAnimate()
 let currentAnimation: ReturnType<typeof animate> | null = null
 
 const handleMouseMove = (e: MouseEvent) => {
-  if (!scope.value || !import.meta.client) {
+  if (!scope.value) {
     return
   }
 
@@ -44,7 +44,7 @@ const handleMouseMove = (e: MouseEvent) => {
 }
 
 const handleMouseLeave = () => {
-  if (!scope.value || !import.meta.client) {
+  if (!scope.value) {
     return
   }
 

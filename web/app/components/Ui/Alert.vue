@@ -25,7 +25,7 @@
         v-if="description"
         :class="[
           'text-xs',
-          variantClasses.description,
+          variantClasses.text,
         ]"
       >
         {{ description }}
@@ -73,28 +73,24 @@ const variantClasses = computed(() => {
         container: 'bg-success/10 border border-success/20',
         icon: 'text-success-light',
         text: 'text-success-light',
-        description: 'text-success-light/80',
       }
     case 'error':
       return {
         container: 'bg-error/10 border border-error/20',
         icon: 'text-error-light',
         text: 'text-error-light',
-        description: 'text-error-light/80',
       }
     case 'warning':
       return {
         container: 'bg-warning/10 border border-warning/20',
         icon: 'text-warning-light',
         text: 'text-warning-light',
-        description: 'text-warning-light/80',
       }
     default:
       return {
         container: 'bg-info/10 border border-info/20',
         icon: 'text-info-light',
         text: 'text-info-light',
-        description: 'text-info-light/80',
       }
   }
 })
