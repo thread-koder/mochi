@@ -11,7 +11,12 @@
       <HomeHealthStatus :health-checks="home.health_checks" />
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <UiStatsCard
+        title="Total Nodes"
+        :value="home.stats.nodes"
+        icon="lucide:cpu"
+      />
       <UiStatsCard
         title="Total Namespaces"
         :value="home.stats.namespaces"

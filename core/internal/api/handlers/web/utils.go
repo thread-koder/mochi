@@ -10,6 +10,7 @@ import (
 )
 
 type Stats struct {
+	Nodes       int `json:"nodes"`
 	Namespaces  int `json:"namespaces"`
 	Workloads   int `json:"workloads"`
 	Pods        int `json:"pods"`
@@ -17,9 +18,15 @@ type Stats struct {
 }
 
 func GetStats(ctx context.Context) (Stats, error) {
-	var namespaceCount, workloadCount, podCount int
+	var nodeCount, namespaceCount, workloadCount, podCount int
 
 	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		var err error
+		nodeCount, err = database.GetNodeCount(gctx)
+		return err
+	})
 
 	g.Go(func() error {
 		var err error
@@ -44,6 +51,7 @@ func GetStats(ctx context.Context) (Stats, error) {
 	}
 
 	return Stats{
+		Nodes:      nodeCount,
 		Namespaces: namespaceCount,
 		Workloads:  workloadCount,
 		Pods:       podCount,

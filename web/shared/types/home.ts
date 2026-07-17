@@ -1,4 +1,5 @@
 interface Stats {
+  nodes: number
   namespaces: number
   workloads: number
   pods: number

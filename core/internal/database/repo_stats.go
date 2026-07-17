@@ -7,6 +7,16 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+func GetNodeCount(ctx context.Context) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM nodes`
+	err := Pool.QueryRow(ctx, query).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count nodes: %w", err)
+	}
+	return count, nil
+}
+
 func GetNamespaceCount(ctx context.Context) (int, error) {
 	var count int
 	query := `SELECT COUNT(*) FROM namespaces`
