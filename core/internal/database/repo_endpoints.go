@@ -22,7 +22,10 @@ func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSl
 		INSERT INTO endpoint_slices (
 			name, namespace, uid, address_type,
 			owner_kind, owner_name, endpoints, ports, labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		) VALUES (
+			@name, @namespace, @uid, @address_type,
+			@owner_kind, @owner_name, @endpoints, @ports, @labels, @annotations, @created_at, @synced_at
+		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
 			namespace = EXCLUDED.namespace,
@@ -38,11 +41,20 @@ func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSl
 
 	batch := &pgx.Batch{}
 	for _, es := range endpointSlices {
-		batch.Queue(query,
-			es.Name, es.Namespace, es.UID, es.AddressType,
-			es.OwnerKind, es.OwnerName, es.Endpoints, es.Ports,
-			es.Labels, es.Annotations, es.CreatedAt, es.SyncedAt,
-		)
+		batch.Queue(query, pgx.StrictNamedArgs{
+			"name":         es.Name,
+			"namespace":    es.Namespace,
+			"uid":          es.UID,
+			"address_type": es.AddressType,
+			"owner_kind":   es.OwnerKind,
+			"owner_name":   es.OwnerName,
+			"endpoints":    es.Endpoints,
+			"ports":        es.Ports,
+			"labels":       es.Labels,
+			"annotations":  es.Annotations,
+			"created_at":   es.CreatedAt,
+			"synced_at":    es.SyncedAt,
+		})
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -70,9 +82,18 @@ func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSl
 // Empty uids deletes every EndpointSlice in the namespace.
 func PruneEndpointSlices(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM endpoint_slices WHERE namespace = $1`, namespace)
+		_, err := Pool.Exec(ctx,
+			`DELETE FROM endpoint_slices WHERE namespace = @namespace`,
+			pgx.StrictNamedArgs{"namespace": namespace},
+		)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM endpoint_slices WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM endpoint_slices WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
+		pgx.StrictNamedArgs{
+			"namespace": namespace,
+			"uids":      uids,
+		},
+	)
 	return err
 }

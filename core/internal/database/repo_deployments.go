@@ -24,7 +24,10 @@ func UpsertDeploymentsBatch(ctx context.Context, deployments []*Deployment) erro
 		INSERT INTO deployments (
 			name, namespace, uid, replicas, ready_replicas, available_replicas,
 			labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		) VALUES (
+			@name, @namespace, @uid, @replicas, @ready_replicas, @available_replicas,
+			@labels, @annotations, @created_at, @synced_at
+		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
 			namespace = EXCLUDED.namespace,
@@ -38,11 +41,18 @@ func UpsertDeploymentsBatch(ctx context.Context, deployments []*Deployment) erro
 
 	batch := &pgx.Batch{}
 	for _, deployment := range deployments {
-		batch.Queue(query,
-			deployment.Name, deployment.Namespace, deployment.UID,
-			deployment.Replicas, deployment.ReadyReplicas, deployment.AvailableReplicas,
-			deployment.Labels, deployment.Annotations, deployment.CreatedAt, deployment.SyncedAt,
-		)
+		batch.Queue(query, pgx.StrictNamedArgs{
+			"name":               deployment.Name,
+			"namespace":          deployment.Namespace,
+			"uid":                deployment.UID,
+			"replicas":           deployment.Replicas,
+			"ready_replicas":     deployment.ReadyReplicas,
+			"available_replicas": deployment.AvailableReplicas,
+			"labels":             deployment.Labels,
+			"annotations":        deployment.Annotations,
+			"created_at":         deployment.CreatedAt,
+			"synced_at":          deployment.SyncedAt,
+		})
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -71,11 +81,13 @@ func GetDeploymentsByNamespace(ctx context.Context, namespace string) ([]*Deploy
 		SELECT id, name, namespace, uid, replicas, ready_replicas, available_replicas,
 		       labels, annotations, created_at, updated_at, synced_at
 		FROM deployments
-		WHERE namespace = $1
+		WHERE namespace = @namespace
 		ORDER BY name ASC
 	`
 
-	rows, err := Pool.Query(ctx, query, namespace)
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{"namespace": namespace},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query deployments by namespace: %w", err)
 	}
@@ -107,12 +119,17 @@ func GetDeploymentByName(ctx context.Context, name string, namespace string) (*D
 		SELECT id, name, namespace, uid, replicas, ready_replicas, available_replicas,
 		       labels, annotations, created_at, updated_at, synced_at
 		FROM deployments
-		WHERE name = $1 AND namespace = $2
+		WHERE name = @name AND namespace = @namespace
 		LIMIT 1
 	`
 
 	var dep Deployment
-	err := Pool.QueryRow(ctx, query, name, namespace).Scan(
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{
+			"name":      name,
+			"namespace": namespace,
+		},
+	).Scan(
 		&dep.ID, &dep.Name, &dep.Namespace, &dep.UID,
 		&dep.Replicas, &dep.ReadyReplicas, &dep.AvailableReplicas,
 		&dep.Labels, &dep.Annotations,
@@ -132,9 +149,18 @@ func GetDeploymentByName(ctx context.Context, name string, namespace string) (*D
 // Empty uids deletes every deployment in the namespace.
 func PruneDeployments(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM deployments WHERE namespace = $1`, namespace)
+		_, err := Pool.Exec(ctx,
+			`DELETE FROM deployments WHERE namespace = @namespace`,
+			pgx.StrictNamedArgs{"namespace": namespace},
+		)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM deployments WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM deployments WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
+		pgx.StrictNamedArgs{
+			"namespace": namespace,
+			"uids":      uids,
+		},
+	)
 	return err
 }

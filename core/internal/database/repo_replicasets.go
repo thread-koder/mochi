@@ -22,7 +22,10 @@ func UpsertReplicaSetsBatch(ctx context.Context, replicasets []*ReplicaSet) erro
 		INSERT INTO replicasets (
 			name, namespace, uid, replicas, ready_replicas,
 			owner_kind, owner_name, labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		) VALUES (
+			@name, @namespace, @uid, @replicas, @ready_replicas,
+			@owner_kind, @owner_name, @labels, @annotations, @created_at, @synced_at
+		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
 			namespace = EXCLUDED.namespace,
@@ -37,12 +40,19 @@ func UpsertReplicaSetsBatch(ctx context.Context, replicasets []*ReplicaSet) erro
 
 	batch := &pgx.Batch{}
 	for _, replicaset := range replicasets {
-		batch.Queue(query,
-			replicaset.Name, replicaset.Namespace, replicaset.UID,
-			replicaset.Replicas, replicaset.ReadyReplicas,
-			replicaset.OwnerKind, replicaset.OwnerName,
-			replicaset.Labels, replicaset.Annotations, replicaset.CreatedAt, replicaset.SyncedAt,
-		)
+		batch.Queue(query, pgx.StrictNamedArgs{
+			"name":           replicaset.Name,
+			"namespace":      replicaset.Namespace,
+			"uid":            replicaset.UID,
+			"replicas":       replicaset.Replicas,
+			"ready_replicas": replicaset.ReadyReplicas,
+			"owner_kind":     replicaset.OwnerKind,
+			"owner_name":     replicaset.OwnerName,
+			"labels":         replicaset.Labels,
+			"annotations":    replicaset.Annotations,
+			"created_at":     replicaset.CreatedAt,
+			"synced_at":      replicaset.SyncedAt,
+		})
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -71,11 +81,16 @@ func GetReplicaSetsByDeployment(ctx context.Context, deploymentName, namespace s
 		SELECT id, name, namespace, uid, replicas, ready_replicas,
 		       owner_kind, owner_name, labels, annotations, created_at, updated_at, synced_at
 		FROM replicasets
-		WHERE namespace = $1 AND owner_kind = 'Deployment' AND owner_name = $2
+		WHERE namespace = @namespace AND owner_kind = 'Deployment' AND owner_name = @owner_name
 		ORDER BY name ASC
 	`
 
-	rows, err := Pool.Query(ctx, query, namespace, deploymentName)
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{
+			"namespace":  namespace,
+			"owner_name": deploymentName,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query replicasets by deployment: %w", err)
 	}
@@ -107,9 +122,18 @@ func GetReplicaSetsByDeployment(ctx context.Context, deploymentName, namespace s
 // Empty uids deletes every ReplicaSet in the namespace.
 func PruneReplicaSets(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM replicasets WHERE namespace = $1`, namespace)
+		_, err := Pool.Exec(ctx,
+			`DELETE FROM replicasets WHERE namespace = @namespace`,
+			pgx.StrictNamedArgs{"namespace": namespace},
+		)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM replicasets WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM replicasets WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
+		pgx.StrictNamedArgs{
+			"namespace": namespace,
+			"uids":      uids,
+		},
+	)
 	return err
 }

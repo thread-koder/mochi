@@ -24,7 +24,10 @@ func UpsertDaemonSetsBatch(ctx context.Context, daemonsets []*DaemonSet) error {
 		INSERT INTO daemonsets (
 			name, namespace, uid, desired_number_scheduled, number_ready, number_available,
 			labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		) VALUES (
+			@name, @namespace, @uid, @desired_number_scheduled, @number_ready, @number_available,
+			@labels, @annotations, @created_at, @synced_at
+		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
 			namespace = EXCLUDED.namespace,
@@ -38,11 +41,18 @@ func UpsertDaemonSetsBatch(ctx context.Context, daemonsets []*DaemonSet) error {
 
 	batch := &pgx.Batch{}
 	for _, daemonset := range daemonsets {
-		batch.Queue(query,
-			daemonset.Name, daemonset.Namespace, daemonset.UID,
-			daemonset.DesiredNumberScheduled, daemonset.NumberReady, daemonset.NumberAvailable,
-			daemonset.Labels, daemonset.Annotations, daemonset.CreatedAt, daemonset.SyncedAt,
-		)
+		batch.Queue(query, pgx.StrictNamedArgs{
+			"name":                     daemonset.Name,
+			"namespace":                daemonset.Namespace,
+			"uid":                      daemonset.UID,
+			"desired_number_scheduled": daemonset.DesiredNumberScheduled,
+			"number_ready":             daemonset.NumberReady,
+			"number_available":         daemonset.NumberAvailable,
+			"labels":                   daemonset.Labels,
+			"annotations":              daemonset.Annotations,
+			"created_at":               daemonset.CreatedAt,
+			"synced_at":                daemonset.SyncedAt,
+		})
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -71,11 +81,13 @@ func GetDaemonSetsByNamespace(ctx context.Context, namespace string) ([]*DaemonS
 		SELECT id, name, namespace, uid, desired_number_scheduled, number_ready, number_available,
 		       labels, annotations, created_at, updated_at, synced_at
 		FROM daemonsets
-		WHERE namespace = $1
+		WHERE namespace = @namespace
 		ORDER BY name ASC
 	`
 
-	rows, err := Pool.Query(ctx, query, namespace)
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{"namespace": namespace},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query daemonsets by namespace: %w", err)
 	}
@@ -107,12 +119,17 @@ func GetDaemonSetByName(ctx context.Context, name string, namespace string) (*Da
 		SELECT id, name, namespace, uid, desired_number_scheduled, number_ready, number_available,
 		       labels, annotations, created_at, updated_at, synced_at
 		FROM daemonsets
-		WHERE name = $1 AND namespace = $2
+		WHERE name = @name AND namespace = @namespace
 		LIMIT 1
 	`
 
 	var ds DaemonSet
-	err := Pool.QueryRow(ctx, query, name, namespace).Scan(
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{
+			"name":      name,
+			"namespace": namespace,
+		},
+	).Scan(
 		&ds.ID, &ds.Name, &ds.Namespace, &ds.UID,
 		&ds.DesiredNumberScheduled, &ds.NumberReady, &ds.NumberAvailable,
 		&ds.Labels, &ds.Annotations,
@@ -132,9 +149,18 @@ func GetDaemonSetByName(ctx context.Context, name string, namespace string) (*Da
 // Empty uids deletes every DaemonSet in the namespace.
 func PruneDaemonSets(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM daemonsets WHERE namespace = $1`, namespace)
+		_, err := Pool.Exec(ctx,
+			`DELETE FROM daemonsets WHERE namespace = @namespace`,
+			pgx.StrictNamedArgs{"namespace": namespace},
+		)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM daemonsets WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM daemonsets WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
+		pgx.StrictNamedArgs{
+			"namespace": namespace,
+			"uids":      uids,
+		},
+	)
 	return err
 }

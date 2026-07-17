@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,13 +25,25 @@ func InsertComputeRecommendation(ctx context.Context, rec *ComputeRecommendation
 		INSERT INTO compute_recommendations (
 			id, workload_type, workload_name, namespace, recommendation_mode,
 			recommendations, status, analysis_time_range, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		) VALUES (
+			@id, @workload_type, @workload_name, @namespace, @recommendation_mode,
+			@recommendations, @status, @analysis_time_range, @created_at, @updated_at
+		)
 	`
 
 	_, err := Pool.Exec(ctx, query,
-		rec.ID, rec.WorkloadType, rec.WorkloadName, rec.Namespace, rec.RecommendationMode,
-		rec.Recommendations, rec.Status, rec.AnalysisTimeRange,
-		rec.CreatedAt, rec.UpdatedAt,
+		pgx.StrictNamedArgs{
+			"id":                  rec.ID,
+			"workload_type":       rec.WorkloadType,
+			"workload_name":       rec.WorkloadName,
+			"namespace":           rec.Namespace,
+			"recommendation_mode": rec.RecommendationMode,
+			"recommendations":     rec.Recommendations,
+			"status":              rec.Status,
+			"analysis_time_range": rec.AnalysisTimeRange,
+			"created_at":          rec.CreatedAt,
+			"updated_at":          rec.UpdatedAt,
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to execute insert compute recommendation: %w", err)
@@ -44,12 +57,14 @@ func GetComputeRecommendationByID(ctx context.Context, id uuid.UUID) (*ComputeRe
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
 		       recommendations, status, analysis_time_range, created_at, updated_at
 		FROM compute_recommendations
-		WHERE id = $1
+		WHERE id = @id
 	`
 
 	var rec ComputeRecommendation
 
-	err := Pool.QueryRow(ctx, query, id).Scan(
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{"id": id},
+	).Scan(
 		&rec.ID, &rec.WorkloadType, &rec.WorkloadName, &rec.Namespace,
 		&rec.RecommendationMode, &rec.Recommendations, &rec.Status,
 		&rec.AnalysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt,
@@ -69,14 +84,20 @@ func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadN
 		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
 		       recommendations, status, analysis_time_range, created_at, updated_at
 		FROM compute_recommendations
-		WHERE namespace = $1 AND workload_type = $2 AND workload_name = $3
+		WHERE namespace = @namespace AND workload_type = @workload_type AND workload_name = @workload_name
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
 
 	var rec ComputeRecommendation
 
-	err := Pool.QueryRow(ctx, query, namespace, workloadType, workloadName).Scan(
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{
+			"namespace":     namespace,
+			"workload_type": workloadType,
+			"workload_name": workloadName,
+		},
+	).Scan(
 		&rec.ID, &rec.WorkloadType, &rec.WorkloadName, &rec.Namespace,
 		&rec.RecommendationMode, &rec.Recommendations, &rec.Status,
 		&rec.AnalysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt,
@@ -93,42 +114,41 @@ func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadN
 
 func GetComputeRecommendations(ctx context.Context, namespace *string, status *string, mode *string, workloadType *string, workloadName *string, limit, offset int) ([]*ComputeRecommendation, int64, error) {
 	whereClause := "WHERE 1=1"
-	args := []any{}
-	argIndex := 1
+	args := pgx.StrictNamedArgs{}
 
 	if namespace != nil {
-		whereClause += fmt.Sprintf(" AND namespace = $%d", argIndex)
-		args = append(args, *namespace)
-		argIndex++
+		whereClause += " AND namespace = @namespace"
+		args["namespace"] = *namespace
 	}
 
 	if status != nil {
-		whereClause += fmt.Sprintf(" AND status = $%d", argIndex)
-		args = append(args, *status)
-		argIndex++
+		whereClause += " AND status = @status"
+		args["status"] = *status
 	}
 
 	if mode != nil {
-		whereClause += fmt.Sprintf(" AND recommendation_mode = $%d", argIndex)
-		args = append(args, *mode)
-		argIndex++
+		whereClause += " AND recommendation_mode = @recommendation_mode"
+		args["recommendation_mode"] = *mode
 	}
 
 	if workloadType != nil {
-		whereClause += fmt.Sprintf(" AND workload_type = $%d", argIndex)
-		args = append(args, *workloadType)
-		argIndex++
+		whereClause += " AND workload_type = @workload_type"
+		args["workload_type"] = *workloadType
 	}
 
 	if workloadName != nil {
-		whereClause += fmt.Sprintf(" AND workload_name ILIKE $%d", argIndex)
-		args = append(args, "%"+*workloadName+"%")
-		argIndex++
+		whereClause += " AND workload_name ILIKE @workload_name"
+		args["workload_name"] = "%" + *workloadName + "%"
 	}
 
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM compute_recommendations %s", whereClause)
 	var total int64
-	err := Pool.QueryRow(ctx, countQuery, args...).Scan(&total)
+	var err error
+	if len(args) == 0 {
+		err = Pool.QueryRow(ctx, countQuery).Scan(&total)
+	} else {
+		err = Pool.QueryRow(ctx, countQuery, args).Scan(&total)
+	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count compute recommendations: %w", err)
 	}
@@ -141,23 +161,25 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 		ORDER BY created_at DESC
 	`, whereClause)
 
-	selectArgs := make([]any, len(args))
-	copy(selectArgs, args)
-	selectArgIndex := argIndex
+	selectArgs := pgx.StrictNamedArgs{}
+	maps.Copy(selectArgs, args)
 
 	if limit > 0 {
-		selectQuery += fmt.Sprintf(" LIMIT $%d", selectArgIndex)
-		selectArgs = append(selectArgs, limit)
-		selectArgIndex++
+		selectQuery += " LIMIT @limit"
+		selectArgs["limit"] = limit
 	}
 
 	if offset > 0 {
-		selectQuery += fmt.Sprintf(" OFFSET $%d", selectArgIndex)
-		selectArgs = append(selectArgs, offset)
-		selectArgIndex++
+		selectQuery += " OFFSET @offset"
+		selectArgs["offset"] = offset
 	}
 
-	rows, err := Pool.Query(ctx, selectQuery, selectArgs...)
+	var rows pgx.Rows
+	if len(selectArgs) == 0 {
+		rows, err = Pool.Query(ctx, selectQuery)
+	} else {
+		rows, err = Pool.Query(ctx, selectQuery, selectArgs)
+	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query compute recommendations: %w", err)
 	}
@@ -189,11 +211,16 @@ func GetComputeRecommendations(ctx context.Context, namespace *string, status *s
 func UpdateComputeRecommendationStatus(ctx context.Context, id uuid.UUID, status string) error {
 	query := `
 		UPDATE compute_recommendations
-		SET status = $1, updated_at = NOW()
-		WHERE id = $2
+		SET status = @status, updated_at = NOW()
+		WHERE id = @id
 	`
 
-	result, err := Pool.Exec(ctx, query, status, id)
+	result, err := Pool.Exec(ctx, query,
+		pgx.StrictNamedArgs{
+			"status": status,
+			"id":     id,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("failed to execute update compute recommendation status: %w", err)
 	}
@@ -209,14 +236,21 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 	query := `
 		UPDATE compute_recommendations
 		SET status = 'superseded', updated_at = NOW()
-		WHERE workload_type = $1
-		  AND workload_name = $2
-		  AND namespace = $3
-		  AND id != $4
+		WHERE workload_type = @workload_type
+		  AND workload_name = @workload_name
+		  AND namespace = @namespace
+		  AND id != @id
 		  AND status != 'superseded'
 	`
 
-	_, err := Pool.Exec(ctx, query, workloadType, workloadName, namespace, excludeID)
+	_, err := Pool.Exec(ctx, query,
+		pgx.StrictNamedArgs{
+			"workload_type": workloadType,
+			"workload_name": workloadName,
+			"namespace":     namespace,
+			"id":            excludeID,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("failed to execute update compute recommendations: %w", err)
 	}
@@ -225,8 +259,10 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 }
 
 func DeleteComputeRecommendationsOlderThan(ctx context.Context, since time.Time) error {
-	query := `DELETE FROM compute_recommendations WHERE created_at < $1`
-	_, err := Pool.Exec(ctx, query, since)
+	query := `DELETE FROM compute_recommendations WHERE created_at < @created_at`
+	_, err := Pool.Exec(ctx, query,
+		pgx.StrictNamedArgs{"created_at": since},
+	)
 	return err
 }
 

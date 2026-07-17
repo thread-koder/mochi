@@ -24,7 +24,10 @@ func UpsertStatefulSetsBatch(ctx context.Context, statefulsets []*StatefulSet) e
 		INSERT INTO statefulsets (
 			name, namespace, uid, replicas, ready_replicas,
 			labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		) VALUES (
+			@name, @namespace, @uid, @replicas, @ready_replicas,
+			@labels, @annotations, @created_at, @synced_at
+		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
 			namespace = EXCLUDED.namespace,
@@ -37,11 +40,17 @@ func UpsertStatefulSetsBatch(ctx context.Context, statefulsets []*StatefulSet) e
 
 	batch := &pgx.Batch{}
 	for _, statefulset := range statefulsets {
-		batch.Queue(query,
-			statefulset.Name, statefulset.Namespace, statefulset.UID,
-			statefulset.Replicas, statefulset.ReadyReplicas,
-			statefulset.Labels, statefulset.Annotations, statefulset.CreatedAt, statefulset.SyncedAt,
-		)
+		batch.Queue(query, pgx.StrictNamedArgs{
+			"name":           statefulset.Name,
+			"namespace":      statefulset.Namespace,
+			"uid":            statefulset.UID,
+			"replicas":       statefulset.Replicas,
+			"ready_replicas": statefulset.ReadyReplicas,
+			"labels":         statefulset.Labels,
+			"annotations":    statefulset.Annotations,
+			"created_at":     statefulset.CreatedAt,
+			"synced_at":      statefulset.SyncedAt,
+		})
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -70,11 +79,13 @@ func GetStatefulSetsByNamespace(ctx context.Context, namespace string) ([]*State
 		SELECT id, name, namespace, uid, replicas, ready_replicas,
 		       labels, annotations, created_at, updated_at, synced_at
 		FROM statefulsets
-		WHERE namespace = $1
+		WHERE namespace = @namespace
 		ORDER BY name ASC
 	`
 
-	rows, err := Pool.Query(ctx, query, namespace)
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{"namespace": namespace},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query statefulsets by namespace: %w", err)
 	}
@@ -106,12 +117,17 @@ func GetStatefulSetByName(ctx context.Context, name string, namespace string) (*
 		SELECT id, name, namespace, uid, replicas, ready_replicas,
 		       labels, annotations, created_at, updated_at, synced_at
 		FROM statefulsets
-		WHERE name = $1 AND namespace = $2
+		WHERE name = @name AND namespace = @namespace
 		LIMIT 1
 	`
 
 	var sts StatefulSet
-	err := Pool.QueryRow(ctx, query, name, namespace).Scan(
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{
+			"name":      name,
+			"namespace": namespace,
+		},
+	).Scan(
 		&sts.ID, &sts.Name, &sts.Namespace, &sts.UID,
 		&sts.Replicas, &sts.ReadyReplicas,
 		&sts.Labels, &sts.Annotations,
@@ -131,9 +147,18 @@ func GetStatefulSetByName(ctx context.Context, name string, namespace string) (*
 // Empty uids deletes every StatefulSet in the namespace.
 func PruneStatefulSets(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM statefulsets WHERE namespace = $1`, namespace)
+		_, err := Pool.Exec(ctx,
+			`DELETE FROM statefulsets WHERE namespace = @namespace`,
+			pgx.StrictNamedArgs{"namespace": namespace},
+		)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM statefulsets WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM statefulsets WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
+		pgx.StrictNamedArgs{
+			"namespace": namespace,
+			"uids":      uids,
+		},
+	)
 	return err
 }

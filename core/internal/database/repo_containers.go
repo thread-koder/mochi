@@ -24,7 +24,9 @@ func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 			cpu_request, cpu_limit, memory_request, memory_limit,
 			created_at, synced_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+			@name, @pod_uid, @pod_name, @namespace, @image, @image_pull_policy, @ports,
+			@cpu_request, @cpu_limit, @memory_request, @memory_limit,
+			@created_at, @synced_at
 		)
 		ON CONFLICT (pod_uid, name) DO UPDATE SET
 			pod_name = EXCLUDED.pod_name,
@@ -41,12 +43,21 @@ func UpsertContainersBatch(ctx context.Context, containers []*Container) error {
 
 	batch := &pgx.Batch{}
 	for _, container := range containers {
-		batch.Queue(query,
-			container.Name, container.PodUID, container.PodName, container.Namespace,
-			container.Image, container.ImagePullPolicy, container.Ports,
-			container.CPURequest, container.CPULimit, container.MemoryRequest, container.MemoryLimit,
-			container.CreatedAt, container.SyncedAt,
-		)
+		batch.Queue(query, pgx.StrictNamedArgs{
+			"name":              container.Name,
+			"pod_uid":           container.PodUID,
+			"pod_name":          container.PodName,
+			"namespace":         container.Namespace,
+			"image":             container.Image,
+			"image_pull_policy": container.ImagePullPolicy,
+			"ports":             container.Ports,
+			"cpu_request":       container.CPURequest,
+			"cpu_limit":         container.CPULimit,
+			"memory_request":    container.MemoryRequest,
+			"memory_limit":      container.MemoryLimit,
+			"created_at":        container.CreatedAt,
+			"synced_at":         container.SyncedAt,
+		})
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -76,11 +87,13 @@ func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, er
 		       cpu_request, cpu_limit, memory_request, memory_limit,
 		       created_at, updated_at, synced_at
 		FROM containers
-		WHERE pod_uid = $1
+		WHERE pod_uid = @pod_uid
 		ORDER BY name
 	`
 
-	rows, err := Pool.Query(ctx, query, podUID)
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{"pod_uid": podUID},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query containers by pod UID: %w", err)
 	}
@@ -112,9 +125,18 @@ func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, er
 // Empty podUIDs deletes every container in the namespace.
 func PruneContainers(ctx context.Context, namespace string, podUIDs []string) error {
 	if len(podUIDs) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM containers WHERE namespace = $1`, namespace)
+		_, err := Pool.Exec(ctx,
+			`DELETE FROM containers WHERE namespace = @namespace`,
+			pgx.StrictNamedArgs{"namespace": namespace},
+		)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM containers WHERE namespace = $1 AND NOT (pod_uid = ANY($2::text[]))`, namespace, podUIDs)
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM containers WHERE namespace = @namespace AND NOT (pod_uid = ANY(@pod_uids::text[]))`,
+		pgx.StrictNamedArgs{
+			"namespace": namespace,
+			"pod_uids":  podUIDs,
+		},
+	)
 	return err
 }

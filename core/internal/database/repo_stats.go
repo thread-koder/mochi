@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func GetNamespaceCount(ctx context.Context) (int, error) {
@@ -42,8 +44,10 @@ func GetPodCount(ctx context.Context) (int, error) {
 
 func GetPodCountByNamespace(ctx context.Context, namespace string) (int, error) {
 	var count int
-	query := `SELECT COUNT(*) FROM pods WHERE namespace = $1`
-	err := Pool.QueryRow(ctx, query, namespace).Scan(&count)
+	query := `SELECT COUNT(*) FROM pods WHERE namespace = @namespace`
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{"namespace": namespace},
+	).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count pods by namespace: %w", err)
 	}
@@ -56,9 +60,11 @@ func GetContainerCountByNamespace(ctx context.Context, namespace string) (int, e
 		SELECT COUNT(*) 
 		FROM containers c
 		INNER JOIN pods p ON c.pod_uid = p.uid
-		WHERE p.namespace = $1
+		WHERE p.namespace = @namespace
 	`
-	err := Pool.QueryRow(ctx, query, namespace).Scan(&count)
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{"namespace": namespace},
+	).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count containers by namespace: %w", err)
 	}

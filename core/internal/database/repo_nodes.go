@@ -24,7 +24,9 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 			container_runtime_version, kubelet_version, cpu_capacity, memory_capacity,
 			cpu_allocatable, memory_allocatable, labels, annotations, conditions, created_at, synced_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+			@name, @uid, @internal_ip, @external_ip, @os_image, @kernel_version,
+			@container_runtime_version, @kubelet_version, @cpu_capacity, @memory_capacity,
+			@cpu_allocatable, @memory_allocatable, @labels, @annotations, @conditions, @created_at, @synced_at
 		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
@@ -46,12 +48,25 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 
 	batch := &pgx.Batch{}
 	for _, node := range nodes {
-		batch.Queue(query,
-			node.Name, node.UID, node.InternalIP, node.ExternalIP, node.OSImage,
-			node.KernelVersion, node.ContainerRuntimeVersion, node.KubeletVersion,
-			node.CPUCapacity, node.MemoryCapacity, node.CPUAllocatable, node.MemoryAllocatable,
-			node.Labels, node.Annotations, node.Conditions, node.CreatedAt, node.SyncedAt,
-		)
+		batch.Queue(query, pgx.StrictNamedArgs{
+			"name":                      node.Name,
+			"uid":                       node.UID,
+			"internal_ip":               node.InternalIP,
+			"external_ip":               node.ExternalIP,
+			"os_image":                  node.OSImage,
+			"kernel_version":            node.KernelVersion,
+			"container_runtime_version": node.ContainerRuntimeVersion,
+			"kubelet_version":           node.KubeletVersion,
+			"cpu_capacity":              node.CPUCapacity,
+			"memory_capacity":           node.MemoryCapacity,
+			"cpu_allocatable":           node.CPUAllocatable,
+			"memory_allocatable":        node.MemoryAllocatable,
+			"labels":                    node.Labels,
+			"annotations":               node.Annotations,
+			"conditions":                node.Conditions,
+			"created_at":                node.CreatedAt,
+			"synced_at":                 node.SyncedAt,
+		})
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -82,6 +97,9 @@ func PruneNodes(ctx context.Context, uids []string) error {
 		_, err := Pool.Exec(ctx, `DELETE FROM nodes`)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM nodes WHERE NOT (uid = ANY($1::text[]))`, uids)
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM nodes WHERE NOT (uid = ANY(@uids::text[]))`,
+		pgx.StrictNamedArgs{"uids": uids},
+	)
 	return err
 }

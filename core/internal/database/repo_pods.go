@@ -26,7 +26,8 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 			name, namespace, uid, node, phase, restart_policy,
 			labels, annotations, owner_kind, owner_name, created_at, synced_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+			@name, @namespace, @uid, @node, @phase, @restart_policy,
+			@labels, @annotations, @owner_kind, @owner_name, @created_at, @synced_at
 		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
@@ -43,11 +44,20 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 
 	batch := &pgx.Batch{}
 	for _, pod := range pods {
-		batch.Queue(query,
-			pod.Name, pod.Namespace, pod.UID, pod.Node, pod.Phase, pod.RestartPolicy,
-			pod.Labels, pod.Annotations, pod.OwnerKind, pod.OwnerName,
-			pod.CreatedAt, pod.SyncedAt,
-		)
+		batch.Queue(query, pgx.StrictNamedArgs{
+			"name":           pod.Name,
+			"namespace":      pod.Namespace,
+			"uid":            pod.UID,
+			"node":           pod.Node,
+			"phase":          pod.Phase,
+			"restart_policy": pod.RestartPolicy,
+			"labels":         pod.Labels,
+			"annotations":    pod.Annotations,
+			"owner_kind":     pod.OwnerKind,
+			"owner_name":     pod.OwnerName,
+			"created_at":     pod.CreatedAt,
+			"synced_at":      pod.SyncedAt,
+		})
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -77,12 +87,17 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
-		WHERE name = $1 AND namespace = $2
+		WHERE name = @name AND namespace = @namespace
 		LIMIT 1
 	`
 
 	var p Pod
-	err := Pool.QueryRow(ctx, query, name, namespace).Scan(
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{
+			"name":      name,
+			"namespace": namespace,
+		},
+	).Scan(
 		&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.Phase, &p.RestartPolicy,
 		&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
 		&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
@@ -109,11 +124,17 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
-		WHERE owner_kind = $1 AND owner_name = $2 AND namespace = $3
+		WHERE owner_kind = @owner_kind AND owner_name = @owner_name AND namespace = @namespace
 		ORDER BY name
 	`
 
-	rows, err := Pool.Query(ctx, query, workloadType, workloadName, namespace)
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{
+			"owner_kind": workloadType,
+			"owner_name": workloadName,
+			"namespace":  namespace,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query pods by workload: %w", err)
 	}
@@ -147,11 +168,13 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
-		WHERE namespace = $1 AND owner_kind IS NULL
+		WHERE namespace = @namespace AND owner_kind IS NULL
 		ORDER BY name
 	`
 
-	rows, err := Pool.Query(ctx, query, namespace)
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{"namespace": namespace},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query standalone pods by namespace: %w", err)
 	}
@@ -184,11 +207,16 @@ func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string)
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
-		WHERE namespace = $1 AND owner_kind = $2
+		WHERE namespace = @namespace AND owner_kind = @owner_kind
 		ORDER BY name
 	`
 
-	rows, err := Pool.Query(ctx, query, namespace, ownerKind)
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{
+			"namespace":  namespace,
+			"owner_kind": ownerKind,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query pods by owner kind: %w", err)
 	}
@@ -219,10 +247,19 @@ func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string)
 // Empty uids deletes every pod in the namespace.
 func PrunePods(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM pods WHERE namespace = $1`, namespace)
+		_, err := Pool.Exec(ctx,
+			`DELETE FROM pods WHERE namespace = @namespace`,
+			pgx.StrictNamedArgs{"namespace": namespace},
+		)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM pods WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM pods WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
+		pgx.StrictNamedArgs{
+			"namespace": namespace,
+			"uids":      uids,
+		},
+	)
 	return err
 }
 

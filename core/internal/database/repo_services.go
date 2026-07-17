@@ -22,7 +22,10 @@ func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 		INSERT INTO services (
 			name, namespace, uid, type, cluster_ip, ports, selector,
 			labels, annotations, created_at, synced_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		) VALUES (
+			@name, @namespace, @uid, @type, @cluster_ip, @ports, @selector,
+			@labels, @annotations, @created_at, @synced_at
+		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
 			namespace = EXCLUDED.namespace,
@@ -37,11 +40,19 @@ func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 
 	batch := &pgx.Batch{}
 	for _, service := range services {
-		batch.Queue(query,
-			service.Name, service.Namespace, service.UID, service.Type, service.ClusterIP,
-			service.Ports, service.Selector, service.Labels, service.Annotations,
-			service.CreatedAt, service.SyncedAt,
-		)
+		batch.Queue(query, pgx.StrictNamedArgs{
+			"name":        service.Name,
+			"namespace":   service.Namespace,
+			"uid":         service.UID,
+			"type":        service.Type,
+			"cluster_ip":  service.ClusterIP,
+			"ports":       service.Ports,
+			"selector":    service.Selector,
+			"labels":      service.Labels,
+			"annotations": service.Annotations,
+			"created_at":  service.CreatedAt,
+			"synced_at":   service.SyncedAt,
+		})
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -69,9 +80,18 @@ func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 // Empty uids deletes every service in the namespace.
 func PruneServices(ctx context.Context, namespace string, uids []string) error {
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM services WHERE namespace = $1`, namespace)
+		_, err := Pool.Exec(ctx,
+			`DELETE FROM services WHERE namespace = @namespace`,
+			pgx.StrictNamedArgs{"namespace": namespace},
+		)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM services WHERE namespace = $1 AND NOT (uid = ANY($2::text[]))`, namespace, uids)
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM services WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
+		pgx.StrictNamedArgs{
+			"namespace": namespace,
+			"uids":      uids,
+		},
+	)
 	return err
 }

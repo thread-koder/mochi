@@ -21,8 +21,11 @@ func UpsertNamespacesBatch(ctx context.Context, namespaces []*Namespace) error {
 	defer tx.Rollback(ctx)
 
 	query := `
-		INSERT INTO namespaces (name, uid, phase, labels, annotations, created_at, synced_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO namespaces (
+			name, uid, phase, labels, annotations, created_at, synced_at
+		) VALUES (
+			@name, @uid, @phase, @labels, @annotations, @created_at, @synced_at
+		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
 			phase = EXCLUDED.phase,
@@ -33,10 +36,15 @@ func UpsertNamespacesBatch(ctx context.Context, namespaces []*Namespace) error {
 
 	batch := &pgx.Batch{}
 	for _, namespace := range namespaces {
-		batch.Queue(query,
-			namespace.Name, namespace.UID, namespace.Phase,
-			namespace.Labels, namespace.Annotations, namespace.CreatedAt, namespace.SyncedAt,
-		)
+		batch.Queue(query, pgx.StrictNamedArgs{
+			"name":        namespace.Name,
+			"uid":         namespace.UID,
+			"phase":       namespace.Phase,
+			"labels":      namespace.Labels,
+			"annotations": namespace.Annotations,
+			"created_at":  namespace.CreatedAt,
+			"synced_at":   namespace.SyncedAt,
+		})
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -90,10 +98,12 @@ func GetNamespaces(ctx context.Context) ([]*Namespace, error) {
 }
 
 func GetNamespaceByName(ctx context.Context, name string) (*Namespace, error) {
-	query := `SELECT id, name, uid, phase, labels, annotations, created_at, updated_at, synced_at FROM namespaces WHERE name = $1 LIMIT 1`
+	query := `SELECT id, name, uid, phase, labels, annotations, created_at, updated_at, synced_at FROM namespaces WHERE name = @name LIMIT 1`
 
 	var ns Namespace
-	err := Pool.QueryRow(ctx, query, name).Scan(
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{"name": name},
+	).Scan(
 		&ns.ID, &ns.Name, &ns.UID, &ns.Phase,
 		&ns.Labels, &ns.Annotations,
 		&ns.CreatedAt, &ns.UpdatedAt, &ns.SyncedAt,
@@ -115,6 +125,9 @@ func PruneNamespaces(ctx context.Context, uids []string) error {
 		_, err := Pool.Exec(ctx, `DELETE FROM namespaces`)
 		return err
 	}
-	_, err := Pool.Exec(ctx, `DELETE FROM namespaces WHERE NOT (uid = ANY($1::text[]))`, uids)
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM namespaces WHERE NOT (uid = ANY(@uids::text[]))`,
+		pgx.StrictNamedArgs{"uids": uids},
+	)
 	return err
 }
