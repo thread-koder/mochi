@@ -48,30 +48,10 @@
         <h2 class="text-2xl font-bold font-heading mb-4">
           Resource Utilization
         </h2>
-        <div class="panel p-4">
-          <div class="space-y-6">
-            <div>
-              <h3 class="text-lg font-semibold font-heading mb-2 text-on-surface">
-                CPU Utilization Over Time
-              </h3>
-              <ComputeResourceChart
-                :data="analysis.time_series.cpu"
-                type="cpu"
-                title="CPU Utilization"
-              />
-            </div>
-            <div>
-              <h3 class="text-lg font-semibold font-heading mb-2 text-on-surface">
-                Memory Utilization Over Time
-              </h3>
-              <ComputeResourceChart
-                :data="analysis.time_series.memory"
-                type="memory"
-                title="Memory Utilization"
-              />
-            </div>
-          </div>
-        </div>
+        <ComputeUtilizationCharts
+          :cpu="analysis.time_series.cpu"
+          :memory="analysis.time_series.memory"
+        />
       </section>
 
       <NamespaceComputeWorkloadsBreakdown

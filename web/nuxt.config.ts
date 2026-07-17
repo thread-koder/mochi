@@ -63,8 +63,10 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
     optimizeDeps: {
       include: [
-        'chart.js',
-        'chartjs-adapter-date-fns',
+        'echarts/charts',
+        'echarts/components',
+        'echarts/core',
+        'echarts/renderers',
       ],
     },
   },

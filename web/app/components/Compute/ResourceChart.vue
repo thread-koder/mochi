@@ -1,234 +1,79 @@
 <template>
-  <div class="h-96 relative">
-    <canvas
-      ref="chartCanvas"
-      class="w-full h-full"
-    />
-  </div>
+  <div
+    ref="chartEl"
+    class="h-72 w-full relative"
+  />
 </template>
 
 <script setup lang="ts">
-import {
-  Chart,
-  LineController,
-  LineElement,
-  PointElement,
-  TimeScale,
-  LinearScale,
-  Decimation,
-  Legend,
-  Tooltip,
-  Filler,
-} from 'chart.js'
-import 'chartjs-adapter-date-fns'
-import { formatCPU } from '#shared/utils/compute/format'
-
-Chart.register(
-  LineController,
-  LineElement,
-  PointElement,
-  TimeScale,
-  LinearScale,
-  Decimation,
-  Legend,
-  Tooltip,
-  Filler,
-)
+import { init, type EChartsType } from 'echarts/core'
+import { buildLineChartOption } from '#shared/utils/compute/chart'
+import type { DataPoint } from '#shared/types/timeseries'
 
 const props = defineProps<{
-  data: Array<{ timestamp: string, value: number }>
+  data: DataPoint[]
   type: 'cpu' | 'memory'
   title: string
+  group?: string
 }>()
 
-const chartCanvas = ref<HTMLCanvasElement | null>(null)
-let chartInstance: Chart | null = null
+const emit = defineEmits<{
+  ready: []
+}>()
+
+const chartEl = ref<HTMLDivElement | null>(null)
+let chartInstance: EChartsType | null = null
 
 const initChart = () => {
-  if (!chartCanvas.value || !props.data || props.data.length === 0) {
-    return
+  if (!chartEl.value) return null
+
+  if (!chartInstance) {
+    chartInstance = init(chartEl.value, undefined, { renderer: 'canvas' })
+    if (props.group) {
+      chartInstance.group = props.group
+    }
+    emit('ready')
   }
 
-  if (chartInstance) {
-    chartInstance.destroy()
-    chartInstance = null
-  }
+  return chartInstance
+}
 
-  const ctx = chartCanvas.value.getContext('2d')
-  if (!ctx) return
+const renderChart = () => {
+  const chart = initChart()
+  if (!chart || !chartEl.value) return
 
-  // Convert to Chart.js format
-  const chartData = props.data.map(dp => ({
-    x: new Date(dp.timestamp).getTime(),
-    y: dp.value,
-  }))
-
-  const isCPU = props.type === 'cpu'
-  const maxValue = Math.max(...chartData.map(d => d.y))
-  const useMillicores = isCPU && maxValue < 1
-
-  // Add 10% padding to the maximum value
-  // Avoids using chart.js's "grace" feature, which can cause fill artifacts
-  const yMax = maxValue > 0 ? maxValue * 1.1 : 1
-
-  const borderColor = cssVariableColor('--color-primary-light')
-  const bgColor = cssVariableColor('--color-primary-light', 0.1)
-  const gridColor = cssVariableColor('--color-primary-light', 0.1)
-  const textColor = cssVariableColor('--color-on-surface-secondary')
-
-  const tooltipBgColor = cssVariableColor('--color-surface-elevated')
-  const tooltipBorderColor = cssVariableColor('--color-primary-light', 0.3)
-  const tooltipBodyColor = cssVariableColor('--color-on-surface')
-
-  chartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      datasets: [{
-        label: isCPU
-          ? (useMillicores ? 'CPU Utilization (millicores)' : 'CPU Utilization (cores)')
-          : 'Memory Utilization',
-        data: chartData,
-        parsing: false,
-        borderColor: borderColor,
-        backgroundColor: bgColor,
-        borderWidth: 2,
-        fill: true,
-        tension: 0.6,
-        pointRadius: 0,
-        pointHoverRadius: 5,
-        normalized: true,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      normalized: true,
-      parsing: false,
-      interaction: {
-        intersect: false,
-        mode: 'index',
-      },
-      plugins: {
-        decimation: {
-          enabled: true,
-          algorithm: 'lttb',
-          threshold: 300,
-        },
-        legend: {
-          labels: {
-            color: textColor,
-            font: { family: 'Inconsolata', size: 14 },
-          },
-        },
-        tooltip: {
-          backgroundColor: tooltipBgColor,
-          borderColor: tooltipBorderColor,
-          borderWidth: 1,
-          titleColor: textColor,
-          bodyColor: tooltipBodyColor,
-          titleFont: { family: 'Inconsolata', size: 14 },
-          bodyFont: { family: 'Inconsolata', size: 14 },
-          cornerRadius: 8,
-          padding: 12,
-          displayColors: true,
-          boxWidth: 12,
-          boxHeight: 12,
-          boxPadding: 2,
-          intersect: false,
-          mode: 'index',
-          callbacks: {
-            title: (context) => {
-              const xValue = context[0]?.parsed?.x
-              if (xValue === null || xValue === undefined) return ''
-              const timestamp = new Date(xValue)
-              return timestamp.toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-              })
-            },
-            label: (context) => {
-              const yValue = context.parsed.y
-              if (yValue === null || yValue === undefined) return 'N/A'
-              return isCPU
-                ? formatCPU(yValue)
-                : formatBytes(yValue)
-            },
-          },
-        },
-      },
-      scales: {
-        x: {
-          type: 'time',
-          time: {
-            minUnit: 'minute',
-            displayFormats: {
-              millisecond: 'HH:mm:ss.SSS',
-              second: 'HH:mm:ss',
-              minute: 'HH:mm',
-              hour: 'MMM d, HH:mm',
-              day: 'MMM d, HH:mm',
-              week: 'MMM d',
-              month: 'MMM yyyy',
-              quarter: 'MMM yyyy',
-              year: 'yyyy',
-            },
-          },
-          ticks: {
-            color: textColor,
-            font: { family: 'Inconsolata', size: 13 },
-            maxTicksLimit: 10,
-            maxRotation: 0,
-            autoSkip: true,
-          },
-          grid: { color: gridColor },
-        },
-        y: {
-          max: yMax,
-          ticks: {
-            color: textColor,
-            font: { family: 'Inconsolata', size: 13 },
-            callback: (value) => {
-              return isCPU ? formatCPU(value as number) : formatBytes(value as number)
-            },
-          },
-          grid: { color: gridColor },
-          title: {
-            display: true,
-            text: isCPU
-              ? (useMillicores ? 'CPU (millicores)' : 'CPU (cores)')
-              : 'Memory',
-            color: textColor,
-            font: { family: 'Inconsolata', size: 14 },
-          },
-        },
-      },
-    },
-  })
+  chart.setOption(buildLineChartOption({
+    type: props.type,
+    data: props.data,
+    title: props.title,
+    width: chartEl.value.clientWidth,
+  }), { notMerge: true })
 }
 
 watch(() => props.data, () => {
   nextTick(() => {
-    initChart()
+    renderChart()
   })
 }, { immediate: true })
 
-// We watch the color mode and re-initialize the chart if it changes
-// This is to ensure the chart is updated with the new color scheme
 const colorMode = useColorMode({ storageKey: 'mochi-theme' })
 watch(colorMode, () => {
   if (chartInstance) {
     nextTick(() => {
-      initChart()
+      renderChart()
     })
   }
 })
 
+useResizeObserver(chartEl, () => {
+  if (!chartInstance) return
+  chartInstance.resize()
+  renderChart()
+})
+
 onBeforeUnmount(() => {
   if (chartInstance) {
-    chartInstance.destroy()
+    chartInstance.dispose()
     chartInstance = null
   }
 })
