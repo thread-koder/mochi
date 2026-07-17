@@ -1,11 +1,9 @@
-type Direction = 'stable' | 'increasing' | 'decreasing'
-
-type Severity = 'low' | 'medium' | 'high'
-
-interface DataPoint {
-  value: number
-  timestamp: string
-}
+import type {
+  DataPoint,
+  StatsResult,
+  TrendResult,
+  AnomalyResult,
+} from '#shared/types/timeseries'
 
 interface TimeSeries {
   cpu: DataPoint[]
@@ -20,41 +18,6 @@ interface StabilityResult {
   memory_pressure: number
   restarts: number
   stability_score: number
-}
-
-interface PercentileResult {
-  p50: number
-  p95: number
-  p99: number
-}
-
-interface StatsResult {
-  mean: number
-  median: number
-  std_dev: number
-  min: number
-  max: number
-  percentile: PercentileResult
-}
-
-interface TrendResult {
-  direction: Direction
-  slope: number
-  strength: number
-}
-
-interface Anomaly {
-  value: number
-  timestamp: string
-  index: number
-  deviation: number
-  severity: Severity
-}
-
-interface AnomalyResult {
-  anomalies: Anomaly[]
-  anomaly_count: number
-  threshold: number
 }
 
 interface CPUUtilization {
