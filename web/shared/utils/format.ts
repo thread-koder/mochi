@@ -13,10 +13,14 @@ export const formatBytes = (value?: number | null): string => {
   }
 
   if (unitIndex === 0) {
-    return `${size} ${units[unitIndex]}`
+    return `${Math.round(size)} ${units[unitIndex]}`
   }
 
-  return `${size.toFixed(2)} ${units[unitIndex]}`
+  const display = size >= 10
+    ? Math.round(size).toString()
+    : Number.isInteger(size) ? size.toString() : size.toFixed(1)
+
+  return `${display} ${units[unitIndex]}`
 }
 
 export const formatPercentage = (value: number): string => {
