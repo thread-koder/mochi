@@ -1,7 +1,6 @@
 .PHONY: help \
 	core-build core-test core-clean core-run core-dev core-fmt core-lint core-deps core-deps-update \
 	web-deps web-dev web-build web-prepare web-clean web-lint \
-	docker-build docker-run \
 	dev-env-setup dev-env-clean dev-env-status \
 	test-workloads-setup test-workloads-clean
 
@@ -84,18 +83,6 @@ web-clean: ## Remove Nuxt build artifacts
 web-lint: ## Lint web code
 	@echo "Linting web..."
 	@cd $(WEB_DIR) && $(PNPM) lint
-
-# Docker
-docker-build: ## Build Docker image
-	@echo "Building Docker image..."
-	@docker build \
-		--build-arg VERSION=$(VERSION) \
-		--build-arg BUILD_TIME=$(BUILD_TIME) \
-		--build-arg GIT_COMMIT=$(GIT_COMMIT) \
-		-t $(BINARY_NAME):$(VERSION) .
-
-docker-run: docker-build ## Build and run Docker container
-	@docker run --rm $(BINARY_NAME):$(VERSION)
 
 # Development environment (minikube / Helm)
 dev-env-setup: ## Set up PostgreSQL, Prometheus, and Redis in minikube using Helm
