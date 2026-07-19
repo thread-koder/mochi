@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS pods (
     uid VARCHAR(255) NOT NULL UNIQUE,
     node VARCHAR(255) REFERENCES nodes(name) ON DELETE SET NULL,
     phase VARCHAR(50) NOT NULL,
-    restart_policy VARCHAR(50),
+    restart_policy VARCHAR(50) NOT NULL,
     labels JSONB,
     annotations JSONB,
     owner_kind VARCHAR(50),

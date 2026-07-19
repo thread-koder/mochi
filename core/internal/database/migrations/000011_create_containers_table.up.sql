@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS containers (
     pod_name VARCHAR(255) NOT NULL,
     namespace VARCHAR(255) NOT NULL REFERENCES namespaces(name) ON DELETE CASCADE,
     image VARCHAR(512) NOT NULL,
-    image_pull_policy VARCHAR(50),
+    image_pull_policy VARCHAR(50) NOT NULL,
     ports JSONB,
     cpu_request VARCHAR(50),
     cpu_limit VARCHAR(50),

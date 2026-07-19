@@ -141,7 +141,7 @@ type Pod struct {
 	UID           string          `db:"uid"`
 	Node          *string         `db:"node"`
 	Phase         string          `db:"phase"`
-	RestartPolicy *string         `db:"restart_policy"`
+	RestartPolicy string          `db:"restart_policy"`
 	Labels        json.RawMessage `db:"labels"`
 	Annotations   json.RawMessage `db:"annotations"`
 	OwnerKind     *string         `db:"owner_kind"`
@@ -158,7 +158,7 @@ type Container struct {
 	PodName         string          `db:"pod_name"`
 	Namespace       string          `db:"namespace"`
 	Image           string          `db:"image"`
-	ImagePullPolicy *string         `db:"image_pull_policy"`
+	ImagePullPolicy string          `db:"image_pull_policy"`
 	Ports           json.RawMessage `db:"ports"`
 	CPURequest      *string         `db:"cpu_request"`
 	CPULimit        *string         `db:"cpu_limit"`
