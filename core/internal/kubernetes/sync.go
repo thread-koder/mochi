@@ -24,22 +24,17 @@ func SyncResources(ctx context.Context, workerCfg *config.WorkerConfig) {
 		log.Warn().Err(err).Msg("Failed to sync cluster nodes")
 	}
 
-	namespaces, err := Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	syncedNames, err := syncNamespaces(ctx, workerCfg)
 	if err != nil {
-		log.Warn().Err(err).Msg("Failed to list cluster namespaces")
-	} else if err := syncNamespaces(ctx, namespaces, workerCfg); err != nil {
 		log.Warn().Err(err).Msg("Failed to sync cluster namespaces")
 	}
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(namespaceSyncConcurrency)
 
-	for _, ns := range namespaces.Items {
-		if !workerCfg.ShouldSyncNamespace(ns.Name) {
-			continue
-		}
+	for _, name := range syncedNames {
 		g.Go(func() error {
-			syncNamespace(gctx, ns.Name)
+			syncNamespace(gctx, name)
 			return nil
 		})
 	}
@@ -124,12 +119,18 @@ func syncNodes(ctx context.Context) error {
 	return nil
 }
 
-func syncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList, workerCfg *config.WorkerConfig) error {
+func syncNamespaces(ctx context.Context, workerCfg *config.WorkerConfig) ([]string, error) {
 	log := logger.WithComponent("kubernetes")
 	start := time.Now()
 	log.Info().Msg("Syncing cluster namespaces...")
 
+	namespaces, err := Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list cluster namespaces: %w", err)
+	}
+
 	dbNamespaces := make([]*database.Namespace, 0, len(namespaces.Items))
+	syncedNames := make([]string, 0, len(namespaces.Items))
 	now := time.Now()
 
 	nsUIDs := make([]string, 0, len(namespaces.Items))
@@ -153,10 +154,11 @@ func syncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList, worke
 		}
 
 		dbNamespaces = append(dbNamespaces, dbNamespace)
+		syncedNames = append(syncedNames, ns.Name)
 	}
 
 	if err := database.UpsertNamespacesBatch(ctx, dbNamespaces); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := database.PruneNamespaces(ctx, nsUIDs); err != nil {
@@ -165,7 +167,7 @@ func syncNamespaces(ctx context.Context, namespaces *corev1.NamespaceList, worke
 	log.Info().
 		Str("duration", time.Since(start).Round(time.Millisecond).String()).
 		Msg("Cluster namespaces synced")
-	return nil
+	return syncedNames, nil
 }
 
 func syncNamespace(ctx context.Context, namespace string) {
@@ -244,6 +246,8 @@ func syncDeployments(ctx context.Context, namespace string) error {
 
 	if err := database.PruneDeployments(ctx, namespace, depUIDs); err != nil {
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune deployments not in current state")
+	} else if err := database.PruneComputeRecommendations(ctx, namespace, "Deployment"); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune compute recommendations for deleted deployments")
 	}
 	return nil
 }
@@ -353,6 +357,8 @@ func syncStatefulSets(ctx context.Context, namespace string) error {
 
 	if err := database.PruneStatefulSets(ctx, namespace, stsUIDs); err != nil {
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune statefulsets not in current state")
+	} else if err := database.PruneComputeRecommendations(ctx, namespace, "StatefulSet"); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune compute recommendations for deleted statefulsets")
 	}
 	return nil
 }
@@ -397,6 +403,8 @@ func syncDaemonSets(ctx context.Context, namespace string) error {
 
 	if err := database.PruneDaemonSets(ctx, namespace, dsUIDs); err != nil {
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune daemonsets not in current state")
+	} else if err := database.PruneComputeRecommendations(ctx, namespace, "DaemonSet"); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune compute recommendations for deleted daemonsets")
 	}
 	return nil
 }
@@ -540,7 +548,7 @@ func syncPods(ctx context.Context, namespace string) error {
 			UID:           podUID,
 			Node:          node,
 			Phase:         string(pod.Status.Phase),
-			RestartPolicy: optionalString(string(pod.Spec.RestartPolicy)),
+			RestartPolicy: string(pod.Spec.RestartPolicy),
 			Labels:        labelsJSON,
 			Annotations:   annotationsJSON,
 			OwnerKind:     ownerKind,
@@ -558,6 +566,8 @@ func syncPods(ctx context.Context, namespace string) error {
 
 	if err := database.PrunePods(ctx, namespace, podUIDs); err != nil {
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune pods not in current state")
+	} else if err := database.PruneComputeRecommendations(ctx, namespace, "Pod"); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune compute recommendations for deleted pods")
 	}
 	return nil
 }
@@ -608,7 +618,7 @@ func syncContainers(ctx context.Context, namespace string) error {
 				PodName:         podName,
 				Namespace:       namespace,
 				Image:           container.Image,
-				ImagePullPolicy: optionalString(string(container.ImagePullPolicy)),
+				ImagePullPolicy: string(container.ImagePullPolicy),
 				Ports:           portsJSON,
 				CPURequest:      cpuRequest,
 				CPULimit:        cpuLimit,

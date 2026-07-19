@@ -209,7 +209,12 @@ func GetLatestRecommendation(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	recommendation, err := database.GetLatestComputeRecommendation(ctx, workloadType, workloadName, namespace)
+	recommendation, err := database.GetLatestComputeRecommendation(
+		ctx,
+		workloadType,
+		workloadName,
+		namespace,
+	)
 	if err != nil {
 		c.Error(err)
 		if errors.Is(err, &apperrors.NotFoundError{}) {
@@ -266,7 +271,8 @@ func ApplyRecommendation(c *gin.Context) {
 			return
 		}
 
-		if bodyRec.WorkloadType == "" || bodyRec.WorkloadName == "" || bodyRec.Namespace == "" || bodyRec.AnalysisTimeRange == "" || bodyRec.RecommendationMode == "" {
+		if bodyRec.WorkloadType == "" || bodyRec.WorkloadName == "" || bodyRec.Namespace == "" ||
+			bodyRec.AnalysisTimeRange == "" || bodyRec.RecommendationMode == "" {
 			err = fmt.Errorf("workload_type, workload_name, namespace, analysis_time_range, and recommendation_mode are required")
 			c.Error(err)
 			common.WriteValidationError(c, "missing_required_fields", "workload_type, workload_name, namespace, analysis_time_range, and recommendation_mode are required.")
@@ -305,9 +311,15 @@ func ApplyRecommendation(c *gin.Context) {
 		return
 	}
 
-	if err := database.MarkRecommendationsSuperseded(ctx, recommendation.WorkloadType, recommendation.WorkloadName, recommendation.Namespace, id); err != nil {
+	if err := database.SupersedeComputeRecommendations(
+		ctx,
+		recommendation.WorkloadType,
+		recommendation.WorkloadName,
+		recommendation.Namespace,
+		id,
+	); err != nil {
 		c.Error(err)
-		common.WriteInternalError(c, "Failed to mark superseded recommendations.")
+		common.WriteInternalError(c, "Failed to supersede recommendations.")
 		return
 	}
 

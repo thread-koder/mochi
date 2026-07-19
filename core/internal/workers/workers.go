@@ -118,12 +118,11 @@ func (w *ResourceSyncWorker) cleanup(ctx context.Context) {
 	since := time.Now().Add(-w.cfg.RetentionDuration())
 
 	log.Info().Msg("Starting cleanup tasks...")
-	if err := database.DeleteComputeRecommendationsOlderThan(ctx, since); err != nil {
+
+	if err := database.PruneExpiredComputeRecommendations(ctx, since); err != nil {
 		log.Warn().Err(err).Str("task", "compute_recommendations_retention").Msg("Cleanup task failed")
 	}
-	if err := database.DeleteComputeRecommendationsForDeletedWorkloads(ctx); err != nil {
-		log.Warn().Err(err).Str("task", "compute_recommendations_deleted_workloads").Msg("Cleanup task failed")
-	}
+
 	if err := ctx.Err(); err != nil {
 		log.Warn().Err(err).Msg("Cleanup tasks ended before completion")
 	} else {

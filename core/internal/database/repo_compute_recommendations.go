@@ -232,7 +232,7 @@ func UpdateComputeRecommendationStatus(ctx context.Context, id uuid.UUID, status
 	return nil
 }
 
-func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadName, namespace string, excludeID uuid.UUID) error {
+func SupersedeComputeRecommendations(ctx context.Context, workloadType, workloadName, namespace string, excludeID uuid.UUID) error {
 	query := `
 		UPDATE compute_recommendations
 		SET status = 'superseded', updated_at = NOW()
@@ -258,7 +258,7 @@ func MarkRecommendationsSuperseded(ctx context.Context, workloadType, workloadNa
 	return nil
 }
 
-func DeleteComputeRecommendationsOlderThan(ctx context.Context, since time.Time) error {
+func PruneExpiredComputeRecommendations(ctx context.Context, since time.Time) error {
 	query := `DELETE FROM compute_recommendations WHERE created_at < @created_at`
 	_, err := Pool.Exec(ctx, query,
 		pgx.StrictNamedArgs{"created_at": since},
@@ -266,32 +266,43 @@ func DeleteComputeRecommendationsOlderThan(ctx context.Context, since time.Time)
 	return err
 }
 
-func DeleteComputeRecommendationsForDeletedWorkloads(ctx context.Context) error {
-	query := `
-		DELETE FROM compute_recommendations cr
-		WHERE NOT EXISTS (
+// PruneComputeRecommendations deletes recommendations whose matching workload row is gone.
+func PruneComputeRecommendations(ctx context.Context, namespace, workloadType string) error {
+	var existsClause string
+	switch workloadType {
+	case "Deployment":
+		existsClause = `
 			SELECT 1 FROM deployments d
-			WHERE d.namespace = cr.namespace AND d.name = cr.workload_name
-			AND cr.workload_type = 'Deployment'
-		)
-		AND NOT EXISTS (
+			WHERE d.namespace = cr.namespace AND d.name = cr.workload_name`
+	case "StatefulSet":
+		existsClause = `
 			SELECT 1 FROM statefulsets s
-			WHERE s.namespace = cr.namespace AND s.name = cr.workload_name
-			AND cr.workload_type = 'StatefulSet'
-		)
-		AND NOT EXISTS (
+			WHERE s.namespace = cr.namespace AND s.name = cr.workload_name`
+	case "DaemonSet":
+		existsClause = `
 			SELECT 1 FROM daemonsets ds
-			WHERE ds.namespace = cr.namespace AND ds.name = cr.workload_name
-			AND cr.workload_type = 'DaemonSet'
-		)
-		AND NOT EXISTS (
+			WHERE ds.namespace = cr.namespace AND ds.name = cr.workload_name`
+	case "Pod":
+		existsClause = `
 			SELECT 1 FROM pods p
 			WHERE p.namespace = cr.namespace AND p.name = cr.workload_name
-			AND cr.workload_type = 'Pod'
-			AND (p.owner_kind IS NULL OR p.owner_name IS NULL)
-		)
-	`
+			AND (p.owner_kind IS NULL OR p.owner_name IS NULL)`
+	default:
+		return fmt.Errorf("unsupported workload type for prune compute recommendations: %s", workloadType)
+	}
 
-	_, err := Pool.Exec(ctx, query)
+	query := fmt.Sprintf(`
+		DELETE FROM compute_recommendations cr
+		WHERE cr.namespace = @namespace
+		  AND cr.workload_type = @workload_type
+		  AND NOT EXISTS (%s)
+	`, existsClause)
+
+	_, err := Pool.Exec(ctx, query,
+		pgx.StrictNamedArgs{
+			"namespace":     namespace,
+			"workload_type": workloadType,
+		},
+	)
 	return err
 }
