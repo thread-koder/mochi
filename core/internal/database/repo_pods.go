@@ -23,16 +23,17 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 
 	query := `
 		INSERT INTO pods (
-			name, namespace, uid, node, phase, restart_policy,
+			name, namespace, uid, node, pod_ip, phase, restart_policy,
 			labels, annotations, owner_kind, owner_name, created_at, synced_at
 		) VALUES (
-			@name, @namespace, @uid, @node, @phase, @restart_policy,
+			@name, @namespace, @uid, @node, @pod_ip, @phase, @restart_policy,
 			@labels, @annotations, @owner_kind, @owner_name, @created_at, @synced_at
 		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
 			namespace = EXCLUDED.namespace,
 			node = EXCLUDED.node,
+			pod_ip = EXCLUDED.pod_ip,
 			phase = EXCLUDED.phase,
 			restart_policy = EXCLUDED.restart_policy,
 			labels = EXCLUDED.labels,
@@ -49,6 +50,7 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 			"namespace":      pod.Namespace,
 			"uid":            pod.UID,
 			"node":           pod.Node,
+			"pod_ip":         pod.PodIP,
 			"phase":          pod.Phase,
 			"restart_policy": pod.RestartPolicy,
 			"labels":         pod.Labels,
@@ -83,7 +85,7 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 
 func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, error) {
 	query := `
-		SELECT id, name, namespace, uid, node, phase, restart_policy,
+		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
@@ -98,7 +100,7 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 			"namespace": namespace,
 		},
 	).Scan(
-		&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.Phase, &p.RestartPolicy,
+		&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
 		&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
 		&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 	)
@@ -112,6 +114,45 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 	return &p, nil
 }
 
+func GetPodsByIP(ctx context.Context, ip string) ([]*Pod, error) {
+	query := `
+		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
+		       labels, annotations, owner_kind, owner_name,
+		       created_at, updated_at, synced_at
+		FROM pods
+		WHERE pod_ip = @pod_ip
+		ORDER BY namespace, name
+	`
+
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{"pod_ip": ip},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query pods by IP: %w", err)
+	}
+	defer rows.Close()
+
+	pods := make([]*Pod, 0)
+	for rows.Next() {
+		var p Pod
+		err := rows.Scan(
+			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
+			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan pod: %w", err)
+		}
+		pods = append(pods, &p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate pods: %w", err)
+	}
+
+	return pods, nil
+}
+
 // GetPodsByWorkload returns the pods for a workload. Deployment is special: pods are owned by
 // ReplicaSets, so we walk RS -> Pod. Other kinds query owner_kind/owner_name directly.
 func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName string, namespace string) ([]*Pod, error) {
@@ -120,7 +161,7 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 	}
 
 	query := `
-		SELECT id, name, namespace, uid, node, phase, restart_policy,
+		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
@@ -144,7 +185,7 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 	for rows.Next() {
 		var p Pod
 		err := rows.Scan(
-			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.Phase, &p.RestartPolicy,
+			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
 			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
 			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 		)
@@ -164,7 +205,7 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 // GetStandalonePodsByNamespace returns the pods that are not owned by a workload controller.
 func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod, error) {
 	query := `
-		SELECT id, name, namespace, uid, node, phase, restart_policy,
+		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
@@ -184,7 +225,7 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 	for rows.Next() {
 		var p Pod
 		err := rows.Scan(
-			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.Phase, &p.RestartPolicy,
+			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
 			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
 			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 		)
@@ -203,7 +244,7 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 
 func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string) ([]*Pod, error) {
 	query := `
-		SELECT id, name, namespace, uid, node, phase, restart_policy,
+		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
 		       labels, annotations, owner_kind, owner_name,
 		       created_at, updated_at, synced_at
 		FROM pods
@@ -226,7 +267,7 @@ func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string)
 	for rows.Next() {
 		var p Pod
 		err := rows.Scan(
-			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.Phase, &p.RestartPolicy,
+			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
 			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
 			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 		)

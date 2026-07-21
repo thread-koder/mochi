@@ -140,6 +140,7 @@ type Pod struct {
 	Namespace     string          `db:"namespace"`
 	UID           string          `db:"uid"`
 	Node          *string         `db:"node"`
+	PodIP         *string         `db:"pod_ip"`
 	Phase         string          `db:"phase"`
 	RestartPolicy string          `db:"restart_policy"`
 	Labels        json.RawMessage `db:"labels"`

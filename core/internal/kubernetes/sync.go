@@ -537,16 +537,12 @@ func syncPods(ctx context.Context, namespace string) error {
 			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Deployment).
 		}
 
-		var node *string
-		if pod.Spec.NodeName != "" {
-			node = new(pod.Spec.NodeName)
-		}
-
 		dbPod := &database.Pod{
 			Name:          pod.Name,
 			Namespace:     pod.Namespace,
 			UID:           podUID,
-			Node:          node,
+			Node:          optionalString(pod.Spec.NodeName),
+			PodIP:         optionalString(pod.Status.PodIP),
 			Phase:         string(pod.Status.Phase),
 			RestartPolicy: string(pod.Spec.RestartPolicy),
 			Labels:        labelsJSON,
