@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-func QueryWorkloadDiskReadBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryWorkloadDiskReadBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildWorkloadDiskReadBytesQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -15,7 +15,7 @@ func QueryWorkloadDiskReadBytesRange(ctx context.Context, r v1.Range, opts Query
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryWorkloadDiskWriteBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryWorkloadDiskWriteBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildWorkloadDiskWriteBytesQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -23,7 +23,7 @@ func QueryWorkloadDiskWriteBytesRange(ctx context.Context, r v1.Range, opts Quer
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryWorkloadDiskReadOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryWorkloadDiskReadOps(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildWorkloadDiskReadOpsQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -31,7 +31,7 @@ func QueryWorkloadDiskReadOpsRange(ctx context.Context, r v1.Range, opts QueryOp
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryWorkloadDiskWriteOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryWorkloadDiskWriteOps(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildWorkloadDiskWriteOpsQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -39,7 +39,7 @@ func QueryWorkloadDiskWriteOpsRange(ctx context.Context, r v1.Range, opts QueryO
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceDiskReadBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryNamespaceDiskReadBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceDiskReadBytesQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -47,7 +47,7 @@ func QueryNamespaceDiskReadBytesRange(ctx context.Context, r v1.Range, opts Quer
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceDiskWriteBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryNamespaceDiskWriteBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceDiskWriteBytesQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -55,7 +55,7 @@ func QueryNamespaceDiskWriteBytesRange(ctx context.Context, r v1.Range, opts Que
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceDiskReadOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryNamespaceDiskReadOps(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceDiskReadOpsQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -63,7 +63,7 @@ func QueryNamespaceDiskReadOpsRange(ctx context.Context, r v1.Range, opts QueryO
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceDiskWriteOpsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryNamespaceDiskWriteOps(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceDiskWriteOpsQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err

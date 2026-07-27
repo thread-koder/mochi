@@ -55,7 +55,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadCPURange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadCPUUsage(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU metrics: %w", err)
 		}
@@ -64,7 +64,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadMemoryRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadMemoryUsage(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query memory metrics: %w", err)
 		}
@@ -73,7 +73,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query network receive metrics: %w", err)
 		}
@@ -82,7 +82,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query network transmit metrics: %w", err)
 		}
@@ -91,7 +91,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadDiskReadBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadDiskReadBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query disk read metrics: %w", err)
 		}
@@ -100,7 +100,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadDiskWriteBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadDiskWriteBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query disk write metrics: %w", err)
 		}

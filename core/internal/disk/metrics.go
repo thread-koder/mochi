@@ -45,7 +45,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadDiskReadBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadDiskReadBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query read bytes metrics: %w", err)
 		}
@@ -54,7 +54,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadDiskWriteBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadDiskWriteBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query write bytes metrics: %w", err)
 		}
@@ -63,7 +63,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadDiskReadOpsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadDiskReadOps(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query read ops metrics: %w", err)
 		}
@@ -72,7 +72,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadDiskWriteOpsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadDiskWriteOps(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query write ops metrics: %w", err)
 		}
@@ -125,7 +125,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadDiskReadBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadDiskReadBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query read bytes metrics: %w", err)
 		}
@@ -134,7 +134,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadDiskWriteBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadDiskWriteBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query write bytes metrics: %w", err)
 		}
@@ -143,7 +143,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadDiskReadOpsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadDiskReadOps(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query read ops metrics: %w", err)
 		}
@@ -152,7 +152,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadDiskWriteOpsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadDiskWriteOps(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query write ops metrics: %w", err)
 		}
@@ -196,7 +196,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceDiskReadBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceDiskReadBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query read bytes metrics: %w", err)
 		}
@@ -205,7 +205,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceDiskWriteBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceDiskWriteBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query write bytes metrics: %w", err)
 		}
@@ -214,7 +214,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceDiskReadOpsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceDiskReadOps(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query read ops metrics: %w", err)
 		}
@@ -223,7 +223,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceDiskWriteOpsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceDiskWriteOps(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query write ops metrics: %w", err)
 		}

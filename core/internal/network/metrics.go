@@ -49,7 +49,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive bytes metrics: %w", err)
 		}
@@ -58,7 +58,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit bytes metrics: %w", err)
 		}
@@ -67,7 +67,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveErrorsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveErrors(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive errors metrics: %w", err)
 		}
@@ -76,7 +76,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitErrorsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitErrors(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit errors metrics: %w", err)
 		}
@@ -85,7 +85,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveDroppedRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveDropped(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive dropped metrics: %w", err)
 		}
@@ -94,7 +94,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitDroppedRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitDropped(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit dropped metrics: %w", err)
 		}
@@ -151,7 +151,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive bytes metrics: %w", err)
 		}
@@ -160,7 +160,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit bytes metrics: %w", err)
 		}
@@ -169,7 +169,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveErrorsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveErrors(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive errors metrics: %w", err)
 		}
@@ -178,7 +178,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitErrorsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitErrors(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit errors metrics: %w", err)
 		}
@@ -187,7 +187,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveDroppedRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkReceiveDropped(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive dropped metrics: %w", err)
 		}
@@ -196,7 +196,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitDroppedRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadNetworkTransmitDropped(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit dropped metrics: %w", err)
 		}
@@ -244,7 +244,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceNetworkReceiveBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceNetworkReceiveBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive bytes metrics: %w", err)
 		}
@@ -253,7 +253,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceNetworkTransmitBytesRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceNetworkTransmitBytes(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit bytes metrics: %w", err)
 		}
@@ -262,7 +262,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceNetworkReceiveErrorsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceNetworkReceiveErrors(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive errors metrics: %w", err)
 		}
@@ -271,7 +271,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceNetworkTransmitErrorsRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceNetworkTransmitErrors(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit errors metrics: %w", err)
 		}
@@ -280,7 +280,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceNetworkReceiveDroppedRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceNetworkReceiveDropped(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query receive dropped metrics: %w", err)
 		}
@@ -289,7 +289,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceNetworkTransmitDroppedRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceNetworkTransmitDropped(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query transmit dropped metrics: %w", err)
 		}

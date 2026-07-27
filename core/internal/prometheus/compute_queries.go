@@ -8,16 +8,16 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-func QueryWorkloadCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildWorkloadCPUQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
+func QueryWorkloadCPUUsage(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadCPUUsageQuery(opts.Namespace, opts.Pods, opts.Container, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryWorkloadMemoryRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildWorkloadMemoryQuery(opts.Namespace, opts.Pods, opts.Container)
+func QueryWorkloadMemoryUsage(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildWorkloadMemoryUsageQuery(opts.Namespace, opts.Pods, opts.Container)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -72,16 +72,16 @@ func QueryWorkloadRestarts(ctx context.Context, timeRange time.Duration, opts Qu
 	return executeScalarQuery(ctx, query, time.Now())
 }
 
-func QueryNamespaceCPURange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildNamespaceCPUQuery(opts.Namespace, opts.RangeDuration)
+func QueryNamespaceCPUUsage(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildNamespaceCPUUsageQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
 	}
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceMemoryRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	query, err := BuildNamespaceMemoryQuery(opts.Namespace)
+func QueryNamespaceMemoryUsage(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+	query, err := BuildNamespaceMemoryUsageQuery(opts.Namespace)
 	if err != nil {
 		return nil, nil, err
 	}

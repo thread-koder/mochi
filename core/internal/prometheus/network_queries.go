@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-func QueryWorkloadNetworkReceiveBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryWorkloadNetworkReceiveBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildWorkloadNetworkReceiveBytesQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -15,7 +15,7 @@ func QueryWorkloadNetworkReceiveBytesRange(ctx context.Context, r v1.Range, opts
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryWorkloadNetworkTransmitBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryWorkloadNetworkTransmitBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildWorkloadNetworkTransmitBytesQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -23,7 +23,7 @@ func QueryWorkloadNetworkTransmitBytesRange(ctx context.Context, r v1.Range, opt
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryWorkloadNetworkReceiveErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryWorkloadNetworkReceiveErrors(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildWorkloadNetworkReceiveErrorsQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -31,7 +31,7 @@ func QueryWorkloadNetworkReceiveErrorsRange(ctx context.Context, r v1.Range, opt
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryWorkloadNetworkTransmitErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryWorkloadNetworkTransmitErrors(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildWorkloadNetworkTransmitErrorsQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -39,7 +39,7 @@ func QueryWorkloadNetworkTransmitErrorsRange(ctx context.Context, r v1.Range, op
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryWorkloadNetworkReceiveDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryWorkloadNetworkReceiveDropped(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildWorkloadNetworkReceiveDroppedQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -47,7 +47,7 @@ func QueryWorkloadNetworkReceiveDroppedRange(ctx context.Context, r v1.Range, op
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryWorkloadNetworkTransmitDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryWorkloadNetworkTransmitDropped(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildWorkloadNetworkTransmitDroppedQuery(opts.Namespace, opts.Pods, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -55,7 +55,7 @@ func QueryWorkloadNetworkTransmitDroppedRange(ctx context.Context, r v1.Range, o
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceNetworkReceiveBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryNamespaceNetworkReceiveBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkReceiveBytesQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -63,7 +63,7 @@ func QueryNamespaceNetworkReceiveBytesRange(ctx context.Context, r v1.Range, opt
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceNetworkTransmitBytesRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryNamespaceNetworkTransmitBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkTransmitBytesQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -71,7 +71,7 @@ func QueryNamespaceNetworkTransmitBytesRange(ctx context.Context, r v1.Range, op
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceNetworkReceiveErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryNamespaceNetworkReceiveErrors(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkReceiveErrorsQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -79,7 +79,7 @@ func QueryNamespaceNetworkReceiveErrorsRange(ctx context.Context, r v1.Range, op
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceNetworkTransmitErrorsRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryNamespaceNetworkTransmitErrors(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkTransmitErrorsQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -87,7 +87,7 @@ func QueryNamespaceNetworkTransmitErrorsRange(ctx context.Context, r v1.Range, o
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceNetworkReceiveDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryNamespaceNetworkReceiveDropped(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkReceiveDroppedQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err
@@ -95,7 +95,7 @@ func QueryNamespaceNetworkReceiveDroppedRange(ctx context.Context, r v1.Range, o
 	return executeMatrixQuery(ctx, query, r, opts)
 }
 
-func QueryNamespaceNetworkTransmitDroppedRange(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
+func QueryNamespaceNetworkTransmitDropped(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
 	query, err := BuildNamespaceNetworkTransmitDroppedQuery(opts.Namespace, opts.RangeDuration)
 	if err != nil {
 		return nil, nil, err

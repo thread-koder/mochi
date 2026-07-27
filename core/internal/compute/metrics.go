@@ -54,7 +54,7 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadCPURange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadCPUUsage(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU metrics: %w", err)
 		}
@@ -63,7 +63,7 @@ func fetchContainerMetrics(ctx context.Context, container *database.Container, o
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadMemoryRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadMemoryUsage(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query memory metrics: %w", err)
 		}
@@ -170,7 +170,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadCPURange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadCPUUsage(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU metrics: %w", err)
 		}
@@ -179,7 +179,7 @@ func fetchPodMetrics(ctx context.Context, pod *database.Pod, opts AnalysisOption
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadMemoryRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadMemoryUsage(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query memory metrics: %w", err)
 		}
@@ -294,7 +294,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadCPURange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadCPUUsage(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU metrics: %w", err)
 		}
@@ -303,7 +303,7 @@ func fetchWorkloadMetrics(ctx context.Context, pods []*database.Pod, opts Analys
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryWorkloadMemoryRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryWorkloadMemoryUsage(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query memory metrics: %w", err)
 		}
@@ -409,7 +409,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	g, gctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceCPURange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceCPUUsage(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query CPU metrics: %w", err)
 		}
@@ -418,7 +418,7 @@ func fetchNamespaceMetrics(ctx context.Context, namespace string, opts AnalysisO
 	})
 
 	g.Go(func() error {
-		matrix, _, err := prometheus.QueryNamespaceMemoryRange(gctx, r, queryOpts)
+		matrix, _, err := prometheus.QueryNamespaceMemoryUsage(gctx, r, queryOpts)
 		if err != nil {
 			return fmt.Errorf("failed to query memory metrics: %w", err)
 		}

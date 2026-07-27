@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func BuildWorkloadCPUQuery(namespace string, pods []string, container string, rangeDuration string) (string, error) {
+func BuildWorkloadCPUUsageQuery(namespace string, pods []string, container string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
@@ -19,7 +19,7 @@ func BuildWorkloadCPUQuery(namespace string, pods []string, container string, ra
 	return fmt.Sprintf("sum(rate(%s))", base), nil
 }
 
-func BuildWorkloadMemoryQuery(namespace string, pods []string, container string) (string, error) {
+func BuildWorkloadMemoryUsageQuery(namespace string, pods []string, container string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
@@ -179,7 +179,7 @@ func BuildWorkloadRestartsQuery(namespace string, pods []string, container strin
 	return fmt.Sprintf("sum(increase(%s[%s]))", query, timeRange), nil
 }
 
-func BuildNamespaceCPUQuery(namespace string, rangeDuration string) (string, error) {
+func BuildNamespaceCPUUsageQuery(namespace string, rangeDuration string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
@@ -190,7 +190,7 @@ func BuildNamespaceCPUQuery(namespace string, rangeDuration string) (string, err
 	return fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{container!="POD",container!="",namespace="%s"}[%s]))`, namespace, rangeDuration), nil
 }
 
-func BuildNamespaceMemoryQuery(namespace string) (string, error) {
+func BuildNamespaceMemoryUsageQuery(namespace string) (string, error) {
 	if namespace == "" {
 		return "", fmt.Errorf("namespace is required")
 	}
