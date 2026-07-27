@@ -76,3 +76,17 @@ func executeScalarQuery(ctx context.Context, query string, ts time.Time) (float6
 		return 0, warnings, fmt.Errorf("query result is not a scalar or vector, got %T", result)
 	}
 }
+
+func executeVectorQuery(ctx context.Context, query string, ts time.Time) (model.Vector, v1.Warnings, error) {
+	result, warnings, err := Query(ctx, query, ts)
+	if err != nil {
+		return nil, warnings, err
+	}
+
+	vector, ok := result.(model.Vector)
+	if !ok {
+		return nil, warnings, fmt.Errorf("query result is not a vector, got %T", result)
+	}
+
+	return vector, warnings, nil
+}

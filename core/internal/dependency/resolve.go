@@ -88,11 +88,6 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 		return ResolvedEdge{}, false, err
 	}
 
-	protocol := series.Protocol
-	if protocol == "" {
-		protocol = "tcp"
-	}
-
 	evidence, err := json.Marshal(map[string]string{
 		"src_pod_uid":   series.SrcPodUID,
 		"dst_ip":        series.DstIP,
@@ -105,7 +100,7 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 	edge := ResolvedEdge{
 		From:                from,
 		To:                  to,
-		Protocol:            protocol,
+		Protocol:            series.Protocol,
 		Port:                series.ActualDstPort,
 		ViaServiceNamespace: viaNS,
 		ViaServiceName:      viaName,
