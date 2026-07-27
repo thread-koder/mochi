@@ -281,8 +281,7 @@ func syncReplicaSets(ctx context.Context, namespace string) error {
 
 		var ownerKind, ownerName *string
 		for _, owner := range rs.OwnerReferences {
-			ownerKind = new(owner.Kind)
-			ownerName = new(owner.Name)
+			ownerKind, ownerName = optionalOwner(owner.Kind, owner.Name)
 			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Deployment).
 		}
 
@@ -476,8 +475,7 @@ func syncEndpointSlices(ctx context.Context, namespace string) error {
 
 		var ownerKind, ownerName *string
 		for _, owner := range es.OwnerReferences {
-			ownerKind = &owner.Kind
-			ownerName = &owner.Name
+			ownerKind, ownerName = optionalOwner(owner.Kind, owner.Name)
 			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Service).
 		}
 
@@ -532,8 +530,7 @@ func syncPods(ctx context.Context, namespace string) error {
 
 		var ownerKind, ownerName *string
 		for _, owner := range pod.OwnerReferences {
-			ownerKind = new(owner.Kind)
-			ownerName = new(owner.Name)
+			ownerKind, ownerName = optionalOwner(owner.Kind, owner.Name)
 			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Deployment).
 		}
 
@@ -645,6 +642,15 @@ func optionalString(s string) *string {
 		return nil
 	}
 	return new(s)
+}
+
+func optionalOwner(kind, name string) (ownerKind, ownerName *string) {
+	ownerKind = optionalString(kind)
+	ownerName = optionalString(name)
+	if ownerKind == nil || ownerName == nil {
+		return nil, nil
+	}
+	return ownerKind, ownerName
 }
 
 func mapToJSON(m map[string]string) (json.RawMessage, error) {
