@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 )
 
 func UpsertReplicaSetsBatch(ctx context.Context, replicasets []*ReplicaSet) error {
@@ -116,6 +118,38 @@ func GetReplicaSetsByDeployment(ctx context.Context, deploymentName, namespace s
 	}
 
 	return replicasets, nil
+}
+
+func GetReplicaSetByName(ctx context.Context, name string, namespace string) (*ReplicaSet, error) {
+	query := `
+		SELECT id, name, namespace, uid, replicas, ready_replicas,
+		       owner_kind, owner_name, labels, annotations, created_at, updated_at, synced_at
+		FROM replicasets
+		WHERE name = @name AND namespace = @namespace
+		LIMIT 1
+	`
+
+	var rs ReplicaSet
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{
+			"name":      name,
+			"namespace": namespace,
+		},
+	).Scan(
+		&rs.ID, &rs.Name, &rs.Namespace, &rs.UID,
+		&rs.Replicas, &rs.ReadyReplicas,
+		&rs.OwnerKind, &rs.OwnerName,
+		&rs.Labels, &rs.Annotations,
+		&rs.CreatedAt, &rs.UpdatedAt, &rs.SyncedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("replicaset", fmt.Sprintf("%s/%s", namespace, name))
+		}
+		return nil, fmt.Errorf("failed to query replicaset by name: %w", err)
+	}
+
+	return &rs, nil
 }
 
 // PruneReplicaSets deletes ReplicaSets not listed in uids.

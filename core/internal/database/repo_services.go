@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 )
 
 func UpsertServicesBatch(ctx context.Context, services []*Service) error {
@@ -74,6 +76,36 @@ func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 	}
 
 	return nil
+}
+
+func GetServiceByClusterIP(ctx context.Context, clusterIP string) (*Service, error) {
+	if clusterIP == "" || clusterIP == "None" {
+		return nil, apperrors.NewNotFound("service", clusterIP)
+	}
+
+	query := `
+		SELECT id, name, namespace, uid, type, cluster_ip, ports, selector,
+		       labels, annotations, created_at, updated_at, synced_at
+		FROM services
+		WHERE cluster_ip = @cluster_ip
+		LIMIT 1
+	`
+
+	var s Service
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{"cluster_ip": clusterIP},
+	).Scan(
+		&s.ID, &s.Name, &s.Namespace, &s.UID, &s.Type, &s.ClusterIP, &s.Ports, &s.Selector,
+		&s.Labels, &s.Annotations, &s.CreatedAt, &s.UpdatedAt, &s.SyncedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("service", clusterIP)
+		}
+		return nil, fmt.Errorf("failed to query service by cluster IP: %w", err)
+	}
+
+	return &s, nil
 }
 
 // PruneServices deletes services not listed in uids.

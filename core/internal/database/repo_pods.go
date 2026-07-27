@@ -114,6 +114,34 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 	return &p, nil
 }
 
+func GetPodByUID(ctx context.Context, uid string) (*Pod, error) {
+	query := `
+		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
+		       labels, annotations, owner_kind, owner_name,
+		       created_at, updated_at, synced_at
+		FROM pods
+		WHERE uid = @uid
+		LIMIT 1
+	`
+
+	var p Pod
+	err := Pool.QueryRow(ctx, query,
+		pgx.StrictNamedArgs{"uid": uid},
+	).Scan(
+		&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
+		&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+		&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("pod", uid)
+		}
+		return nil, fmt.Errorf("failed to query pod by UID: %w", err)
+	}
+
+	return &p, nil
+}
+
 func GetPodsByIP(ctx context.Context, ip string) ([]*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,

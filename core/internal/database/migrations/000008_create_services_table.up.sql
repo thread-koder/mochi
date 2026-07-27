@@ -19,6 +19,8 @@ CREATE INDEX IF NOT EXISTS idx_services_namespace_name ON services(namespace, na
 
 CREATE INDEX IF NOT EXISTS idx_services_uid ON services(uid);
 
+CREATE INDEX IF NOT EXISTS idx_services_cluster_ip ON services(cluster_ip);
+
 CREATE INDEX IF NOT EXISTS idx_services_synced_at ON services(synced_at);
 
 CREATE TRIGGER update_services_updated_at
