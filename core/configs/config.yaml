@@ -68,11 +68,14 @@ redis:
     client_key_path: ""
 
 workers:
-  resource_sync_interval: 120 # seconds
-  retention: 90 # days. Older records eligible for cleanup
-  exclude_namespaces:
-    - "default"
-    - "kube-system"
-    - "kube-public"
-    - "kube-node-lease"
-  include_namespaces: [] # if non-empty, only these namespaces (exclude_namespaces ignored)
+  sync:
+    interval: 120 # seconds
+    exclude_namespaces:
+      - "default"
+      - "kube-system"
+      - "kube-public"
+      - "kube-node-lease"
+    include_namespaces: [] # if non-empty, only these namespaces (exclude_namespaces ignored)
+  retention:
+    interval: 86400 # seconds
+    max_age: 90 # days - delete records older than this

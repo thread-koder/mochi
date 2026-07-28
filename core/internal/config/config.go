@@ -136,21 +136,21 @@ func (c *RedisConfig) CacheTTLDuration() time.Duration {
 }
 
 type WorkerConfig struct {
-	ResourceSyncInterval int      `mapstructure:"resource_sync_interval"`
-	ExcludeNamespaces    []string `mapstructure:"exclude_namespaces"`
-	IncludeNamespaces    []string `mapstructure:"include_namespaces"`
-	Retention            int      `mapstructure:"retention"`
+	Sync      WorkerSyncConfig      `mapstructure:"sync"`
+	Retention WorkerRetentionConfig `mapstructure:"retention"`
 }
 
-func (c *WorkerConfig) ResourceSyncIntervalDuration() time.Duration {
-	return time.Duration(c.ResourceSyncInterval) * time.Second
+type WorkerSyncConfig struct {
+	Interval          int      `mapstructure:"interval"`
+	ExcludeNamespaces []string `mapstructure:"exclude_namespaces"`
+	IncludeNamespaces []string `mapstructure:"include_namespaces"`
 }
 
-func (c *WorkerConfig) RetentionDuration() time.Duration {
-	return time.Duration(c.Retention) * 24 * time.Hour
+func (c *WorkerSyncConfig) IntervalDuration() time.Duration {
+	return time.Duration(c.Interval) * time.Second
 }
 
-func (c *WorkerConfig) ShouldSyncNamespace(namespace string) bool {
+func (c *WorkerSyncConfig) ShouldSyncNamespace(namespace string) bool {
 	if len(c.IncludeNamespaces) > 0 {
 		return slices.Contains(c.IncludeNamespaces, namespace)
 	}
@@ -160,6 +160,19 @@ func (c *WorkerConfig) ShouldSyncNamespace(namespace string) bool {
 	}
 
 	return true
+}
+
+type WorkerRetentionConfig struct {
+	Interval int `mapstructure:"interval"`
+	MaxAge   int `mapstructure:"max_age"`
+}
+
+func (c *WorkerRetentionConfig) IntervalDuration() time.Duration {
+	return time.Duration(c.Interval) * time.Second
+}
+
+func (c *WorkerRetentionConfig) MaxAgeDuration() time.Duration {
+	return time.Duration(c.MaxAge) * 24 * time.Hour
 }
 
 func Load() (*Config, error) {
@@ -247,10 +260,11 @@ func setDefaults() {
 	viper.SetDefault("redis.tls.client_cert_path", "")
 	viper.SetDefault("redis.tls.client_key_path", "")
 
-	viper.SetDefault("workers.resource_sync_interval", 120)
-	viper.SetDefault("workers.exclude_namespaces", []string{"default", "kube-system", "kube-public", "kube-node-lease"})
-	viper.SetDefault("workers.include_namespaces", []string{})
-	viper.SetDefault("workers.retention", 90)
+	viper.SetDefault("workers.sync.interval", 120)
+	viper.SetDefault("workers.sync.exclude_namespaces", []string{"default", "kube-system", "kube-public", "kube-node-lease"})
+	viper.SetDefault("workers.sync.include_namespaces", []string{})
+	viper.SetDefault("workers.retention.interval", 86400)
+	viper.SetDefault("workers.retention.max_age", 90)
 }
 
 func parseConfigFilesEnv(pathsList string) []string {
@@ -446,20 +460,37 @@ func (c *RedisConfig) Validate() error {
 }
 
 func (c *WorkerConfig) Validate() error {
-	if c.ResourceSyncInterval <= 0 {
-		return fmt.Errorf("resource_sync_interval must be greater than 0, got: %d", c.ResourceSyncInterval)
+	if err := c.Sync.Validate(); err != nil {
+		return err
 	}
-	if c.Retention <= 0 {
-		return fmt.Errorf("retention must be at least 1 day, got: %d", c.Retention)
+	if err := c.Retention.Validate(); err != nil {
+		return err
 	}
-	if c.Retention > 3650 {
-		return fmt.Errorf("retention must be at most 3650 days (about 10 years), got: %d", c.Retention)
+	return nil
+}
+
+func (c *WorkerSyncConfig) Validate() error {
+	if c.Interval <= 0 {
+		return fmt.Errorf("workers.sync.interval must be greater than 0, got: %d", c.Interval)
 	}
 	if c.ExcludeNamespaces == nil {
 		c.ExcludeNamespaces = []string{}
 	}
 	if c.IncludeNamespaces == nil {
 		c.IncludeNamespaces = []string{}
+	}
+	return nil
+}
+
+func (c *WorkerRetentionConfig) Validate() error {
+	if c.Interval <= 0 {
+		return fmt.Errorf("workers.retention.interval must be greater than 0, got: %d", c.Interval)
+	}
+	if c.MaxAge <= 0 {
+		return fmt.Errorf("workers.retention.max_age must be at least 1 day, got: %d", c.MaxAge)
+	}
+	if c.MaxAge > 3650 {
+		return fmt.Errorf("workers.retention.max_age must be at most 3650 days (about 10 years), got: %d", c.MaxAge)
 	}
 	return nil
 }

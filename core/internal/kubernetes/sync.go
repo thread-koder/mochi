@@ -17,7 +17,7 @@ import (
 
 const namespaceSyncConcurrency = 4
 
-func SyncResources(ctx context.Context, workerCfg *config.WorkerConfig) {
+func SyncResources(ctx context.Context, workerCfg *config.WorkerSyncConfig) {
 	log := logger.WithComponent("kubernetes")
 
 	if err := syncNodes(ctx); err != nil {
@@ -119,7 +119,7 @@ func syncNodes(ctx context.Context) error {
 	return nil
 }
 
-func syncNamespaces(ctx context.Context, workerCfg *config.WorkerConfig) ([]string, error) {
+func syncNamespaces(ctx context.Context, workerCfg *config.WorkerSyncConfig) ([]string, error) {
 	log := logger.WithComponent("kubernetes")
 	start := time.Now()
 	log.Info().Msg("Syncing cluster namespaces...")
