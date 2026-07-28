@@ -197,23 +197,23 @@ type DependencyNode struct {
 }
 
 type DependencyEdge struct {
-	ID                   uuid.UUID       `db:"id"`
-	FromNodeID           uuid.UUID       `db:"from_node_id"`
-	ToNodeID             uuid.UUID       `db:"to_node_id"`
-	Protocol             string          `db:"protocol"`
-	Port                 int             `db:"port"`
-	ViaServiceNamespace  *string         `db:"via_service_namespace"`
-	ViaServiceName       *string         `db:"via_service_name"`
-	Source               string          `db:"source"`
-	Confidence           float32         `db:"confidence"`
-	Connects             float64         `db:"connects"`
-	TxBytes              float64         `db:"tx_bytes"`
-	RxBytes              float64         `db:"rx_bytes"`
-	ActiveConnections    float64         `db:"active_connections"`
-	FirstSeenAt          time.Time       `db:"first_seen_at"`
-	LastSeenAt           time.Time       `db:"last_seen_at"`
-	Evidence             json.RawMessage `db:"evidence"`
-	Attrs                json.RawMessage `db:"attrs"`
-	CreatedAt            time.Time       `db:"created_at"`
-	UpdatedAt            time.Time       `db:"updated_at"`
+	ID                  uuid.UUID       `db:"id"`
+	FromNodeID          uuid.UUID       `db:"from_node_id"`
+	ToNodeID            uuid.UUID       `db:"to_node_id"`
+	Protocol            string          `db:"protocol"`
+	Port                int             `db:"port"`
+	ViaServiceNamespace *string         `db:"via_service_namespace"`
+	ViaServiceName      *string         `db:"via_service_name"`
+	Source              string          `db:"source"`
+	Confidence          float32         `db:"confidence"`
+	Connects            float64         `db:"connects"`
+	TxBytes             float64         `db:"tx_bytes"`
+	RxBytes             float64         `db:"rx_bytes"`
+	ActiveConnections   float64         `db:"active_connections"`
+	FirstSeenAt         time.Time       `db:"first_seen_at"`
+	LastSeenAt          time.Time       `db:"last_seen_at"`
+	Evidence            json.RawMessage `db:"evidence"`
+	Attrs               json.RawMessage `db:"attrs"`
+	CreatedAt           time.Time       `db:"created_at"`
+	UpdatedAt           time.Time       `db:"updated_at"`
 }
