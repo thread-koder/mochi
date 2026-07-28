@@ -16,7 +16,7 @@ type Namespace struct {
 }
 
 func GetNamespaces(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
 	namespaces, err := database.GetNamespaces(ctx)

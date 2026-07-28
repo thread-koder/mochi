@@ -57,7 +57,7 @@ func GenerateRecommendations(c *gin.Context) {
 		recConfig.Mode = mode
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
 	defer cancel()
 
 	if _, err := database.GetNamespaceByName(ctx, namespace); err != nil {
@@ -121,7 +121,7 @@ func GetRecommendations(c *gin.Context) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
 	var namespacePtr, statusPtr, modePtr, workloadTypePtr, workloadNamePtr *string
@@ -173,7 +173,7 @@ func GetRecommendationByID(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
 	recommendation, err := database.GetComputeRecommendationByID(ctx, id)
@@ -206,7 +206,7 @@ func GetLatestRecommendation(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
 	recommendation, err := database.GetLatestComputeRecommendation(
@@ -230,7 +230,7 @@ func GetLatestRecommendation(c *gin.Context) {
 
 // ApplyRecommendation applies an existing (by ID) or inline (in request body) recommendation to a workload.
 func ApplyRecommendation(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
 	defer cancel()
 
 	var recommendation *database.ComputeRecommendation

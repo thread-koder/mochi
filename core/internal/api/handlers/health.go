@@ -24,7 +24,7 @@ type CheckResult struct {
 }
 
 func Health(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
 	var dbErr, kubeErr, promErr, redisErr error
@@ -99,7 +99,7 @@ func Health(c *gin.Context) {
 }
 
 func DatabaseHealth(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
 	if err := database.HealthCheck(ctx); err != nil {
@@ -117,7 +117,7 @@ func DatabaseHealth(c *gin.Context) {
 }
 
 func KubernetesHealth(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
 	if err := kubernetes.HealthCheck(ctx); err != nil {
@@ -135,7 +135,7 @@ func KubernetesHealth(c *gin.Context) {
 }
 
 func PrometheusHealth(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
 	if err := prometheus.HealthCheck(ctx); err != nil {
@@ -153,7 +153,7 @@ func PrometheusHealth(c *gin.Context) {
 }
 
 func RedisHealth(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
 	if err := redis.HealthCheck(ctx); err != nil {

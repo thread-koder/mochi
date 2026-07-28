@@ -47,7 +47,7 @@ type StandalonePod struct {
 func GetNamespace(c *gin.Context) {
 	namespaceName := c.Param("namespace")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
 
 	namespace, err := database.GetNamespaceByName(ctx, namespaceName)

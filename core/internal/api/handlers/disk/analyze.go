@@ -31,7 +31,7 @@ func AnalyzeNamespace(c *gin.Context) {
 		opts.SetTimeRange(timeRange)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
 	defer cancel()
 
 	if _, err := database.GetNamespaceByName(ctx, namespace); err != nil {
@@ -87,7 +87,7 @@ func AnalyzeWorkload(c *gin.Context) {
 		opts.SetTimeRange(timeRange)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
 	defer cancel()
 
 	if _, err := database.GetNamespaceByName(ctx, namespace); err != nil {
