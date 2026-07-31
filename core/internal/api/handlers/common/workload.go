@@ -44,7 +44,9 @@ func ValidateStandalonePod(c *gin.Context, pod *database.Pod, podName string) bo
 	return false
 }
 
-func ResolveWorkloadPods(c *gin.Context, ctx context.Context, workloadType, workloadName, namespace string) ([]*database.Pod, bool) {
+// EnsureWorkloadExists verifies the database record exists.
+// For Pod, returns the loaded pod, and for controllers returns nil pod on success.
+func EnsureWorkloadExists(c *gin.Context, ctx context.Context, workloadType, workloadName, namespace string) (*database.Pod, bool) {
 	if workloadType == "Pod" {
 		pod, err := database.GetPodByName(ctx, workloadName, namespace)
 		if err != nil {
@@ -59,7 +61,7 @@ func ResolveWorkloadPods(c *gin.Context, ctx context.Context, workloadType, work
 		if !ValidateStandalonePod(c, pod, workloadName) {
 			return nil, false
 		}
-		return []*database.Pod{pod}, true
+		return pod, true
 	}
 
 	switch workloadType {
@@ -93,6 +95,19 @@ func ResolveWorkloadPods(c *gin.Context, ctx context.Context, workloadType, work
 			}
 			return nil, false
 		}
+	}
+
+	return nil, true
+}
+
+func ResolveWorkloadPods(c *gin.Context, ctx context.Context, workloadType, workloadName, namespace string) ([]*database.Pod, bool) {
+	pod, ok := EnsureWorkloadExists(c, ctx, workloadType, workloadName, namespace)
+	if !ok {
+		return nil, false
+	}
+
+	if workloadType == "Pod" {
+		return []*database.Pod{pod}, true
 	}
 
 	pods, err := database.GetPodsByWorkload(ctx, workloadType, workloadName, namespace)

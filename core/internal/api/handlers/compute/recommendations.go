@@ -20,8 +20,6 @@ func GenerateRecommendations(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
-	timeRangeStr := c.Query("timeRange")
-	modeStr := strings.ToLower(c.Query("mode"))
 
 	if !common.ValidateWorkloadType(c, workloadType) {
 		return
@@ -35,8 +33,8 @@ func GenerateRecommendations(c *gin.Context) {
 	}
 
 	analysisOpts := compute.DefaultAnalysisOptions()
-	if timeRangeStr != "" {
-		timeRange, err := common.ParseTimeRange(timeRangeStr)
+	if q := c.Query("timeRange"); q != "" {
+		timeRange, err := common.ParseTimeRange(q)
 		if err != nil {
 			c.Error(err)
 			common.WriteValidationError(c, "invalid_time_range", "Invalid timeRange query parameter. Use values like 24h, 7d, or 1h30m.")
@@ -46,8 +44,8 @@ func GenerateRecommendations(c *gin.Context) {
 	}
 
 	recConfig := compute.DefaultRecommendationConfig()
-	if modeStr != "" {
-		mode := compute.RecommendationMode(modeStr)
+	if q := strings.ToLower(c.Query("mode")); q != "" {
+		mode := compute.RecommendationMode(q)
 		if mode != compute.ModeBurstable && mode != compute.ModeGuaranteed && mode != compute.ModeCostOptimized {
 			err := fmt.Errorf("recommendation mode must be one of: burstable, guaranteed, cost_optimized")
 			c.Error(err)
@@ -59,16 +57,6 @@ func GenerateRecommendations(c *gin.Context) {
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
 	defer cancel()
-
-	if _, err := database.GetNamespaceByName(ctx, namespace); err != nil {
-		c.Error(err)
-		if errors.Is(err, &apperrors.NotFoundError{}) {
-			common.WriteNotFoundError(c, "namespace_not_found", "Namespace not found.")
-		} else {
-			common.WriteInternalError(c, "Failed to get namespace.")
-		}
-		return
-	}
 
 	pods, ok := common.ResolveWorkloadPods(c, ctx, workloadType, workloadName, namespace)
 	if !ok {
@@ -110,13 +98,13 @@ func GetRecommendations(c *gin.Context) {
 
 	limit := 100
 	offset := 0
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if parsed, err := parseInt(limitStr); err == nil && parsed > 0 {
+	if q := c.Query("limit"); q != "" {
+		if parsed, err := parseInt(q); err == nil && parsed > 0 {
 			limit = parsed
 		}
 	}
-	if offsetStr := c.Query("offset"); offsetStr != "" {
-		if parsed, err := parseInt(offsetStr); err == nil && parsed >= 0 {
+	if q := c.Query("offset"); q != "" {
+		if parsed, err := parseInt(q); err == nil && parsed >= 0 {
 			offset = parsed
 		}
 	}
@@ -164,9 +152,7 @@ func GetRecommendations(c *gin.Context) {
 }
 
 func GetRecommendationByID(c *gin.Context) {
-	idStr := c.Param("id")
-
-	id, err := parseUUID(idStr)
+	id, err := parseUUID(c.Param("id"))
 	if err != nil {
 		c.Error(err)
 		common.WriteValidationError(c, "invalid_recommendation_id", "Recommendation ID must be a valid UUID.")
@@ -237,9 +223,9 @@ func ApplyRecommendation(c *gin.Context) {
 	var id uuid.UUID
 	var err error
 
-	idStr := c.Query("id")
-	if idStr != "" {
-		id, err = parseUUID(idStr)
+	idQuery := c.Query("id")
+	if idQuery != "" {
+		id, err = parseUUID(idQuery)
 		if err != nil {
 			c.Error(err)
 			common.WriteValidationError(c, "invalid_recommendation_id", "Recommendation ID must be a valid UUID.")
@@ -298,7 +284,7 @@ func ApplyRecommendation(c *gin.Context) {
 		return
 	}
 
-	if idStr == "" {
+	if idQuery == "" {
 		recommendation.Status = "applied"
 		if err := database.InsertComputeRecommendation(ctx, recommendation); err != nil {
 			c.Error(err)

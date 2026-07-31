@@ -11,14 +11,12 @@ import (
 	"github.com/thread_koder/mochi/core/internal/analysis"
 	"github.com/thread_koder/mochi/core/internal/api/handlers/common"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
-	"github.com/thread_koder/mochi/core/internal/database"
 )
 
 func AnalyzeWorkloadCorrelations(c *gin.Context) {
 	workloadType := c.Param("workloadType")
 	workloadName := c.Param("workloadName")
 	namespace := c.Query("namespace")
-	timeRangeStr := c.Query("timeRange")
 
 	if !common.ValidateWorkloadType(c, workloadType) {
 		return
@@ -33,8 +31,8 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 
 	opts := analysis.DefaultCorrelationOptions()
 
-	if timeRangeStr != "" {
-		timeRange, err := common.ParseTimeRange(timeRangeStr)
+	if q := c.Query("timeRange"); q != "" {
+		timeRange, err := common.ParseTimeRange(q)
 		if err != nil {
 			c.Error(err)
 			common.WriteValidationError(c, "invalid_time_range", "Invalid timeRange query parameter. Use values like 24h, 7d, or 1h30m.")
@@ -45,16 +43,6 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
 	defer cancel()
-
-	if _, err := database.GetNamespaceByName(ctx, namespace); err != nil {
-		c.Error(err)
-		if errors.Is(err, &apperrors.NotFoundError{}) {
-			common.WriteNotFoundError(c, "namespace_not_found", "Namespace not found.")
-		} else {
-			common.WriteInternalError(c, "Failed to get namespace.")
-		}
-		return
-	}
 
 	pods, ok := common.ResolveWorkloadPods(c, ctx, workloadType, workloadName, namespace)
 	if !ok {
