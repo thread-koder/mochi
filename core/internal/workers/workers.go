@@ -16,6 +16,7 @@ type WorkerPool struct {
 	wg           sync.WaitGroup
 	resourceSync *ResourceSyncWorker
 	retention    *RetentionWorker
+	discovery    *DependencyDiscoveryWorker
 }
 
 func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
@@ -30,6 +31,7 @@ func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
 		cancel:       cancel,
 		resourceSync: NewResourceSyncWorker(ctx, &cfg.Sync),
 		retention:    NewRetentionWorker(ctx, &cfg.Retention),
+		discovery:    NewDependencyDiscoveryWorker(ctx),
 	}, nil
 }
 
@@ -42,6 +44,9 @@ func (wp *WorkerPool) Start() {
 	})
 	wp.wg.Go(func() {
 		wp.retention.Run()
+	})
+	wp.wg.Go(func() {
+		wp.discovery.Run()
 	})
 
 	log.Info().Msg("Worker pool started")

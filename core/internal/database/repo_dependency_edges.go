@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -84,5 +85,16 @@ func UpsertDependencyEdgesBatch(ctx context.Context, edges []*DependencyEdge) er
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	return nil
+}
+
+func PruneStaleDependencyEdges(ctx context.Context, before time.Time) error {
+	query := `DELETE FROM dependency_edges WHERE last_seen_at < @before`
+	_, err := Pool.Exec(ctx, query,
+		pgx.StrictNamedArgs{"before": before},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to prune stale dependency edges: %w", err)
+	}
 	return nil
 }
