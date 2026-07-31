@@ -24,11 +24,11 @@ CREATE TABLE IF NOT EXISTS dependency_edges (
 CREATE INDEX IF NOT EXISTS idx_dependency_edges_last_seen_at
     ON dependency_edges(last_seen_at);
 
-CREATE INDEX IF NOT EXISTS idx_dependency_edges_from_node_id
-    ON dependency_edges(from_node_id);
+CREATE INDEX IF NOT EXISTS idx_dependency_edges_from_last_seen
+    ON dependency_edges(from_node_id, last_seen_at);
 
-CREATE INDEX IF NOT EXISTS idx_dependency_edges_to_node_id
-    ON dependency_edges(to_node_id);
+CREATE INDEX IF NOT EXISTS idx_dependency_edges_to_last_seen
+    ON dependency_edges(to_node_id, last_seen_at);
 
 CREATE INDEX IF NOT EXISTS idx_dependency_edges_via_service
     ON dependency_edges(via_service_namespace, via_service_name);

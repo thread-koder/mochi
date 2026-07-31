@@ -5,6 +5,7 @@ import (
 	"github.com/thread_koder/mochi/core/internal/api/handlers"
 	analysisHandlers "github.com/thread_koder/mochi/core/internal/api/handlers/analysis"
 	computeHandlers "github.com/thread_koder/mochi/core/internal/api/handlers/compute"
+	dependencyHandlers "github.com/thread_koder/mochi/core/internal/api/handlers/dependency"
 	diskHandlers "github.com/thread_koder/mochi/core/internal/api/handlers/disk"
 	networkHandlers "github.com/thread_koder/mochi/core/internal/api/handlers/network"
 	webHandlers "github.com/thread_koder/mochi/core/internal/api/handlers/web"
@@ -66,6 +67,16 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			{
 				diskAnalysis.GET("/analyze/namespaces/:namespace", diskHandlers.AnalyzeNamespace)
 				diskAnalysis.GET("/analyze/workloads/:workloadType/:workloadName", diskHandlers.AnalyzeWorkload)
+			}
+		}
+
+		dependency := v1.Group("/dependency")
+		{
+			dependencyAnalysis := dependency.Group("")
+			dependencyAnalysis.Use(middleware.CacheMiddleware(cacheTTL))
+			{
+				dependencyAnalysis.GET("/analyze/namespaces/:namespace", dependencyHandlers.AnalyzeNamespace)
+				dependencyAnalysis.GET("/analyze/workloads/:workloadType/:workloadName", dependencyHandlers.AnalyzeWorkload)
 			}
 		}
 

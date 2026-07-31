@@ -2,10 +2,12 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 )
 
 func UpsertDependencyNodesBatch(ctx context.Context, nodes []*DependencyNode) error {
@@ -63,6 +65,72 @@ func UpsertDependencyNodesBatch(ctx context.Context, nodes []*DependencyNode) er
 	}
 
 	return nil
+}
+
+func GetDependencyNodeByKey(ctx context.Context, kind, namespace, name string) (*DependencyNode, error) {
+	query := `
+		SELECT id, kind, namespace, name, metadata, 
+			   first_seen_at, last_seen_at, created_at, updated_at
+		FROM dependency_nodes
+		WHERE kind = @kind AND namespace = @namespace AND name = @name
+		LIMIT 1
+	`
+
+	var node DependencyNode
+	err := Pool.QueryRow(ctx, query, pgx.StrictNamedArgs{
+		"kind":      kind,
+		"namespace": namespace,
+		"name":      name,
+	}).Scan(
+		&node.ID, &node.Kind, &node.Namespace, &node.Name, &node.Metadata,
+		&node.FirstSeenAt, &node.LastSeenAt, &node.CreatedAt, &node.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NewNotFound("dependency_node", fmt.Sprintf("%s/%s/%s", kind, namespace, name))
+		}
+		return nil, fmt.Errorf("failed to query dependency node by key: %w", err)
+	}
+
+	return &node, nil
+}
+
+func GetDependencyNodesByIDs(ctx context.Context, ids []uuid.UUID) ([]*DependencyNode, error) {
+	if len(ids) == 0 {
+		return []*DependencyNode{}, nil
+	}
+
+	query := `
+		SELECT id, kind, namespace, name, metadata, 
+			   first_seen_at, last_seen_at, created_at, updated_at
+		FROM dependency_nodes
+		WHERE id = ANY(@ids::uuid[])
+	`
+
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{"ids": ids},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query dependency nodes by ids: %w", err)
+	}
+	defer rows.Close()
+
+	nodes := make([]*DependencyNode, 0, len(ids))
+	for rows.Next() {
+		var node DependencyNode
+		if err := rows.Scan(
+			&node.ID, &node.Kind, &node.Namespace, &node.Name, &node.Metadata,
+			&node.FirstSeenAt, &node.LastSeenAt, &node.CreatedAt, &node.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan dependency node: %w", err)
+		}
+		nodes = append(nodes, &node)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate dependency nodes: %w", err)
+	}
+
+	return nodes, nil
 }
 
 func PruneOrphanDependencyNodes(ctx context.Context) error {

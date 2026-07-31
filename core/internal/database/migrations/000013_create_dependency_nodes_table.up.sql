@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS dependency_nodes (
 CREATE INDEX IF NOT EXISTS idx_dependency_nodes_last_seen_at
     ON dependency_nodes(last_seen_at);
 
+CREATE INDEX IF NOT EXISTS idx_dependency_nodes_namespace
+    ON dependency_nodes(namespace);
+
 CREATE TRIGGER update_dependency_nodes_updated_at
     BEFORE UPDATE ON dependency_nodes
     FOR EACH ROW

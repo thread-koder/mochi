@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -86,6 +87,103 @@ func UpsertDependencyEdgesBatch(ctx context.Context, edges []*DependencyEdge) er
 	}
 
 	return nil
+}
+
+const dependencyEdgeSelectColumns = `
+	e.id, e.from_node_id, e.to_node_id, e.protocol, e.port,
+	e.via_service_namespace, e.via_service_name, e.source, e.confidence,
+	e.connects, e.tx_bytes, e.rx_bytes, e.active_connections,
+	e.first_seen_at, e.last_seen_at, e.evidence, e.attrs, e.created_at, e.updated_at
+`
+
+func GetDependencyEdgesForNamespace(ctx context.Context, namespace string, since time.Time) ([]*DependencyEdge, error) {
+	query := `
+		SELECT ` + dependencyEdgeSelectColumns + `
+		FROM dependency_edges e
+		JOIN dependency_nodes f ON f.id = e.from_node_id
+		JOIN dependency_nodes t ON t.id = e.to_node_id
+		WHERE f.namespace = @namespace
+		  AND e.last_seen_at >= @since
+		UNION
+		SELECT ` + dependencyEdgeSelectColumns + `
+		FROM dependency_edges e
+		JOIN dependency_nodes f ON f.id = e.from_node_id
+		JOIN dependency_nodes t ON t.id = e.to_node_id
+		WHERE t.namespace = @namespace
+		  AND e.last_seen_at >= @since
+	`
+
+	rows, err := Pool.Query(ctx, query, pgx.StrictNamedArgs{
+		"namespace": namespace,
+		"since":     since,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dependency edges for namespace: %w", err)
+	}
+	defer rows.Close()
+
+	return collectDependencyEdges(rows)
+}
+
+func GetDependencyEdgesByFromNode(ctx context.Context, nodeID uuid.UUID, since time.Time) ([]*DependencyEdge, error) {
+	query := `
+		SELECT ` + dependencyEdgeSelectColumns + `
+		FROM dependency_edges e
+		WHERE e.from_node_id = @node_id
+		  AND e.last_seen_at >= @since
+	`
+
+	rows, err := Pool.Query(ctx, query, pgx.StrictNamedArgs{
+		"node_id": nodeID,
+		"since":   since,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dependency edges by from node: %w", err)
+	}
+	defer rows.Close()
+
+	return collectDependencyEdges(rows)
+}
+
+func GetDependencyEdgesByToNode(ctx context.Context, nodeID uuid.UUID, since time.Time) ([]*DependencyEdge, error) {
+	query := `
+		SELECT ` + dependencyEdgeSelectColumns + `
+		FROM dependency_edges e
+		WHERE e.to_node_id = @node_id
+		  AND e.last_seen_at >= @since
+	`
+
+	rows, err := Pool.Query(ctx, query, pgx.StrictNamedArgs{
+		"node_id": nodeID,
+		"since":   since,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dependency edges by to node: %w", err)
+	}
+	defer rows.Close()
+
+	return collectDependencyEdges(rows)
+}
+
+func collectDependencyEdges(rows pgx.Rows) ([]*DependencyEdge, error) {
+	edges := make([]*DependencyEdge, 0)
+	for rows.Next() {
+		var edge DependencyEdge
+		if err := rows.Scan(
+			&edge.ID, &edge.FromNodeID, &edge.ToNodeID, &edge.Protocol, &edge.Port,
+			&edge.ViaServiceNamespace, &edge.ViaServiceName, &edge.Source, &edge.Confidence,
+			&edge.Connects, &edge.TxBytes, &edge.RxBytes, &edge.ActiveConnections,
+			&edge.FirstSeenAt, &edge.LastSeenAt, &edge.Evidence, &edge.Attrs,
+			&edge.CreatedAt, &edge.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan dependency edge: %w", err)
+		}
+		edges = append(edges, &edge)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate dependency edges: %w", err)
+	}
+	return edges, nil
 }
 
 func PruneStaleDependencyEdges(ctx context.Context, before time.Time) error {
