@@ -155,19 +155,23 @@ func GetReplicaSetByName(ctx context.Context, name string, namespace string) (*R
 // PruneReplicaSets deletes ReplicaSets not listed in uids.
 // Empty uids deletes every ReplicaSet in the namespace.
 func PruneReplicaSets(ctx context.Context, namespace string, uids []string) error {
+	var err error
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx,
+		_, err = Pool.Exec(ctx,
 			`DELETE FROM replicasets WHERE namespace = @namespace`,
 			pgx.StrictNamedArgs{"namespace": namespace},
 		)
-		return err
+	} else {
+		_, err = Pool.Exec(ctx,
+			`DELETE FROM replicasets WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
+			pgx.StrictNamedArgs{
+				"namespace": namespace,
+				"uids":      uids,
+			},
+		)
 	}
-	_, err := Pool.Exec(ctx,
-		`DELETE FROM replicasets WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
-		pgx.StrictNamedArgs{
-			"namespace": namespace,
-			"uids":      uids,
-		},
-	)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to prune replicasets: %w", err)
+	}
+	return nil
 }

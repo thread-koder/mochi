@@ -121,13 +121,17 @@ func GetNamespaceByName(ctx context.Context, name string) (*Namespace, error) {
 // PruneNamespaces deletes namespaces not listed in uids.
 // Empty uids deletes all namespaces.
 func PruneNamespaces(ctx context.Context, uids []string) error {
+	var err error
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM namespaces`)
-		return err
+		_, err = Pool.Exec(ctx, `DELETE FROM namespaces`)
+	} else {
+		_, err = Pool.Exec(ctx,
+			`DELETE FROM namespaces WHERE NOT (uid = ANY(@uids::text[]))`,
+			pgx.StrictNamedArgs{"uids": uids},
+		)
 	}
-	_, err := Pool.Exec(ctx,
-		`DELETE FROM namespaces WHERE NOT (uid = ANY(@uids::text[]))`,
-		pgx.StrictNamedArgs{"uids": uids},
-	)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to prune namespaces: %w", err)
+	}
+	return nil
 }

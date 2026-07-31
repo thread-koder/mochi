@@ -263,7 +263,10 @@ func PruneExpiredComputeRecommendations(ctx context.Context, since time.Time) er
 	_, err := Pool.Exec(ctx, query,
 		pgx.StrictNamedArgs{"created_at": since},
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to prune expired compute recommendations: %w", err)
+	}
+	return nil
 }
 
 // PruneComputeRecommendations deletes recommendations whose matching workload row is gone.
@@ -304,5 +307,8 @@ func PruneComputeRecommendations(ctx context.Context, namespace, workloadType st
 			"workload_type": workloadType,
 		},
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to prune compute recommendations: %w", err)
+	}
+	return nil
 }

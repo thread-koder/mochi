@@ -111,19 +111,23 @@ func GetServiceByClusterIP(ctx context.Context, clusterIP string) (*Service, err
 // PruneServices deletes services not listed in uids.
 // Empty uids deletes every service in the namespace.
 func PruneServices(ctx context.Context, namespace string, uids []string) error {
+	var err error
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx,
+		_, err = Pool.Exec(ctx,
 			`DELETE FROM services WHERE namespace = @namespace`,
 			pgx.StrictNamedArgs{"namespace": namespace},
 		)
-		return err
+	} else {
+		_, err = Pool.Exec(ctx,
+			`DELETE FROM services WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
+			pgx.StrictNamedArgs{
+				"namespace": namespace,
+				"uids":      uids,
+			},
+		)
 	}
-	_, err := Pool.Exec(ctx,
-		`DELETE FROM services WHERE namespace = @namespace AND NOT (uid = ANY(@uids::text[]))`,
-		pgx.StrictNamedArgs{
-			"namespace": namespace,
-			"uids":      uids,
-		},
-	)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to prune services: %w", err)
+	}
+	return nil
 }

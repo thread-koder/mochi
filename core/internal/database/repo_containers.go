@@ -124,19 +124,23 @@ func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, er
 // PruneContainers deletes containers not listed in podUIDs.
 // Empty podUIDs deletes every container in the namespace.
 func PruneContainers(ctx context.Context, namespace string, podUIDs []string) error {
+	var err error
 	if len(podUIDs) == 0 {
-		_, err := Pool.Exec(ctx,
+		_, err = Pool.Exec(ctx,
 			`DELETE FROM containers WHERE namespace = @namespace`,
 			pgx.StrictNamedArgs{"namespace": namespace},
 		)
-		return err
+	} else {
+		_, err = Pool.Exec(ctx,
+			`DELETE FROM containers WHERE namespace = @namespace AND NOT (pod_uid = ANY(@pod_uids::text[]))`,
+			pgx.StrictNamedArgs{
+				"namespace": namespace,
+				"pod_uids":  podUIDs,
+			},
+		)
 	}
-	_, err := Pool.Exec(ctx,
-		`DELETE FROM containers WHERE namespace = @namespace AND NOT (pod_uid = ANY(@pod_uids::text[]))`,
-		pgx.StrictNamedArgs{
-			"namespace": namespace,
-			"pod_uids":  podUIDs,
-		},
-	)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to prune containers: %w", err)
+	}
+	return nil
 }

@@ -93,13 +93,17 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 // PruneNodes deletes nodes not listed in uids.
 // Empty uids deletes all nodes.
 func PruneNodes(ctx context.Context, uids []string) error {
+	var err error
 	if len(uids) == 0 {
-		_, err := Pool.Exec(ctx, `DELETE FROM nodes`)
-		return err
+		_, err = Pool.Exec(ctx, `DELETE FROM nodes`)
+	} else {
+		_, err = Pool.Exec(ctx,
+			`DELETE FROM nodes WHERE NOT (uid = ANY(@uids::text[]))`,
+			pgx.StrictNamedArgs{"uids": uids},
+		)
 	}
-	_, err := Pool.Exec(ctx,
-		`DELETE FROM nodes WHERE NOT (uid = ANY(@uids::text[]))`,
-		pgx.StrictNamedArgs{"uids": uids},
-	)
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to prune nodes: %w", err)
+	}
+	return nil
 }
