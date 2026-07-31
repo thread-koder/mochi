@@ -79,39 +79,6 @@ func GetComputeRecommendationByID(ctx context.Context, id uuid.UUID) (*ComputeRe
 	return &rec, nil
 }
 
-func GetLatestComputeRecommendation(ctx context.Context, workloadType, workloadName, namespace string) (*ComputeRecommendation, error) {
-	query := `
-		SELECT id, workload_type, workload_name, namespace, recommendation_mode,
-		       recommendations, status, analysis_time_range, created_at, updated_at
-		FROM compute_recommendations
-		WHERE namespace = @namespace AND workload_type = @workload_type AND workload_name = @workload_name
-		ORDER BY created_at DESC
-		LIMIT 1
-	`
-
-	var rec ComputeRecommendation
-
-	err := Pool.QueryRow(ctx, query,
-		pgx.StrictNamedArgs{
-			"namespace":     namespace,
-			"workload_type": workloadType,
-			"workload_name": workloadName,
-		},
-	).Scan(
-		&rec.ID, &rec.WorkloadType, &rec.WorkloadName, &rec.Namespace,
-		&rec.RecommendationMode, &rec.Recommendations, &rec.Status,
-		&rec.AnalysisTimeRange, &rec.CreatedAt, &rec.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, apperrors.NewNotFound("compute_recommendation", fmt.Sprintf("%s/%s/%s", namespace, workloadType, workloadName))
-		}
-		return nil, fmt.Errorf("failed to query compute recommendation by workload: %w", err)
-	}
-
-	return &rec, nil
-}
-
 func GetComputeRecommendations(ctx context.Context, namespace *string, status *string, mode *string, workloadType *string, workloadName *string, limit, offset int) ([]*ComputeRecommendation, int64, error) {
 	whereClause := "WHERE 1=1"
 	args := pgx.StrictNamedArgs{}

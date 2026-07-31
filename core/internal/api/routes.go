@@ -43,7 +43,6 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			{
 				computeRecommendations.GET("/recommendations", computeHandlers.GetRecommendations)
 				computeRecommendations.GET("/recommendations/:id", computeHandlers.GetRecommendationByID)
-				computeRecommendations.GET("/recommendations/workloads/:workloadType/:workloadName/latest", computeHandlers.GetLatestRecommendation)
 			}
 
 			compute.POST("/recommendations/generate/:workloadType/:workloadName", computeHandlers.GenerateRecommendations)

@@ -176,44 +176,6 @@ func GetRecommendationByID(c *gin.Context) {
 	c.JSON(http.StatusOK, recommendation)
 }
 
-func GetLatestRecommendation(c *gin.Context) {
-	workloadType := c.Param("workloadType")
-	workloadName := c.Param("workloadName")
-	namespace := c.Query("namespace")
-
-	if !common.ValidateWorkloadType(c, workloadType) {
-		return
-	}
-
-	if namespace == "" {
-		err := fmt.Errorf("namespace query parameter is empty or missing")
-		c.Error(err)
-		common.WriteValidationError(c, "missing_namespace", "Namespace query parameter is required.")
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
-	defer cancel()
-
-	recommendation, err := database.GetLatestComputeRecommendation(
-		ctx,
-		workloadType,
-		workloadName,
-		namespace,
-	)
-	if err != nil {
-		c.Error(err)
-		if errors.Is(err, &apperrors.NotFoundError{}) {
-			common.WriteNotFoundError(c, "recommendation_not_found", "Recommendation not found.")
-		} else {
-			common.WriteInternalError(c, "Failed to get recommendation.")
-		}
-		return
-	}
-
-	c.JSON(http.StatusOK, recommendation)
-}
-
 // ApplyRecommendation applies an existing (by ID) or inline (in request body) recommendation to a workload.
 func ApplyRecommendation(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
