@@ -26,9 +26,8 @@ func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSl
 			@name, @namespace, @uid, @address_type,
 			@owner_kind, @owner_name, @endpoints, @ports, @labels, @annotations, @created_at, @synced_at
 		)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			namespace = EXCLUDED.namespace,
+		ON CONFLICT (namespace, name) DO UPDATE SET
+			uid = EXCLUDED.uid,
 			address_type = EXCLUDED.address_type,
 			owner_kind = EXCLUDED.owner_kind,
 			owner_name = EXCLUDED.owner_name,
@@ -76,6 +75,45 @@ func UpsertEndpointSlicesBatch(ctx context.Context, endpointSlices []*EndpointSl
 	}
 
 	return nil
+}
+
+func GetEndpointSlicesByService(ctx context.Context, namespace, serviceName string) ([]*EndpointSlice, error) {
+	query := `
+		SELECT id, name, namespace, uid, address_type,
+		       owner_kind, owner_name, endpoints, ports,
+		       labels, annotations, created_at, updated_at, synced_at
+		FROM endpoint_slices
+		WHERE namespace = @namespace
+		  AND owner_kind = 'Service'
+		  AND owner_name = @owner_name
+	`
+
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{
+			"namespace":  namespace,
+			"owner_name": serviceName,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query endpoint slices by service: %w", err)
+	}
+	defer rows.Close()
+
+	var slices []*EndpointSlice
+	for rows.Next() {
+		var es EndpointSlice
+		if err := rows.Scan(
+			&es.ID, &es.Name, &es.Namespace, &es.UID, &es.AddressType,
+			&es.OwnerKind, &es.OwnerName, &es.Endpoints, &es.Ports,
+			&es.Labels, &es.Annotations, &es.CreatedAt, &es.UpdatedAt, &es.SyncedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan endpoint slice: %w", err)
+		}
+		slices = append(slices, &es)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate endpoint slices: %w", err)
+	}
+	return slices, nil
 }
 
 // PruneEndpointSlices deletes EndpointSlices not listed in uids.
