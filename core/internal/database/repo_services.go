@@ -28,9 +28,8 @@ func UpsertServicesBatch(ctx context.Context, services []*Service) error {
 			@name, @namespace, @uid, @type, @cluster_ip, @ports, @selector,
 			@labels, @annotations, @created_at, @synced_at
 		)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			namespace = EXCLUDED.namespace,
+		ON CONFLICT (namespace, name) DO UPDATE SET
+			uid = EXCLUDED.uid,
 			type = EXCLUDED.type,
 			cluster_ip = EXCLUDED.cluster_ip,
 			ports = EXCLUDED.ports,

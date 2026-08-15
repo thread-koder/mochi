@@ -28,9 +28,8 @@ func UpsertDaemonSetsBatch(ctx context.Context, daemonsets []*DaemonSet) error {
 			@name, @namespace, @uid, @desired_number_scheduled, @number_ready, @number_available,
 			@labels, @annotations, @created_at, @synced_at
 		)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			namespace = EXCLUDED.namespace,
+		ON CONFLICT (namespace, name) DO UPDATE SET
+			uid = EXCLUDED.uid,
 			desired_number_scheduled = EXCLUDED.desired_number_scheduled,
 			number_ready = EXCLUDED.number_ready,
 			number_available = EXCLUDED.number_available,

@@ -26,8 +26,8 @@ func UpsertNamespacesBatch(ctx context.Context, namespaces []*Namespace) error {
 		) VALUES (
 			@name, @uid, @phase, @labels, @annotations, @created_at, @synced_at
 		)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
+		ON CONFLICT (name) DO UPDATE SET
+			uid = EXCLUDED.uid,
 			phase = EXCLUDED.phase,
 			labels = EXCLUDED.labels,
 			annotations = EXCLUDED.annotations,

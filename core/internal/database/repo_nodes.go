@@ -28,8 +28,8 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 			@container_runtime_version, @kubelet_version, @cpu_capacity, @memory_capacity,
 			@cpu_allocatable, @memory_allocatable, @labels, @annotations, @conditions, @created_at, @synced_at
 		)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
+		ON CONFLICT (name) DO UPDATE SET
+			uid = EXCLUDED.uid,
 			internal_ip = EXCLUDED.internal_ip,
 			external_ip = EXCLUDED.external_ip,
 			os_image = EXCLUDED.os_image,

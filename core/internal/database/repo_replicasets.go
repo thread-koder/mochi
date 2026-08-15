@@ -28,9 +28,8 @@ func UpsertReplicaSetsBatch(ctx context.Context, replicasets []*ReplicaSet) erro
 			@name, @namespace, @uid, @replicas, @ready_replicas,
 			@owner_kind, @owner_name, @labels, @annotations, @created_at, @synced_at
 		)
-		ON CONFLICT (uid) DO UPDATE SET
-			name = EXCLUDED.name,
-			namespace = EXCLUDED.namespace,
+		ON CONFLICT (namespace, name) DO UPDATE SET
+			uid = EXCLUDED.uid,
 			replicas = EXCLUDED.replicas,
 			ready_replicas = EXCLUDED.ready_replicas,
 			owner_kind = EXCLUDED.owner_kind,
