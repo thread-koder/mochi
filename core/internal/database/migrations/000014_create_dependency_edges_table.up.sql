@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS dependency_edges (
     via_service_namespace VARCHAR(255),
     via_service_name VARCHAR(255),
     source VARCHAR(50) NOT NULL DEFAULT 'mochi-ebpf',
-    confidence REAL NOT NULL DEFAULT 0,
     connects DOUBLE PRECISION NOT NULL DEFAULT 0,
     tx_bytes DOUBLE PRECISION NOT NULL DEFAULT 0,
     rx_bytes DOUBLE PRECISION NOT NULL DEFAULT 0,

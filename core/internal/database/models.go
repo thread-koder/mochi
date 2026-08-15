@@ -205,7 +205,6 @@ type DependencyEdge struct {
 	ViaServiceNamespace *string         `db:"via_service_namespace"`
 	ViaServiceName      *string         `db:"via_service_name"`
 	Source              string          `db:"source"`
-	Confidence          float32         `db:"confidence"`
 	Connects            float64         `db:"connects"`
 	TxBytes             float64         `db:"tx_bytes"`
 	RxBytes             float64         `db:"rx_bytes"`

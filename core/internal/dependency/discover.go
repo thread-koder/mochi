@@ -79,7 +79,6 @@ func Discover(ctx context.Context) error {
 				ViaServiceNamespace: edge.ViaServiceNamespace,
 				ViaServiceName:      edge.ViaServiceName,
 				Source:              edge.Source,
-				Confidence:          edge.Confidence,
 				Connects:            edge.Connects,
 				TxBytes:             edge.TxBytes,
 				RxBytes:             edge.RxBytes,
@@ -126,12 +125,7 @@ func mergeResolvedEdge(merged map[string]*ResolvedEdge, edge ResolvedEdge) {
 	existing.Connects += edge.Connects
 	existing.TxBytes += edge.TxBytes
 	existing.RxBytes += edge.RxBytes
-	if edge.ActiveConnections > existing.ActiveConnections {
-		existing.ActiveConnections = edge.ActiveConnections
-	}
-	if edge.Confidence > existing.Confidence {
-		existing.Confidence = edge.Confidence
-	}
+	existing.ActiveConnections += edge.ActiveConnections
 	if existing.ViaServiceName == nil && edge.ViaServiceName != nil {
 		existing.ViaServiceNamespace = edge.ViaServiceNamespace
 		existing.ViaServiceName = edge.ViaServiceName

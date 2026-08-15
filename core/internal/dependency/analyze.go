@@ -41,7 +41,6 @@ type EdgeDTO struct {
 	ViaServiceNamespace *string   `json:"via_service_namespace"`
 	ViaServiceName      *string   `json:"via_service_name"`
 	Source              string    `json:"source"`
-	Confidence          float32   `json:"confidence"`
 	Connects            float64   `json:"connects"`
 	TxBytes             float64   `json:"tx_bytes"`
 	RxBytes             float64   `json:"rx_bytes"`
@@ -217,7 +216,6 @@ func toEdgeDTO(e *database.DependencyEdge) EdgeDTO {
 		ViaServiceNamespace: e.ViaServiceNamespace,
 		ViaServiceName:      e.ViaServiceName,
 		Source:              e.Source,
-		Confidence:          e.Confidence,
 		Connects:            e.Connects,
 		TxBytes:             e.TxBytes,
 		RxBytes:             e.RxBytes,
