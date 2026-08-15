@@ -3,24 +3,29 @@
 set -e
 
 # Colors for output
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-NAMESPACE="mochi-dev"
+NAMESPACE="mochi-system"
 POSTGRES_RELEASE="mochi-postgres"
 PROMETHEUS_RELEASE="mochi-prometheus"
 REDIS_RELEASE="mochi-redis"
 
-echo -e "${YELLOW}Cleaning up Mochi development environment${NC}\n"
+echo -e "${YELLOW}Cleaning up development environment dependencies${NC}\n"
 
 # Confirm deletion
-read -p "Are you sure you want to remove all Mochi dev services? (y/N): " -n 1 -r
+read -p "Are you sure you want to remove all development environment dependencies? (y/N): " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${GREEN}Aborted.${NC}"
+    exit 0
+fi
+
+# Check if namespace exists
+if ! kubectl get namespace ${NAMESPACE} &>/dev/null; then
+    echo -e "${YELLOW}Namespace '${NAMESPACE}' does not exist. Nothing to clean up.${NC}"
     exit 0
 fi
 

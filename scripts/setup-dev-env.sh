@@ -9,12 +9,12 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-NAMESPACE="mochi-dev"
+NAMESPACE="mochi-system"
 POSTGRES_RELEASE="mochi-postgres"
 PROMETHEUS_RELEASE="mochi-prometheus"
 REDIS_RELEASE="mochi-redis"
 
-echo -e "${GREEN}Setting up Mochi development environment in minikube${NC}\n"
+echo -e "${GREEN}Setting up development environment dependencies in minikube${NC}\n"
 
 # Check if minikube is running
 if ! minikube status &>/dev/null; then
@@ -48,7 +48,7 @@ helm upgrade --install ${POSTGRES_RELEASE} bitnami/postgresql \
     --set auth.username=mochi \
     --set auth.password=mochi \
     --set auth.database=mochi \
-    --set primary.persistence.size=2Gi \
+    --set primary.persistence.size=5Gi \
     --set primary.resources.requests.memory=256Mi \
     --set primary.resources.requests.cpu=250m \
     --wait >/dev/null 2>&1
@@ -73,7 +73,7 @@ helm upgrade --install ${REDIS_RELEASE} bitnami/redis \
     --set fullnameOverride=${REDIS_RELEASE} \
     --set auth.enabled=true \
     --set auth.password=mochi \
-    --set master.persistence.size=2Gi \
+    --set master.persistence.size=5Gi \
     --set master.resources.requests.memory=256Mi \
     --set master.resources.requests.cpu=250m \
     --set replica.replicaCount=0 \
@@ -81,7 +81,7 @@ helm upgrade --install ${REDIS_RELEASE} bitnami/redis \
 
 # Print Services info
 echo -e "\n${GREEN}Installation complete!${NC}\n"
-echo -e "${YELLOW}Services Information:${NC}\n"
+echo -e "${YELLOW}Dependencies Information:${NC}\n"
 
 # PostgreSQL
 POSTGRES_SVC="${POSTGRES_RELEASE}"
@@ -108,5 +108,4 @@ echo "  Password: mochi"
 echo "  Database: 0"
 echo ""
 
-echo -e "\n${GREEN}Tip: Use 'make dev-env-status' to check the status of services${NC}"
-echo -e "${GREEN}Tip: Use 'make dev-env-clean' to remove all services${NC}"
+echo -e "${GREEN}Tip: Use 'make dev-env-cleanup' to remove development environment dependencies${NC}"

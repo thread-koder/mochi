@@ -5,11 +5,10 @@ set -e
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-NAMESPACE="mochi-dev"
+NAMESPACE="mochi-system"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKLOADS_FILE="${SCRIPT_DIR}/test-workloads.yaml"
 
@@ -22,24 +21,22 @@ if ! minikube status &>/dev/null; then
 fi
 
 # Check if namespace exists
-if ! kubectl get namespace ${NAMESPACE} &>/dev/null; then
-    echo -e "${YELLOW}Namespace '${NAMESPACE}' does not exist. Creating it...${NC}"
-    kubectl create namespace ${NAMESPACE} >/dev/null 2>&1
-fi
-
-# Check if workloads file exists
-if [ ! -f "${WORKLOADS_FILE}" ]; then
-    echo -e "${RED}Workloads file not found: ${WORKLOADS_FILE}${NC}"
+if ! kubectl get namespace "${NAMESPACE}" &>/dev/null; then
+    echo -e "${RED}Namespace '${NAMESPACE}' does not exist. Run 'make dev-env-setup' first.${NC}"
     exit 1
 fi
 
 # Deploy test workloads
 echo -e "${GREEN}Deploying test workloads...${NC}"
-kubectl apply -f "${WORKLOADS_FILE}" --namespace ${NAMESPACE} >/dev/null 2>&1
+kubectl apply -f "${WORKLOADS_FILE}"
 
 echo -e "${GREEN}Waiting for workloads to be ready...${NC}"
-kubectl wait --for=condition=available --timeout=60s deployment/test-deployment -n ${NAMESPACE} >/dev/null 2>&1 || true
-kubectl wait --for=condition=ready --timeout=60s pod/test-standalone-pod -n ${NAMESPACE} >/dev/null 2>&1 || true
+kubectl -n "${NAMESPACE}" rollout status deployment/test-backend --timeout=120s
+kubectl -n "${NAMESPACE}" rollout status deployment/test-frontend --timeout=120s
+kubectl -n "${NAMESPACE}" rollout status statefulset/test-cache --timeout=120s
+kubectl -n "${NAMESPACE}" rollout status deployment/test-worker --timeout=120s
+kubectl -n "${NAMESPACE}" rollout status daemonset/test-daemonset --timeout=120s
+kubectl -n "${NAMESPACE}" wait pod/test-standalone-pod --for=condition=Ready --timeout=120s
 
 echo -e "${GREEN}Test workloads deployed successfully!${NC}"
-echo -e "${GREEN}Tip: Use 'make test-workloads-clean' to remove test workloads${NC}"
+echo -e "${GREEN}Tip: Use 'make test-workloads-cleanup' to remove test workloads${NC}"
