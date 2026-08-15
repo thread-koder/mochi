@@ -36,10 +36,16 @@ var (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load configuration: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	logger.Init(cfg.Log.Level, cfg.Log.Format)
@@ -53,41 +59,42 @@ func main() {
 
 	log.Info().Msg("Initializing components...")
 	if err := database.Init(&cfg.Database); err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize database")
+		return fmt.Errorf("initialize database: %w", err)
 	}
 	defer database.Close()
 
 	if err := database.Migrate(&cfg.Database); err != nil {
-		log.Fatal().Err(err).Msg("Failed to run database migrations")
+		return fmt.Errorf("run database migrations: %w", err)
 	}
 
 	if err := kubernetes.Init(&cfg.Kubernetes); err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize Kubernetes client")
+		return fmt.Errorf("initialize Kubernetes client: %w", err)
 	}
 
 	if err := prometheus.Init(&cfg.Prometheus); err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize Prometheus client")
+		return fmt.Errorf("initialize Prometheus client: %w", err)
 	}
 
 	if err := redis.Init(&cfg.Redis); err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize Redis client")
+		return fmt.Errorf("initialize Redis client: %w", err)
 	}
 	defer redis.Close()
 
 	workerPool, err := workers.NewWorkerPool(&cfg.Workers)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create worker pool")
+		return fmt.Errorf("create worker pool: %w", err)
 	}
 
-	server, err := api.NewServer(cfg)
+	srv, err := api.NewServer(cfg)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create API server")
+		return fmt.Errorf("create API server: %w", err)
 	}
 	log.Info().Msg("Components initialized")
 
+	errCh := make(chan error, 1)
 	go func() {
-		if err := server.Start(); err != nil {
-			log.Fatal().Err(err).Msg("Failed to start API server")
+		if err := srv.Start(); err != nil {
+			errCh <- err
 		}
 	}()
 
@@ -96,17 +103,29 @@ func main() {
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+
+	var startErr error
+	select {
+	case <-quit:
+	case startErr = <-errCh:
+	}
 
 	// Bound shutdown so SIGTERM/SIGINT can't leave the process stuck
 	// if Close or in-flight work never completes.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := server.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(ctx); err != nil {
 		log.Error().Err(err).Msg("Server forced to shutdown")
-		os.Exit(1)
+		if startErr != nil {
+			return fmt.Errorf("API server: %w (shutdown: %v)", startErr, err)
+		}
+		return fmt.Errorf("API server shutdown: %w", err)
 	}
 
 	log.Info().Msg("Server shutdown")
+	if startErr != nil {
+		return fmt.Errorf("API server: %w", startErr)
+	}
+	return nil
 }
