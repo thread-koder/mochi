@@ -65,7 +65,7 @@ func DefaultResolveOptions() ResolveOptions {
 
 // Resolve turns one connection series into a workload edge, or drops it as noise/unresolvable src.
 func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (ResolvedEdge, bool, error) {
-	if series.Connects <= 0 {
+	if series.Connects <= 0 && series.ActiveConnections <= 0 {
 		return ResolvedEdge{}, false, nil
 	}
 	if isLinkLocalOrMetadata(series.ActualDstIP) {

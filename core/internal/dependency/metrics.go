@@ -85,10 +85,28 @@ func joinConnectionSeries(connects, txBytes, rxBytes, active model.Vector) []Con
 	rxByKey := vectorValuesByKey(rxBytes)
 	activeByKey := vectorValuesByKey(active)
 
-	series := make([]ConnectionSeries, 0, len(connects))
+	seen := make(map[string]struct{}, len(connects))
+	series := make([]ConnectionSeries, 0, len(connects)+len(active))
+
 	for _, sample := range connects {
-		conn, ok := connectionFromSample(sample, txByKey, rxByKey, activeByKey)
+		conn, key, ok := connectionFromMetric(sample.Metric, float64(sample.Value), txByKey, rxByKey, activeByKey)
 		if !ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		series = append(series, conn)
+	}
+
+	// Long-lived sockets often have active > 0 with no connects increase in the window.
+	for _, sample := range active {
+		if float64(sample.Value) <= 0 {
+			continue
+		}
+		conn, key, ok := connectionFromMetric(sample.Metric, 0, txByKey, rxByKey, activeByKey)
+		if !ok {
+			continue
+		}
+		if _, ok := seen[key]; ok {
 			continue
 		}
 		series = append(series, conn)
@@ -118,27 +136,26 @@ func identityKey(parts ...string) string {
 	return strings.Join(parts, "\x00")
 }
 
-func connectionFromSample(
-	sample *model.Sample,
+func connectionFromMetric(
+	metric model.Metric,
+	connects float64,
 	txByKey, rxByKey, activeByKey map[string]float64,
-) (ConnectionSeries, bool) {
-	metric := sample.Metric
-
+) (ConnectionSeries, string, bool) {
 	srcPodUID := string(metric["src_pod_uid"])
 	if srcPodUID == "" {
-		return ConnectionSeries{}, false
+		return ConnectionSeries{}, "", false
 	}
 
 	dstPortLabel := string(metric["dst_port"])
 	dstPort, err := strconv.Atoi(dstPortLabel)
 	if err != nil {
-		return ConnectionSeries{}, false
+		return ConnectionSeries{}, "", false
 	}
 
 	actualDstPortLabel := string(metric["actual_dst_port"])
 	actualDstPort, err := strconv.Atoi(actualDstPortLabel)
 	if err != nil {
-		return ConnectionSeries{}, false
+		return ConnectionSeries{}, "", false
 	}
 
 	srcNamespace := string(metric["src_namespace"])
@@ -167,9 +184,9 @@ func connectionFromSample(
 		ActualDstIP:       actualDstIP,
 		ActualDstPort:     actualDstPort,
 		Protocol:          protocol,
-		Connects:          float64(sample.Value),
+		Connects:          connects,
 		TxBytes:           txByKey[key],
 		RxBytes:           rxByKey[key],
 		ActiveConnections: activeByKey[key],
-	}, true
+	}, key, true
 }
