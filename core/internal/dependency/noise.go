@@ -33,3 +33,7 @@ func isDNSNoise(node NodeRef) bool {
 func sameNode(a, b NodeRef) bool {
 	return a.Kind == b.Kind && a.Namespace == b.Namespace && a.Name == b.Name
 }
+
+func isValidIPAddress(ip string) bool {
+	return ip != "" && net.ParseIP(ip) != nil
+}

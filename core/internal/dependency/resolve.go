@@ -68,6 +68,9 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 	if series.Connects <= 0 && series.ActiveConnections <= 0 {
 		return ResolvedEdge{}, false, nil
 	}
+	if !isValidIPAddress(series.ActualDstIP) {
+		return ResolvedEdge{}, false, nil
+	}
 	if isLinkLocalOrMetadata(series.ActualDstIP) {
 		return ResolvedEdge{}, false, nil
 	}
