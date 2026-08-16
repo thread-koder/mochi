@@ -39,26 +39,30 @@ type ResolveOptions struct {
 }
 
 type resolveCache struct {
-	serviceByIP  map[string]cachedService
-	workloadByIP map[string]cachedWorkload
+	serviceByClusterIP map[string]*database.Service
+	nodeRefByClusterIP map[string]cachedNodeRef
+	podsByIP           map[string][]*database.Pod
+	replicaSetByKey    map[string]*database.ReplicaSet
+	nodeRefByUID       map[string]cachedNodeRef
 }
 
-type cachedService struct {
-	svc   *database.Service
-	found bool
-}
-
-type cachedWorkload struct {
+type cachedNodeRef struct {
 	ref NodeRef
 	ok  bool
 }
 
+// DefaultResolveOptions returns options with a ready pass-local cache.
+// Callers of Resolve must use this (or equivalent initialized maps),
+// a zero value panics on cache write.
 func DefaultResolveOptions() ResolveOptions {
 	return ResolveOptions{
 		IncludeDNS: false,
 		cache: resolveCache{
-			serviceByIP:  make(map[string]cachedService),
-			workloadByIP: make(map[string]cachedWorkload),
+			serviceByClusterIP: make(map[string]*database.Service),
+			nodeRefByClusterIP: make(map[string]cachedNodeRef),
+			podsByIP:           make(map[string][]*database.Pod),
+			replicaSetByKey:    make(map[string]*database.ReplicaSet),
+			nodeRefByUID:       make(map[string]cachedNodeRef),
 		},
 	}
 }
@@ -78,17 +82,27 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 		return ResolvedEdge{}, false, nil
 	}
 
-	srcPod, err := database.GetPodByUID(ctx, series.SrcPodUID)
-	if err != nil {
-		if errors.Is(err, &apperrors.NotFoundError{}) {
-			return ResolvedEdge{}, false, nil
+	var from NodeRef
+	var ok bool
+	if cached, hit := opts.cache.nodeRefByUID[series.SrcPodUID]; hit {
+		from, ok = cached.ref, cached.ok
+	} else {
+		srcPod, err := database.GetPodByUID(ctx, series.SrcPodUID)
+		if err != nil {
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				opts.cache.nodeRefByUID[series.SrcPodUID] = cachedNodeRef{}
+				return ResolvedEdge{}, false, nil
+			}
+			return ResolvedEdge{}, false, fmt.Errorf("lookup src pod %s: %w", series.SrcPodUID, err)
 		}
-		return ResolvedEdge{}, false, fmt.Errorf("lookup src pod %s: %w", series.SrcPodUID, err)
-	}
-
-	from, ok, err := nodeRefFromPod(ctx, srcPod)
-	if err != nil {
-		return ResolvedEdge{}, false, err
+		from, ok, err = nodeRefFromPod(ctx, srcPod, opts)
+		if err != nil {
+			return ResolvedEdge{}, false, err
+		}
+		opts.cache.nodeRefByUID[srcPod.UID] = cachedNodeRef{
+			ref: from,
+			ok:  ok,
+		}
 	}
 	if !ok {
 		return ResolvedEdge{}, false, nil
@@ -138,12 +152,12 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 }
 
 func resolveDestination(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (NodeRef, error) {
-	pods, err := database.GetPodsByIP(ctx, series.ActualDstIP)
+	pods, err := lookupPodsByIP(ctx, opts, series.ActualDstIP)
 	if err != nil {
-		return NodeRef{}, fmt.Errorf("lookup pods by IP %s: %w", series.ActualDstIP, err)
+		return NodeRef{}, err
 	}
 	if len(pods) > 0 {
-		ref, ok, err := nodeRefFromPod(ctx, pods[0])
+		ref, ok, err := resolvePodNodeRef(ctx, opts, pods[0])
 		if err != nil {
 			return NodeRef{}, err
 		}
@@ -177,29 +191,70 @@ func resolveDestination(ctx context.Context, series ConnectionSeries, opts Resol
 	}, nil
 }
 
+func resolvePodNodeRef(ctx context.Context, opts ResolveOptions, pod *database.Pod) (NodeRef, bool, error) {
+	if cached, hit := opts.cache.nodeRefByUID[pod.UID]; hit {
+		return cached.ref, cached.ok, nil
+	}
+	ref, ok, err := nodeRefFromPod(ctx, pod, opts)
+	if err != nil {
+		return NodeRef{}, false, err
+	}
+	opts.cache.nodeRefByUID[pod.UID] = cachedNodeRef{
+		ref: ref,
+		ok:  ok,
+	}
+	return ref, ok, nil
+}
+
+func lookupPodsByIP(ctx context.Context, opts ResolveOptions, ip string) ([]*database.Pod, error) {
+	if pods, hit := opts.cache.podsByIP[ip]; hit {
+		return pods, nil
+	}
+	pods, err := database.GetPodsByIP(ctx, ip)
+	if err != nil {
+		return nil, fmt.Errorf("lookup pods by IP %s: %w", ip, err)
+	}
+	opts.cache.podsByIP[ip] = pods
+	return pods, nil
+}
+
+func lookupReplicaSet(ctx context.Context, opts ResolveOptions, namespace, name string) (*database.ReplicaSet, bool, error) {
+	key := namespace + "\x00" + name
+	if rs, hit := opts.cache.replicaSetByKey[key]; hit {
+		return rs, rs != nil, nil
+	}
+	rs, err := database.GetReplicaSetByName(ctx, name, namespace)
+	if err != nil {
+		if errors.Is(err, &apperrors.NotFoundError{}) {
+			opts.cache.replicaSetByKey[key] = nil
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("lookup ReplicaSet %s/%s: %w", namespace, name, err)
+	}
+	opts.cache.replicaSetByKey[key] = rs
+	return rs, true, nil
+}
+
 func lookupService(ctx context.Context, opts ResolveOptions, clusterIP string) (*database.Service, bool, error) {
-	if cached, hit := opts.cache.serviceByIP[clusterIP]; hit {
-		return cached.svc, cached.found, nil
+	if svc, hit := opts.cache.serviceByClusterIP[clusterIP]; hit {
+		return svc, svc != nil, nil
 	}
 
 	svc, err := database.GetServiceByClusterIP(ctx, clusterIP)
 	if err != nil {
 		if errors.Is(err, &apperrors.NotFoundError{}) {
-			opts.cache.serviceByIP[clusterIP] = cachedService{}
+			opts.cache.serviceByClusterIP[clusterIP] = nil
 			return nil, false, nil
 		}
 		return nil, false, fmt.Errorf("lookup service by cluster IP %s: %w", clusterIP, err)
 	}
 
-	opts.cache.serviceByIP[clusterIP] = cachedService{
-		svc:   svc,
-		found: true,
-	}
+	opts.cache.serviceByClusterIP[clusterIP] = svc
 	return svc, true, nil
 }
 
 func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, clusterIP string) (NodeRef, bool, error) {
-	if cached, hit := opts.cache.workloadByIP[clusterIP]; hit {
+	if cached, hit := opts.cache.nodeRefByClusterIP[clusterIP]; hit {
 		return cached.ref, cached.ok, nil
 	}
 
@@ -208,13 +263,13 @@ func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, cluste
 		return NodeRef{}, false, err
 	}
 	if !found {
-		opts.cache.workloadByIP[clusterIP] = cachedWorkload{}
+		opts.cache.nodeRefByClusterIP[clusterIP] = cachedNodeRef{}
 		return NodeRef{}, false, nil
 	}
 
 	slices, err := database.GetEndpointSlicesByService(ctx, svc.Namespace, svc.Name)
 	if err != nil {
-		return NodeRef{}, false, err
+		return NodeRef{}, false, fmt.Errorf("lookup endpoint slices for %s/%s: %w", svc.Namespace, svc.Name, err)
 	}
 
 	for _, es := range slices {
@@ -223,19 +278,19 @@ func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, cluste
 			return NodeRef{}, false, fmt.Errorf("parse endpoints for %s/%s: %w", es.Namespace, es.Name, err)
 		}
 		for _, addr := range addrs {
-			pods, err := database.GetPodsByIP(ctx, addr)
+			pods, err := lookupPodsByIP(ctx, opts, addr)
 			if err != nil {
-				return NodeRef{}, false, fmt.Errorf("lookup pods by endpoint IP %s: %w", addr, err)
+				return NodeRef{}, false, err
 			}
 			if len(pods) == 0 {
 				continue
 			}
-			ref, ok, err := nodeRefFromPod(ctx, pods[0])
+			ref, ok, err := resolvePodNodeRef(ctx, opts, pods[0])
 			if err != nil {
 				return NodeRef{}, false, err
 			}
 			if ok {
-				opts.cache.workloadByIP[clusterIP] = cachedWorkload{
+				opts.cache.nodeRefByClusterIP[clusterIP] = cachedNodeRef{
 					ref: ref,
 					ok:  true,
 				}
@@ -244,7 +299,7 @@ func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, cluste
 		}
 	}
 
-	opts.cache.workloadByIP[clusterIP] = cachedWorkload{}
+	opts.cache.nodeRefByClusterIP[clusterIP] = cachedNodeRef{}
 	return NodeRef{}, false, nil
 }
 

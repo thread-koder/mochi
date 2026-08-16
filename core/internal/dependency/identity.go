@@ -2,10 +2,7 @@ package dependency
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
-	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
 )
 
@@ -18,11 +15,7 @@ const (
 )
 
 // nodeRefFromPod maps a pod to a stable workload identity.
-func nodeRefFromPod(ctx context.Context, pod *database.Pod) (NodeRef, bool, error) {
-	if pod == nil {
-		return NodeRef{}, false, fmt.Errorf("pod cannot be nil")
-	}
-
+func nodeRefFromPod(ctx context.Context, pod *database.Pod, opts ResolveOptions) (NodeRef, bool, error) {
 	if pod.OwnerKind == nil || pod.OwnerName == nil {
 		return NodeRef{
 			Kind:      KindPod,
@@ -40,12 +33,12 @@ func nodeRefFromPod(ctx context.Context, pod *database.Pod) (NodeRef, bool, erro
 
 	switch ownerKind {
 	case "ReplicaSet":
-		rs, err := database.GetReplicaSetByName(ctx, ownerName, pod.Namespace)
+		rs, found, err := lookupReplicaSet(ctx, opts, pod.Namespace, ownerName)
 		if err != nil {
-			if errors.Is(err, &apperrors.NotFoundError{}) {
-				return NodeRef{}, false, nil
-			}
-			return NodeRef{}, false, fmt.Errorf("resolve ReplicaSet owner for pod %s: %w", pod.UID, err)
+			return NodeRef{}, false, err
+		}
+		if !found {
+			return NodeRef{}, false, nil
 		}
 		if rs.OwnerKind != nil && rs.OwnerName != nil && *rs.OwnerKind == "Deployment" {
 			return NodeRef{

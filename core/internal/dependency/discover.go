@@ -133,9 +133,6 @@ func mergeResolvedEdge(merged map[string]*ResolvedEdge, edge ResolvedEdge) {
 	if len(existing.Evidence) == 0 && len(edge.Evidence) > 0 {
 		existing.Evidence = edge.Evidence
 	}
-	if existing.Source == "" {
-		existing.Source = edge.Source
-	}
 }
 
 func addDiscoveryNode(nodesByKey map[string]*database.DependencyNode, ref NodeRef, now time.Time) {
