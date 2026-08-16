@@ -27,6 +27,15 @@ type ConnectionSeries struct {
 	ActiveConnections float64
 }
 
+const (
+	ProtocolTCP = "tcp"
+	ProtocolUDP = "udp"
+)
+
+func isKnownProtocol(protocol string) bool {
+	return protocol == ProtocolTCP || protocol == ProtocolUDP
+}
+
 func FetchConnectionSeries(ctx context.Context, opts prometheus.QueryOptions) ([]ConnectionSeries, error) {
 	var (
 		connects model.Vector
@@ -163,6 +172,9 @@ func connectionFromMetric(
 	dstIP := string(metric["dst_ip"])
 	actualDstIP := string(metric["actual_dst_ip"])
 	protocol := string(metric["protocol"])
+	if !isKnownProtocol(protocol) {
+		return ConnectionSeries{}, "", false
+	}
 
 	key := identityKey(
 		srcPodUID,

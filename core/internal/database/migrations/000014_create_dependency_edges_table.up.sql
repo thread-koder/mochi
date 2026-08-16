@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS dependency_edges (
     id UUID PRIMARY KEY DEFAULT uuidv7(),
     from_node_id UUID NOT NULL REFERENCES dependency_nodes(id) ON DELETE CASCADE,
     to_node_id UUID NOT NULL REFERENCES dependency_nodes(id) ON DELETE CASCADE,
-    protocol VARCHAR(50) NOT NULL DEFAULT 'tcp',
+    protocol VARCHAR(50) NOT NULL CHECK (protocol IN ('tcp', 'udp')),
     port INT NOT NULL,
     via_service_namespace VARCHAR(255),
     via_service_name VARCHAR(255),
