@@ -116,6 +116,48 @@ func GetEndpointSlicesByService(ctx context.Context, namespace, serviceName stri
 	return slices, nil
 }
 
+func GetHeadlessServicesByEndpointIP(ctx context.Context, ip string) ([]*Service, error) {
+	query := `
+		SELECT DISTINCT s.id, s.name, s.namespace, s.uid, s.type, s.cluster_ip, s.ports, s.selector,
+		       s.labels, s.annotations, s.created_at, s.updated_at, s.synced_at
+		FROM endpoint_slices es
+		JOIN services s ON s.namespace = es.namespace AND s.name = es.owner_name
+		WHERE es.owner_kind = 'Service'
+		  AND (s.cluster_ip IS NULL OR s.cluster_ip = 'None')
+		  AND EXISTS (
+		    SELECT 1
+		    FROM jsonb_array_elements(es.endpoints) AS ep,
+		         jsonb_array_elements_text(ep->'addresses') AS addr
+		    WHERE addr = @ip
+		  )
+		ORDER BY s.namespace, s.name
+	`
+
+	rows, err := Pool.Query(ctx, query,
+		pgx.StrictNamedArgs{"ip": ip},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query headless services by endpoint IP: %w", err)
+	}
+	defer rows.Close()
+
+	var services []*Service
+	for rows.Next() {
+		var s Service
+		if err := rows.Scan(
+			&s.ID, &s.Name, &s.Namespace, &s.UID, &s.Type, &s.ClusterIP, &s.Ports, &s.Selector,
+			&s.Labels, &s.Annotations, &s.CreatedAt, &s.UpdatedAt, &s.SyncedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan service: %w", err)
+		}
+		services = append(services, &s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate services: %w", err)
+	}
+	return services, nil
+}
+
 // PruneEndpointSlices deletes EndpointSlices not listed in uids.
 // Empty uids deletes every EndpointSlice in the namespace.
 func PruneEndpointSlices(ctx context.Context, namespace string, uids []string) error {

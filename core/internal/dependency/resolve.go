@@ -39,11 +39,12 @@ type ResolveOptions struct {
 }
 
 type resolveCache struct {
-	serviceByClusterIP map[string]*database.Service
-	nodeRefByClusterIP map[string]cachedNodeRef
-	podsByIP           map[string][]*database.Pod
-	replicaSetByKey    map[string]*database.ReplicaSet
-	nodeRefByUID       map[string]cachedNodeRef
+	serviceByClusterIP  map[string]*database.Service
+	serviceByEndpointIP map[string]*database.Service
+	nodeRefByClusterIP  map[string]cachedNodeRef
+	podsByIP            map[string][]*database.Pod
+	replicaSetByKey     map[string]*database.ReplicaSet
+	nodeRefByUID        map[string]cachedNodeRef
 }
 
 type cachedNodeRef struct {
@@ -58,11 +59,12 @@ func DefaultResolveOptions() ResolveOptions {
 	return ResolveOptions{
 		IncludeDNS: false,
 		cache: resolveCache{
-			serviceByClusterIP: make(map[string]*database.Service),
-			nodeRefByClusterIP: make(map[string]cachedNodeRef),
-			podsByIP:           make(map[string][]*database.Pod),
-			replicaSetByKey:    make(map[string]*database.ReplicaSet),
-			nodeRefByUID:       make(map[string]cachedNodeRef),
+			serviceByClusterIP:  make(map[string]*database.Service),
+			serviceByEndpointIP: make(map[string]*database.Service),
+			nodeRefByClusterIP:  make(map[string]cachedNodeRef),
+			podsByIP:            make(map[string][]*database.Pod),
+			replicaSetByKey:     make(map[string]*database.ReplicaSet),
+			nodeRefByUID:        make(map[string]cachedNodeRef),
 		},
 	}
 }
@@ -253,6 +255,24 @@ func lookupService(ctx context.Context, opts ResolveOptions, clusterIP string) (
 	return svc, true, nil
 }
 
+func lookupHeadlessService(ctx context.Context, opts ResolveOptions, ip string) (*database.Service, bool, error) {
+	if svc, hit := opts.cache.serviceByEndpointIP[ip]; hit {
+		return svc, svc != nil, nil
+	}
+
+	services, err := database.GetHeadlessServicesByEndpointIP(ctx, ip)
+	if err != nil {
+		return nil, false, fmt.Errorf("lookup headless service by endpoint IP %s: %w", ip, err)
+	}
+	if len(services) != 1 {
+		opts.cache.serviceByEndpointIP[ip] = nil
+		return nil, false, nil
+	}
+
+	opts.cache.serviceByEndpointIP[ip] = services[0]
+	return services[0], true, nil
+}
+
 func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, clusterIP string) (NodeRef, bool, error) {
 	if cached, hit := opts.cache.nodeRefByClusterIP[clusterIP]; hit {
 		return cached.ref, cached.ok, nil
@@ -327,6 +347,20 @@ func viaService(ctx context.Context, series ConnectionSeries, opts ResolveOption
 			continue
 		}
 		svc, found, err := lookupService(ctx, opts, ip)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !found {
+			continue
+		}
+		return new(svc.Namespace), new(svc.Name), nil
+	}
+	// Headless clients dial pod IPs. Unique headless EndpointSlice membership only.
+	for _, ip := range []string{series.DstIP, series.ActualDstIP} {
+		if ip == "" {
+			continue
+		}
+		svc, found, err := lookupHeadlessService(ctx, opts, ip)
 		if err != nil {
 			return nil, nil, err
 		}
