@@ -30,10 +30,12 @@ func GetNamespaceCount(ctx context.Context) (int, error) {
 func GetWorkloadCount(ctx context.Context) (int, error) {
 	var count int
 	query := `
-		SELECT 
+		SELECT
 			(SELECT COUNT(*) FROM deployments) +
 			(SELECT COUNT(*) FROM statefulsets) +
-			(SELECT COUNT(*) FROM daemonsets) as total
+			(SELECT COUNT(*) FROM daemonsets) +
+			(SELECT COUNT(*) FROM cronjobs) +
+			(SELECT COUNT(*) FROM jobs WHERE owner_kind IS NULL OR owner_kind <> 'CronJob') as total
 	`
 	err := Pool.QueryRow(ctx, query).Scan(&count)
 	if err != nil {

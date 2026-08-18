@@ -86,8 +86,12 @@ func ApplyRecommendation(ctx context.Context, rec *database.ComputeRecommendatio
 		return applyToStatefulSet(ctx, rec, containerRecs)
 	case "DaemonSet":
 		return applyToDaemonSet(ctx, rec, containerRecs)
+	case "Job":
+		return newApplyNotSupported("Job", "Jobs are not patched in place: apply manually or regenerate the Job")
+	case "CronJob":
+		return newApplyNotSupported("CronJob", "CronJobs are not auto-patched: apply manually or via a later job template change")
 	case "Pod":
-		return applyToPod()
+		return newApplyNotSupported("Pod", "Pods are immutable: apply manually or via the owning workload")
 	default:
 		return newApplyNotSupported(rec.WorkloadType, fmt.Sprintf("unsupported workload type: %s", rec.WorkloadType))
 	}
@@ -185,10 +189,6 @@ func applyToDaemonSet(ctx context.Context, rec *database.ComputeRecommendation, 
 	}
 
 	return nil
-}
-
-func applyToPod() error {
-	return newApplyNotSupported("Pod", "pods are immutable: apply manually or via the owning Deployment, StatefulSet, or DaemonSet")
 }
 
 func getMochiAnnotations(rec *database.ComputeRecommendation) map[string]string {

@@ -454,6 +454,8 @@ func syncCronJobs(ctx context.Context, namespace string) error {
 
 	if err := database.PruneCronJobs(ctx, namespace, cjUIDs); err != nil {
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune cronjobs not in current state")
+	} else if err := database.PruneComputeRecommendations(ctx, namespace, "CronJob"); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune compute recommendations for deleted cronjobs")
 	}
 	return nil
 }
@@ -506,6 +508,8 @@ func syncJobs(ctx context.Context, namespace string) error {
 
 	if err := database.PruneJobs(ctx, namespace, jobUIDs); err != nil {
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune jobs not in current state")
+	} else if err := database.PruneComputeRecommendations(ctx, namespace, "Job"); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune compute recommendations for deleted jobs")
 	}
 	return nil
 }

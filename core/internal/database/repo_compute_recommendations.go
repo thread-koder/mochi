@@ -252,6 +252,14 @@ func PruneComputeRecommendations(ctx context.Context, namespace, workloadType st
 		existsClause = `
 			SELECT 1 FROM daemonsets ds
 			WHERE ds.namespace = cr.namespace AND ds.name = cr.workload_name`
+	case "Job":
+		existsClause = `
+			SELECT 1 FROM jobs j
+			WHERE j.namespace = cr.namespace AND j.name = cr.workload_name`
+	case "CronJob":
+		existsClause = `
+			SELECT 1 FROM cronjobs cj
+			WHERE cj.namespace = cr.namespace AND cj.name = cr.workload_name`
 	case "Pod":
 		existsClause = `
 			SELECT 1 FROM pods p
