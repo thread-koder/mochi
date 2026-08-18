@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { workloadTypeLabel } from '#shared/constants/workload'
+import { workloadTypeLabel, workloadStatusLine } from '#shared/constants/workload'
 import type { WorkloadResponse } from '#shared/types/workload'
 
 const route = useRoute()
@@ -71,7 +71,7 @@ const breadcrumbs = [
 
 const headerSubline = [
   workloadTypeLabel(workload.type),
-  ...(workload.type !== 'Pod' ? [`${workload.ready}/${workload.replicas} replicas`] : []),
+  workloadStatusLine(workload),
   `Created ${timeAgo(workload.created_at)}`,
 ].join(' · ')
 

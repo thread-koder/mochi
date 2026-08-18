@@ -4,13 +4,25 @@ interface NamespaceStats {
   containers: number
 }
 
-interface Workload {
-  type: string
-  name: string
-  replicas: number
-  ready: number
-  created_at: string
-}
+type Workload
+  = | {
+    type: 'Deployment' | 'StatefulSet' | 'DaemonSet'
+    name: string
+    created_at: string
+    status: ReplicaStatus
+  }
+  | {
+    type: 'Job'
+    name: string
+    created_at: string
+    status: JobStatus
+  }
+  | {
+    type: 'CronJob'
+    name: string
+    created_at: string
+    status: CronJobStatus
+  }
 
 interface StandalonePod {
   name: string

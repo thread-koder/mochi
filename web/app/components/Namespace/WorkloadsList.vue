@@ -28,7 +28,7 @@
               {{ workload.name }}
             </h3>
             <div class="text-sm text-on-surface-subtle mt-1">
-              <span>Replicas: {{ workload.ready }}/{{ workload.replicas }}</span>
+              <span>{{ workloadStatusLine(workload) }}</span>
               <span class="mx-2">•</span>
               <span>Created: {{ timeAgo(workload.created_at) }}</span>
             </div>
@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { workloadTypeLabel } from '#shared/constants/workload'
+import { workloadTypeLabel, workloadStatusLine } from '#shared/constants/workload'
 import type { Workload } from '#shared/types/namespace'
 
 defineProps<{

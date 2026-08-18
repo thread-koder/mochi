@@ -1,3 +1,23 @@
+interface ReplicaStatus {
+  replicas: number
+  ready: number
+}
+
+interface JobStatus {
+  active: number
+  succeeded: number
+  failed: number
+}
+
+interface CronJobStatus {
+  schedule: string
+  suspend: boolean
+}
+
+interface PodStatus {
+  phase: string
+}
+
 interface WorkloadStats {
   pods: number
   containers: number
@@ -20,16 +40,53 @@ interface Container {
   memory_limit: string
 }
 
-interface WorkloadResponse {
-  namespace: string
-  type: string
-  name: string
-  replicas: number
-  ready: number
-  created_at: string
-  pods: Pod[]
-  containers: Container[]
-  stats: WorkloadStats
-}
+type WorkloadResponse
+  = | {
+    type: 'Deployment' | 'StatefulSet' | 'DaemonSet'
+    name: string
+    created_at: string
+    namespace: string
+    status: ReplicaStatus
+    pods: Pod[]
+    containers: Container[]
+    stats: WorkloadStats
+  }
+  | {
+    type: 'Job'
+    name: string
+    created_at: string
+    namespace: string
+    status: JobStatus
+    pods: Pod[]
+    containers: Container[]
+    stats: WorkloadStats
+  }
+  | {
+    type: 'CronJob'
+    name: string
+    created_at: string
+    namespace: string
+    status: CronJobStatus
+    pods: Pod[]
+    containers: Container[]
+    stats: WorkloadStats
+  }
+  | {
+    type: 'Pod'
+    name: string
+    created_at: string
+    namespace: string
+    status: PodStatus
+    pods: Pod[]
+    containers: Container[]
+    stats: WorkloadStats
+  }
 
-export type { WorkloadResponse, Container, Pod }
+export type {
+  ReplicaStatus,
+  JobStatus,
+  CronJobStatus,
+  WorkloadResponse,
+  Container,
+  Pod,
+}
