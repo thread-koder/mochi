@@ -160,8 +160,8 @@ func GetNamespace(c *gin.Context) {
 	workloads := make([]Workload, 0, len(deployments)+len(statefulsets)+len(daemonsets)+len(cronjobs)+len(standaloneJobs))
 	for _, dep := range deployments {
 		workloads = append(workloads, Workload{
-			Type:      "Deployment",
-			Name:      dep.Name,
+			Type: "Deployment",
+			Name: dep.Name,
 			Status: WorkloadStatus{
 				Replicas: new(dep.Replicas),
 				Ready:    new(dep.ReadyReplicas),
@@ -171,8 +171,8 @@ func GetNamespace(c *gin.Context) {
 	}
 	for _, sts := range statefulsets {
 		workloads = append(workloads, Workload{
-			Type:      "StatefulSet",
-			Name:      sts.Name,
+			Type: "StatefulSet",
+			Name: sts.Name,
 			Status: WorkloadStatus{
 				Replicas: new(sts.Replicas),
 				Ready:    new(sts.ReadyReplicas),
@@ -182,8 +182,8 @@ func GetNamespace(c *gin.Context) {
 	}
 	for _, ds := range daemonsets {
 		workloads = append(workloads, Workload{
-			Type:      "DaemonSet",
-			Name:      ds.Name,
+			Type: "DaemonSet",
+			Name: ds.Name,
 			Status: WorkloadStatus{
 				Replicas: new(ds.DesiredNumberScheduled),
 				Ready:    new(ds.NumberReady),
