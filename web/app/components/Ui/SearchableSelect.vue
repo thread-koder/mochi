@@ -9,7 +9,7 @@
       type="button"
       class="bg-surface-elevated border border-on-surface-muted/20 rounded-lg px-3 py-2
        text-sm text-on-surface-secondary focus:outline-none focus:border-primary/50
-       min-w-[140px] text-left flex items-center justify-between gap-2 cursor-pointer
+       min-w-35 text-left flex items-center justify-between gap-2 cursor-pointer
        disabled:opacity-50 disabled:cursor-not-allowed"
       :class="modelValue ? 'text-on-surface' : ''"
       :disabled="disabled"

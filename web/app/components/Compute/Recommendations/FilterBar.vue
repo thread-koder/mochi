@@ -76,7 +76,7 @@
           placeholder="Search workload name..."
           class="bg-surface-elevated border border-on-surface-muted/20 rounded-lg px-3 py-2
              text-sm text-on-surface-secondary placeholder:text-on-surface-muted
-             focus:outline-none focus:border-primary/50 min-w-[180px]"
+             focus:outline-none focus:border-primary/50 min-w-45"
         >
       </div>
     </div>

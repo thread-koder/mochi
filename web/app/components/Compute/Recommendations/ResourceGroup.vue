@@ -5,7 +5,7 @@
       :key="field.label"
       class="text-sm flex items-center"
     >
-      <span class="text-on-surface-secondary min-w-[60px]">{{ field.label }}:</span>
+      <span class="text-on-surface-secondary min-w-15">{{ field.label }}:</span>
 
       <template v-if="field.state === 'empty'">
         <span class="text-on-surface-muted ml-2">N/A</span>
