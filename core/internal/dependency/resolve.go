@@ -44,6 +44,7 @@ type resolveCache struct {
 	nodeRefByClusterIP  map[string]cachedNodeRef
 	podsByIP            map[string][]*database.Pod
 	replicaSetByKey     map[string]*database.ReplicaSet
+	jobByKey            map[string]*database.Job
 	nodeRefByUID        map[string]cachedNodeRef
 }
 
@@ -64,6 +65,7 @@ func DefaultResolveOptions() ResolveOptions {
 			nodeRefByClusterIP:  make(map[string]cachedNodeRef),
 			podsByIP:            make(map[string][]*database.Pod),
 			replicaSetByKey:     make(map[string]*database.ReplicaSet),
+			jobByKey:            make(map[string]*database.Job),
 			nodeRefByUID:        make(map[string]cachedNodeRef),
 		},
 	}
@@ -235,6 +237,23 @@ func lookupReplicaSet(ctx context.Context, opts ResolveOptions, namespace, name 
 	}
 	opts.cache.replicaSetByKey[key] = rs
 	return rs, true, nil
+}
+
+func lookupJob(ctx context.Context, opts ResolveOptions, namespace, name string) (*database.Job, bool, error) {
+	key := namespace + "\x00" + name
+	if job, hit := opts.cache.jobByKey[key]; hit {
+		return job, job != nil, nil
+	}
+	job, err := database.GetJobByName(ctx, name, namespace)
+	if err != nil {
+		if errors.Is(err, &apperrors.NotFoundError{}) {
+			opts.cache.jobByKey[key] = nil
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("lookup Job %s/%s: %w", namespace, name, err)
+	}
+	opts.cache.jobByKey[key] = job
+	return job, true, nil
 }
 
 func lookupService(ctx context.Context, opts ResolveOptions, clusterIP string) (*database.Service, bool, error) {

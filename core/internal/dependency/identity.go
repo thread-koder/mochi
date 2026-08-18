@@ -10,6 +10,8 @@ const (
 	KindDeployment  = "Deployment"
 	KindStatefulSet = "StatefulSet"
 	KindDaemonSet   = "DaemonSet"
+	KindJob         = "Job"
+	KindCronJob     = "CronJob"
 	KindPod         = "Pod"
 	KindExternal    = "External"
 )
@@ -60,12 +62,27 @@ func nodeRefFromPod(ctx context.Context, pod *database.Pod, opts ResolveOptions)
 			Namespace: pod.Namespace,
 			Name:      ownerName,
 		}, true, nil
-	default:
-		// Job/CronJob and other controllers: treat as Pod-named node.
+	case "Job":
+		job, found, err := lookupJob(ctx, opts, pod.Namespace, ownerName)
+		if err != nil {
+			return NodeRef{}, false, err
+		}
+		if !found {
+			return NodeRef{}, false, nil
+		}
+		if job.OwnerKind != nil && job.OwnerName != nil && *job.OwnerKind == "CronJob" {
+			return NodeRef{
+				Kind:      KindCronJob,
+				Namespace: pod.Namespace,
+				Name:      *job.OwnerName,
+			}, true, nil
+		}
 		return NodeRef{
-			Kind:      KindPod,
+			Kind:      KindJob,
 			Namespace: pod.Namespace,
-			Name:      pod.Name,
+			Name:      ownerName,
 		}, true, nil
+	default:
+		return NodeRef{}, false, nil
 	}
 }

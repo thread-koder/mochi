@@ -101,6 +101,37 @@ type DaemonSet struct {
 	SyncedAt               time.Time       `db:"synced_at"`
 }
 
+type Job struct {
+	ID          uuid.UUID       `db:"id"`
+	Name        string          `db:"name"`
+	Namespace   string          `db:"namespace"`
+	UID         string          `db:"uid"`
+	Active      int             `db:"active"`
+	Succeeded   int             `db:"succeeded"`
+	Failed      int             `db:"failed"`
+	OwnerKind   *string         `db:"owner_kind"`
+	OwnerName   *string         `db:"owner_name"`
+	Labels      json.RawMessage `db:"labels"`
+	Annotations json.RawMessage `db:"annotations"`
+	CreatedAt   time.Time       `db:"created_at"`
+	UpdatedAt   time.Time       `db:"updated_at"`
+	SyncedAt    time.Time       `db:"synced_at"`
+}
+
+type CronJob struct {
+	ID          uuid.UUID       `db:"id"`
+	Name        string          `db:"name"`
+	Namespace   string          `db:"namespace"`
+	UID         string          `db:"uid"`
+	Schedule    string          `db:"schedule"`
+	Suspend     bool            `db:"suspend"`
+	Labels      json.RawMessage `db:"labels"`
+	Annotations json.RawMessage `db:"annotations"`
+	CreatedAt   time.Time       `db:"created_at"`
+	UpdatedAt   time.Time       `db:"updated_at"`
+	SyncedAt    time.Time       `db:"synced_at"`
+}
+
 type Service struct {
 	ID          uuid.UUID       `db:"id"`
 	Name        string          `db:"name"`

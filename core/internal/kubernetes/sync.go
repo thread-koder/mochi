@@ -183,6 +183,8 @@ func syncNamespace(ctx context.Context, namespace string) {
 		{"replicasets", syncReplicaSets},
 		{"statefulsets", syncStatefulSets},
 		{"daemonsets", syncDaemonSets},
+		{"cronjobs", syncCronJobs},
+		{"jobs", syncJobs},
 		{"services", syncServices},
 		{"endpoint slices", syncEndpointSlices},
 		{"pods", syncPods},
@@ -404,6 +406,106 @@ func syncDaemonSets(ctx context.Context, namespace string) error {
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune daemonsets not in current state")
 	} else if err := database.PruneComputeRecommendations(ctx, namespace, "DaemonSet"); err != nil {
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune compute recommendations for deleted daemonsets")
+	}
+	return nil
+}
+
+func syncCronJobs(ctx context.Context, namespace string) error {
+	log := logger.WithComponent("kubernetes")
+
+	cronjobs, err := Clientset.BatchV1().CronJobs(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list cronjobs: %w", err)
+	}
+
+	dbCronJobs := make([]*database.CronJob, 0, len(cronjobs.Items))
+	now := time.Now()
+
+	cjUIDs := make([]string, 0, len(cronjobs.Items))
+	for _, cj := range cronjobs.Items {
+		cjUID := string(cj.UID)
+		cjUIDs = append(cjUIDs, cjUID)
+		labelsJSON, _ := mapToJSON(cj.Labels)
+		annotationsJSON, _ := mapToJSON(cj.Annotations)
+
+		suspend := false
+		if cj.Spec.Suspend != nil {
+			suspend = *cj.Spec.Suspend
+		}
+
+		dbCronJob := &database.CronJob{
+			Name:        cj.Name,
+			Namespace:   cj.Namespace,
+			UID:         cjUID,
+			Schedule:    cj.Spec.Schedule,
+			Suspend:     suspend,
+			Labels:      labelsJSON,
+			Annotations: annotationsJSON,
+			CreatedAt:   cj.CreationTimestamp.Time,
+			SyncedAt:    now,
+		}
+
+		dbCronJobs = append(dbCronJobs, dbCronJob)
+	}
+
+	if err := database.UpsertCronJobsBatch(ctx, dbCronJobs); err != nil {
+		return err
+	}
+
+	if err := database.PruneCronJobs(ctx, namespace, cjUIDs); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune cronjobs not in current state")
+	}
+	return nil
+}
+
+func syncJobs(ctx context.Context, namespace string) error {
+	log := logger.WithComponent("kubernetes")
+
+	jobs, err := Clientset.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list jobs: %w", err)
+	}
+
+	dbJobs := make([]*database.Job, 0, len(jobs.Items))
+	now := time.Now()
+
+	jobUIDs := make([]string, 0, len(jobs.Items))
+	for _, job := range jobs.Items {
+		jobUID := string(job.UID)
+		jobUIDs = append(jobUIDs, jobUID)
+		labelsJSON, _ := mapToJSON(job.Labels)
+		annotationsJSON, _ := mapToJSON(job.Annotations)
+
+		var ownerKind, ownerName *string
+		for _, owner := range job.OwnerReferences {
+			ownerKind, ownerName = optionalOwner(owner.Kind, owner.Name)
+			break
+		}
+
+		dbJob := &database.Job{
+			Name:        job.Name,
+			Namespace:   job.Namespace,
+			UID:         jobUID,
+			Active:      int(job.Status.Active),
+			Succeeded:   int(job.Status.Succeeded),
+			Failed:      int(job.Status.Failed),
+			OwnerKind:   ownerKind,
+			OwnerName:   ownerName,
+			Labels:      labelsJSON,
+			Annotations: annotationsJSON,
+			CreatedAt:   job.CreationTimestamp.Time,
+			SyncedAt:    now,
+		}
+
+		dbJobs = append(dbJobs, dbJob)
+	}
+
+	if err := database.UpsertJobsBatch(ctx, dbJobs); err != nil {
+		return err
+	}
+
+	if err := database.PruneJobs(ctx, namespace, jobUIDs); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune jobs not in current state")
 	}
 	return nil
 }
