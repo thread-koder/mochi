@@ -94,6 +94,28 @@ func AnalyzeWorkloads[T any](
 	})
 
 	g.Go(func() error {
+		cronJobs, err := database.GetCronJobsByNamespace(gctx, namespace)
+		if err != nil {
+			return err
+		}
+		for _, cronJob := range cronJobs {
+			analyzeEntry("CronJob", cronJob.Name, nil)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		standaloneJobs, err := database.GetStandaloneJobsByNamespace(gctx, namespace)
+		if err != nil {
+			return err
+		}
+		for _, job := range standaloneJobs {
+			analyzeEntry("Job", job.Name, nil)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
 		standalonePods, err := database.GetStandalonePodsByNamespace(gctx, namespace)
 		if err != nil {
 			return err

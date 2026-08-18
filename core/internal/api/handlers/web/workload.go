@@ -13,16 +13,26 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+type WorkloadStatus struct {
+	Replicas  *int    `json:"replicas,omitempty"`
+	Ready     *int    `json:"ready,omitempty"`
+	Active    *int    `json:"active,omitempty"`
+	Succeeded *int    `json:"succeeded,omitempty"`
+	Failed    *int    `json:"failed,omitempty"`
+	Schedule  *string `json:"schedule,omitempty"`
+	Suspend   *bool   `json:"suspend,omitempty"`
+	Phase     *string `json:"phase,omitempty"`
+}
+
 type WorkloadResponse struct {
-	Namespace  string        `json:"namespace"`
-	Type       string        `json:"type"`
-	Name       string        `json:"name"`
-	Replicas   int           `json:"replicas"`
-	Ready      int           `json:"ready"`
-	CreatedAt  time.Time     `json:"created_at"`
-	Pods       []Pod         `json:"pods"`
-	Containers []Container   `json:"containers"`
-	Stats      WorkloadStats `json:"stats"`
+	Namespace  string         `json:"namespace"`
+	Type       string         `json:"type"`
+	Name       string         `json:"name"`
+	Status     WorkloadStatus `json:"status"`
+	CreatedAt  time.Time      `json:"created_at"`
+	Pods       []Pod          `json:"pods"`
+	Containers []Container    `json:"containers"`
+	Stats      WorkloadStats  `json:"stats"`
 }
 
 type WorkloadStats struct {
@@ -79,8 +89,10 @@ func GetWorkload(c *gin.Context) {
 			}
 			return
 		}
-		response.Replicas = dep.Replicas
-		response.Ready = dep.ReadyReplicas
+		response.Status = WorkloadStatus{
+			Replicas: new(dep.Replicas),
+			Ready:    new(dep.ReadyReplicas),
+		}
 		response.CreatedAt = dep.CreatedAt
 		pods, err = database.GetPodsByWorkload(ctx, "Deployment", workloadName, namespaceName)
 		if err != nil {
@@ -98,8 +110,10 @@ func GetWorkload(c *gin.Context) {
 			}
 			return
 		}
-		response.Replicas = sts.Replicas
-		response.Ready = sts.ReadyReplicas
+		response.Status = WorkloadStatus{
+			Replicas: new(sts.Replicas),
+			Ready:    new(sts.ReadyReplicas),
+		}
 		response.CreatedAt = sts.CreatedAt
 		pods, err = database.GetPodsByWorkload(ctx, "StatefulSet", workloadName, namespaceName)
 		if err != nil {
@@ -117,10 +131,55 @@ func GetWorkload(c *gin.Context) {
 			}
 			return
 		}
-		response.Replicas = ds.DesiredNumberScheduled
-		response.Ready = ds.NumberReady
+		response.Status = WorkloadStatus{
+			Replicas: new(ds.DesiredNumberScheduled),
+			Ready:    new(ds.NumberReady),
+		}
 		response.CreatedAt = ds.CreatedAt
 		pods, err = database.GetPodsByWorkload(ctx, "DaemonSet", workloadName, namespaceName)
+		if err != nil {
+			c.Error(err)
+		}
+
+	case "Job":
+		job, err := database.GetJobByName(ctx, workloadName, namespaceName)
+		if err != nil {
+			c.Error(err)
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				common.WriteNotFoundError(c, "job_not_found", "Job not found.")
+			} else {
+				common.WriteInternalError(c, "Failed to get Job.")
+			}
+			return
+		}
+		response.Status = WorkloadStatus{
+			Active:    new(job.Active),
+			Succeeded: new(job.Succeeded),
+			Failed:    new(job.Failed),
+		}
+		response.CreatedAt = job.CreatedAt
+		pods, err = database.GetPodsByWorkload(ctx, "Job", workloadName, namespaceName)
+		if err != nil {
+			c.Error(err)
+		}
+
+	case "CronJob":
+		cj, err := database.GetCronJobByName(ctx, workloadName, namespaceName)
+		if err != nil {
+			c.Error(err)
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				common.WriteNotFoundError(c, "cronjob_not_found", "CronJob not found.")
+			} else {
+				common.WriteInternalError(c, "Failed to get CronJob.")
+			}
+			return
+		}
+		response.Status = WorkloadStatus{
+			Schedule: new(cj.Schedule),
+			Suspend:  new(cj.Suspend),
+		}
+		response.CreatedAt = cj.CreatedAt
+		pods, err = database.GetPodsByWorkload(ctx, "CronJob", workloadName, namespaceName)
 		if err != nil {
 			c.Error(err)
 		}
@@ -139,10 +198,7 @@ func GetWorkload(c *gin.Context) {
 		if !common.ValidateStandalonePod(c, pod, workloadName) {
 			return
 		}
-		response.Replicas = 1
-		if pod.Phase == "Running" {
-			response.Ready = 1
-		}
+		response.Status = WorkloadStatus{Phase: new(pod.Phase)}
 		response.CreatedAt = pod.CreatedAt
 		pods = []*database.Pod{pod}
 	}

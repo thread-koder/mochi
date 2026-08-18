@@ -29,11 +29,10 @@ type NamespaceStats struct {
 }
 
 type Workload struct {
-	Type      string    `json:"type"`
-	Name      string    `json:"name"`
-	Replicas  int       `json:"replicas"`
-	Ready     int       `json:"ready"`
-	CreatedAt time.Time `json:"created_at"`
+	Type      string         `json:"type"`
+	Name      string         `json:"name"`
+	Status    WorkloadStatus `json:"status"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 // StandalonePod represents a pod that is not managed by a workload controller.
@@ -65,6 +64,8 @@ func GetNamespace(c *gin.Context) {
 		deployments    []*database.Deployment
 		statefulsets   []*database.StatefulSet
 		daemonsets     []*database.DaemonSet
+		cronjobs       []*database.CronJob
+		standaloneJobs []*database.Job
 		standalonePods []*database.Pod
 		systemPods     []*database.Pod
 		podCount       int
@@ -94,6 +95,24 @@ func GetNamespace(c *gin.Context) {
 	g.Go(func() error {
 		var err error
 		daemonsets, err = database.GetDaemonSetsByNamespace(gctx, namespaceName)
+		if err != nil {
+			c.Error(err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		cronjobs, err = database.GetCronJobsByNamespace(gctx, namespaceName)
+		if err != nil {
+			c.Error(err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		standaloneJobs, err = database.GetStandaloneJobsByNamespace(gctx, namespaceName)
 		if err != nil {
 			c.Error(err)
 		}
@@ -138,13 +157,15 @@ func GetNamespace(c *gin.Context) {
 
 	_ = g.Wait()
 
-	workloads := make([]Workload, 0, len(deployments)+len(statefulsets)+len(daemonsets))
+	workloads := make([]Workload, 0, len(deployments)+len(statefulsets)+len(daemonsets)+len(cronjobs)+len(standaloneJobs))
 	for _, dep := range deployments {
 		workloads = append(workloads, Workload{
 			Type:      "Deployment",
 			Name:      dep.Name,
-			Replicas:  dep.Replicas,
-			Ready:     dep.ReadyReplicas,
+			Status: WorkloadStatus{
+				Replicas: new(dep.Replicas),
+				Ready:    new(dep.ReadyReplicas),
+			},
 			CreatedAt: dep.CreatedAt,
 		})
 	}
@@ -152,8 +173,10 @@ func GetNamespace(c *gin.Context) {
 		workloads = append(workloads, Workload{
 			Type:      "StatefulSet",
 			Name:      sts.Name,
-			Replicas:  sts.Replicas,
-			Ready:     sts.ReadyReplicas,
+			Status: WorkloadStatus{
+				Replicas: new(sts.Replicas),
+				Ready:    new(sts.ReadyReplicas),
+			},
 			CreatedAt: sts.CreatedAt,
 		})
 	}
@@ -161,9 +184,34 @@ func GetNamespace(c *gin.Context) {
 		workloads = append(workloads, Workload{
 			Type:      "DaemonSet",
 			Name:      ds.Name,
-			Replicas:  ds.DesiredNumberScheduled,
-			Ready:     ds.NumberReady,
+			Status: WorkloadStatus{
+				Replicas: new(ds.DesiredNumberScheduled),
+				Ready:    new(ds.NumberReady),
+			},
 			CreatedAt: ds.CreatedAt,
+		})
+	}
+	for _, cj := range cronjobs {
+		workloads = append(workloads, Workload{
+			Type: "CronJob",
+			Name: cj.Name,
+			Status: WorkloadStatus{
+				Schedule: new(cj.Schedule),
+				Suspend:  new(cj.Suspend),
+			},
+			CreatedAt: cj.CreatedAt,
+		})
+	}
+	for _, job := range standaloneJobs {
+		workloads = append(workloads, Workload{
+			Type: "Job",
+			Name: job.Name,
+			Status: WorkloadStatus{
+				Active:    new(job.Active),
+				Succeeded: new(job.Succeeded),
+				Failed:    new(job.Failed),
+			},
+			CreatedAt: job.CreatedAt,
 		})
 	}
 
@@ -203,7 +251,7 @@ func GetNamespace(c *gin.Context) {
 		Standalone: standalone,
 		System:     system,
 		Stats: NamespaceStats{
-			Workloads:  len(deployments) + len(statefulsets) + len(daemonsets),
+			Workloads:  len(deployments) + len(statefulsets) + len(daemonsets) + len(cronjobs) + len(standaloneJobs),
 			Pods:       podCount,
 			Containers: containerCount,
 		},

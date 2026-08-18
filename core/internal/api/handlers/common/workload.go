@@ -14,6 +14,8 @@ var supportedWorkloadTypes = map[string]bool{
 	"Deployment":  true,
 	"StatefulSet": true,
 	"DaemonSet":   true,
+	"Job":         true,
+	"CronJob":     true,
 	"Pod":         true,
 }
 
@@ -26,9 +28,9 @@ func ValidateWorkloadType(c *gin.Context, workloadType string) bool {
 	if IsValidWorkloadType(workloadType) {
 		return true
 	}
-	err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Pod")
+	err := fmt.Errorf("workload type must be one of: Deployment, StatefulSet, DaemonSet, Job, CronJob, Pod")
 	c.Error(err)
-	WriteValidationError(c, "invalid_workload_type", "Workload type must be one of Deployment, StatefulSet, DaemonSet, or Pod.")
+	WriteValidationError(c, "invalid_workload_type", "Workload type must be one of Deployment, StatefulSet, DaemonSet, Job, CronJob, or Pod.")
 	return false
 }
 
@@ -92,6 +94,26 @@ func EnsureWorkloadExists(c *gin.Context, ctx context.Context, workloadType, wor
 				WriteNotFoundError(c, "daemonset_not_found", "DaemonSet not found.")
 			} else {
 				WriteInternalError(c, "Failed to get DaemonSet.")
+			}
+			return nil, false
+		}
+	case "Job":
+		if _, err := database.GetJobByName(ctx, workloadName, namespace); err != nil {
+			c.Error(err)
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				WriteNotFoundError(c, "job_not_found", "Job not found.")
+			} else {
+				WriteInternalError(c, "Failed to get Job.")
+			}
+			return nil, false
+		}
+	case "CronJob":
+		if _, err := database.GetCronJobByName(ctx, workloadName, namespace); err != nil {
+			c.Error(err)
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				WriteNotFoundError(c, "cronjob_not_found", "CronJob not found.")
+			} else {
+				WriteInternalError(c, "Failed to get CronJob.")
 			}
 			return nil, false
 		}

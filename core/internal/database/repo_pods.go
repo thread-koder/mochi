@@ -181,11 +181,14 @@ func GetPodsByIP(ctx context.Context, ip string) ([]*Pod, error) {
 	return pods, nil
 }
 
-// GetPodsByWorkload returns the pods for a workload. Deployment is special: pods are owned by
-// ReplicaSets, so we walk RS -> Pod. Other kinds query owner_kind/owner_name directly.
 func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName string, namespace string) ([]*Pod, error) {
+	// Deployment/CronJob are special: pods are owned by
+	// ReplicaSets/Jobs, so we walk RS/Job -> Pod.
 	if workloadType == "Deployment" {
 		return getPodsByDeployment(ctx, workloadName, namespace)
+	}
+	if workloadType == "CronJob" {
+		return getPodsByCronJob(ctx, workloadName, namespace)
 	}
 
 	query := `
@@ -354,6 +357,42 @@ func getPodsByDeployment(ctx context.Context, deploymentName, namespace string) 
 			pods, err := GetPodsByWorkload(gctx, "ReplicaSet", replicaset.Name, namespace)
 			if err != nil {
 				// Best-effort: omit pods for one RS if the subquery fails, so caller still gets partial data.
+				return nil
+			}
+			podSets[i] = pods
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	allPods := make([]*Pod, 0)
+	for _, pods := range podSets {
+		allPods = append(allPods, pods...)
+	}
+
+	return allPods, nil
+}
+
+func getPodsByCronJob(ctx context.Context, cronJobName, namespace string) ([]*Pod, error) {
+	jobs, err := GetJobsByCronJob(ctx, cronJobName, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(jobs) == 0 {
+		return []*Pod{}, nil
+	}
+
+	podSets := make([][]*Pod, len(jobs))
+	g, gctx := errgroup.WithContext(ctx)
+
+	for i, job := range jobs {
+		g.Go(func() error {
+			pods, err := GetPodsByWorkload(gctx, "Job", job.Name, namespace)
+			if err != nil {
 				return nil
 			}
 			podSets[i] = pods
