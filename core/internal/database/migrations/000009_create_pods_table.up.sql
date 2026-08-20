@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS pods (
     restart_policy VARCHAR(50) NOT NULL,
     labels JSONB,
     annotations JSONB,
-    owner_kind VARCHAR(50),
-    owner_name VARCHAR(255),
+    workload_kind VARCHAR(50),
+    workload_name VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     synced_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_pods_node ON pods(node);
 
 CREATE INDEX IF NOT EXISTS idx_pods_pod_ip ON pods(pod_ip);
 
-CREATE INDEX IF NOT EXISTS idx_pods_owner ON pods(owner_kind, owner_name);
+CREATE INDEX IF NOT EXISTS idx_pods_namespace_workload ON pods(namespace, workload_kind, workload_name);
 
 CREATE INDEX IF NOT EXISTS idx_pods_synced_at ON pods(synced_at);
 

@@ -56,22 +56,6 @@ type Deployment struct {
 	SyncedAt          time.Time       `db:"synced_at"`
 }
 
-type ReplicaSet struct {
-	ID            uuid.UUID       `db:"id"`
-	Name          string          `db:"name"`
-	Namespace     string          `db:"namespace"`
-	UID           string          `db:"uid"`
-	Replicas      int             `db:"replicas"`
-	ReadyReplicas int             `db:"ready_replicas"`
-	OwnerKind     *string         `db:"owner_kind"`
-	OwnerName     *string         `db:"owner_name"`
-	Labels        json.RawMessage `db:"labels"`
-	Annotations   json.RawMessage `db:"annotations"`
-	CreatedAt     time.Time       `db:"created_at"`
-	UpdatedAt     time.Time       `db:"updated_at"`
-	SyncedAt      time.Time       `db:"synced_at"`
-}
-
 type StatefulSet struct {
 	ID            uuid.UUID       `db:"id"`
 	Name          string          `db:"name"`
@@ -109,8 +93,6 @@ type Job struct {
 	Active      int             `db:"active"`
 	Succeeded   int             `db:"succeeded"`
 	Failed      int             `db:"failed"`
-	OwnerKind   *string         `db:"owner_kind"`
-	OwnerName   *string         `db:"owner_name"`
 	Labels      json.RawMessage `db:"labels"`
 	Annotations json.RawMessage `db:"annotations"`
 	CreatedAt   time.Time       `db:"created_at"`
@@ -176,8 +158,8 @@ type Pod struct {
 	RestartPolicy string          `db:"restart_policy"`
 	Labels        json.RawMessage `db:"labels"`
 	Annotations   json.RawMessage `db:"annotations"`
-	OwnerKind     *string         `db:"owner_kind"`
-	OwnerName     *string         `db:"owner_name"`
+	WorkloadKind  *string         `db:"workload_kind"`
+	WorkloadName  *string         `db:"workload_name"`
 	CreatedAt     time.Time       `db:"created_at"`
 	UpdatedAt     time.Time       `db:"updated_at"`
 	SyncedAt      time.Time       `db:"synced_at"`
