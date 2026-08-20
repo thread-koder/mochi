@@ -264,7 +264,7 @@ func PruneComputeRecommendations(ctx context.Context, namespace, workloadType st
 		existsClause = `
 			SELECT 1 FROM pods p
 			WHERE p.namespace = cr.namespace AND p.name = cr.workload_name
-			AND (p.owner_kind IS NULL OR p.owner_name IS NULL)`
+			AND (p.workload_kind IS NULL OR p.workload_kind = 'Node')`
 	default:
 		return fmt.Errorf("unsupported workload type for prune compute recommendations: %s", workloadType)
 	}

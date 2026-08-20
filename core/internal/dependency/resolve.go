@@ -43,8 +43,6 @@ type resolveCache struct {
 	serviceByEndpointIP map[string]*database.Service
 	nodeRefByClusterIP  map[string]cachedNodeRef
 	podsByIP            map[string][]*database.Pod
-	replicaSetByKey     map[string]*database.ReplicaSet
-	jobByKey            map[string]*database.Job
 	nodeRefByUID        map[string]cachedNodeRef
 }
 
@@ -64,8 +62,6 @@ func DefaultResolveOptions() ResolveOptions {
 			serviceByEndpointIP: make(map[string]*database.Service),
 			nodeRefByClusterIP:  make(map[string]cachedNodeRef),
 			podsByIP:            make(map[string][]*database.Pod),
-			replicaSetByKey:     make(map[string]*database.ReplicaSet),
-			jobByKey:            make(map[string]*database.Job),
 			nodeRefByUID:        make(map[string]cachedNodeRef),
 		},
 	}
@@ -99,10 +95,7 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 			}
 			return ResolvedEdge{}, false, fmt.Errorf("lookup src pod %s: %w", series.SrcPodUID, err)
 		}
-		from, ok, err = nodeRefFromPod(ctx, srcPod, opts)
-		if err != nil {
-			return ResolvedEdge{}, false, err
-		}
+		from, ok = nodeRefFromPod(srcPod)
 		opts.cache.nodeRefByUID[srcPod.UID] = cachedNodeRef{
 			ref: from,
 			ok:  ok,
@@ -161,10 +154,7 @@ func resolveDestination(ctx context.Context, series ConnectionSeries, opts Resol
 		return NodeRef{}, err
 	}
 	if len(pods) > 0 {
-		ref, ok, err := resolvePodNodeRef(ctx, opts, pods[0])
-		if err != nil {
-			return NodeRef{}, err
-		}
+		ref, ok := resolvePodNodeRef(opts, pods[0])
 		if ok {
 			return ref, nil
 		}
@@ -195,19 +185,16 @@ func resolveDestination(ctx context.Context, series ConnectionSeries, opts Resol
 	}, nil
 }
 
-func resolvePodNodeRef(ctx context.Context, opts ResolveOptions, pod *database.Pod) (NodeRef, bool, error) {
+func resolvePodNodeRef(opts ResolveOptions, pod *database.Pod) (NodeRef, bool) {
 	if cached, hit := opts.cache.nodeRefByUID[pod.UID]; hit {
-		return cached.ref, cached.ok, nil
+		return cached.ref, cached.ok
 	}
-	ref, ok, err := nodeRefFromPod(ctx, pod, opts)
-	if err != nil {
-		return NodeRef{}, false, err
-	}
+	ref, ok := nodeRefFromPod(pod)
 	opts.cache.nodeRefByUID[pod.UID] = cachedNodeRef{
 		ref: ref,
 		ok:  ok,
 	}
-	return ref, ok, nil
+	return ref, ok
 }
 
 func lookupPodsByIP(ctx context.Context, opts ResolveOptions, ip string) ([]*database.Pod, error) {
@@ -220,40 +207,6 @@ func lookupPodsByIP(ctx context.Context, opts ResolveOptions, ip string) ([]*dat
 	}
 	opts.cache.podsByIP[ip] = pods
 	return pods, nil
-}
-
-func lookupReplicaSet(ctx context.Context, opts ResolveOptions, namespace, name string) (*database.ReplicaSet, bool, error) {
-	key := namespace + "\x00" + name
-	if rs, hit := opts.cache.replicaSetByKey[key]; hit {
-		return rs, rs != nil, nil
-	}
-	rs, err := database.GetReplicaSetByName(ctx, name, namespace)
-	if err != nil {
-		if errors.Is(err, &apperrors.NotFoundError{}) {
-			opts.cache.replicaSetByKey[key] = nil
-			return nil, false, nil
-		}
-		return nil, false, fmt.Errorf("lookup ReplicaSet %s/%s: %w", namespace, name, err)
-	}
-	opts.cache.replicaSetByKey[key] = rs
-	return rs, true, nil
-}
-
-func lookupJob(ctx context.Context, opts ResolveOptions, namespace, name string) (*database.Job, bool, error) {
-	key := namespace + "\x00" + name
-	if job, hit := opts.cache.jobByKey[key]; hit {
-		return job, job != nil, nil
-	}
-	job, err := database.GetJobByName(ctx, name, namespace)
-	if err != nil {
-		if errors.Is(err, &apperrors.NotFoundError{}) {
-			opts.cache.jobByKey[key] = nil
-			return nil, false, nil
-		}
-		return nil, false, fmt.Errorf("lookup Job %s/%s: %w", namespace, name, err)
-	}
-	opts.cache.jobByKey[key] = job
-	return job, true, nil
 }
 
 func lookupService(ctx context.Context, opts ResolveOptions, clusterIP string) (*database.Service, bool, error) {
@@ -324,10 +277,7 @@ func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, cluste
 			if len(pods) == 0 {
 				continue
 			}
-			ref, ok, err := resolvePodNodeRef(ctx, opts, pods[0])
-			if err != nil {
-				return NodeRef{}, false, err
-			}
+			ref, ok := resolvePodNodeRef(opts, pods[0])
 			if ok {
 				opts.cache.nodeRefByClusterIP[clusterIP] = cachedNodeRef{
 					ref: ref,

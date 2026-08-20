@@ -7,7 +7,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
-	"golang.org/x/sync/errgroup"
 )
 
 func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
@@ -24,10 +23,10 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 	query := `
 		INSERT INTO pods (
 			name, namespace, uid, node, pod_ip, phase, restart_policy,
-			labels, annotations, owner_kind, owner_name, created_at, synced_at
+			labels, annotations, workload_kind, workload_name, created_at, synced_at
 		) VALUES (
 			@name, @namespace, @uid, @node, @pod_ip, @phase, @restart_policy,
-			@labels, @annotations, @owner_kind, @owner_name, @created_at, @synced_at
+			@labels, @annotations, @workload_kind, @workload_name, @created_at, @synced_at
 		)
 		ON CONFLICT (uid) DO UPDATE SET
 			name = EXCLUDED.name,
@@ -38,8 +37,8 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 			restart_policy = EXCLUDED.restart_policy,
 			labels = EXCLUDED.labels,
 			annotations = EXCLUDED.annotations,
-			owner_kind = EXCLUDED.owner_kind,
-			owner_name = EXCLUDED.owner_name,
+			workload_kind = EXCLUDED.workload_kind,
+			workload_name = EXCLUDED.workload_name,
 			synced_at = EXCLUDED.synced_at
 	`
 
@@ -55,8 +54,8 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 			"restart_policy": pod.RestartPolicy,
 			"labels":         pod.Labels,
 			"annotations":    pod.Annotations,
-			"owner_kind":     pod.OwnerKind,
-			"owner_name":     pod.OwnerName,
+			"workload_kind":  pod.WorkloadKind,
+			"workload_name":  pod.WorkloadName,
 			"created_at":     pod.CreatedAt,
 			"synced_at":      pod.SyncedAt,
 		})
@@ -86,7 +85,7 @@ func UpsertPodsBatch(ctx context.Context, pods []*Pod) error {
 func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
-		       labels, annotations, owner_kind, owner_name,
+		       labels, annotations, workload_kind, workload_name,
 		       created_at, updated_at, synced_at
 		FROM pods
 		WHERE name = @name AND namespace = @namespace
@@ -101,7 +100,7 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 		},
 	).Scan(
 		&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
-		&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+		&p.Labels, &p.Annotations, &p.WorkloadKind, &p.WorkloadName,
 		&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 	)
 	if err != nil {
@@ -117,7 +116,7 @@ func GetPodByName(ctx context.Context, name string, namespace string) (*Pod, err
 func GetPodByUID(ctx context.Context, uid string) (*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
-		       labels, annotations, owner_kind, owner_name,
+		       labels, annotations, workload_kind, workload_name,
 		       created_at, updated_at, synced_at
 		FROM pods
 		WHERE uid = @uid
@@ -129,7 +128,7 @@ func GetPodByUID(ctx context.Context, uid string) (*Pod, error) {
 		pgx.StrictNamedArgs{"uid": uid},
 	).Scan(
 		&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
-		&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+		&p.Labels, &p.Annotations, &p.WorkloadKind, &p.WorkloadName,
 		&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 	)
 	if err != nil {
@@ -145,7 +144,7 @@ func GetPodByUID(ctx context.Context, uid string) (*Pod, error) {
 func GetPodsByIP(ctx context.Context, ip string) ([]*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
-		       labels, annotations, owner_kind, owner_name,
+		       labels, annotations, workload_kind, workload_name,
 		       created_at, updated_at, synced_at
 		FROM pods
 		WHERE pod_ip = @pod_ip
@@ -165,7 +164,7 @@ func GetPodsByIP(ctx context.Context, ip string) ([]*Pod, error) {
 		var p Pod
 		err := rows.Scan(
 			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
-			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+			&p.Labels, &p.Annotations, &p.WorkloadKind, &p.WorkloadName,
 			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 		)
 		if err != nil {
@@ -181,30 +180,21 @@ func GetPodsByIP(ctx context.Context, ip string) ([]*Pod, error) {
 	return pods, nil
 }
 
-func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName string, namespace string) ([]*Pod, error) {
-	// Deployment/CronJob are special: pods are owned by
-	// ReplicaSets/Jobs, so we walk RS/Job -> Pod.
-	if workloadType == "Deployment" {
-		return getPodsByDeployment(ctx, workloadName, namespace)
-	}
-	if workloadType == "CronJob" {
-		return getPodsByCronJob(ctx, workloadName, namespace)
-	}
-
+func GetPodsByWorkload(ctx context.Context, workloadKind string, workloadName string, namespace string) ([]*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
-		       labels, annotations, owner_kind, owner_name,
+		       labels, annotations, workload_kind, workload_name,
 		       created_at, updated_at, synced_at
 		FROM pods
-		WHERE owner_kind = @owner_kind AND owner_name = @owner_name AND namespace = @namespace
+		WHERE workload_kind = @workload_kind AND workload_name = @workload_name AND namespace = @namespace
 		ORDER BY name
 	`
 
 	rows, err := Pool.Query(ctx, query,
 		pgx.StrictNamedArgs{
-			"owner_kind": workloadType,
-			"owner_name": workloadName,
-			"namespace":  namespace,
+			"workload_kind": workloadKind,
+			"workload_name": workloadName,
+			"namespace":     namespace,
 		},
 	)
 	if err != nil {
@@ -217,7 +207,7 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 		var p Pod
 		err := rows.Scan(
 			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
-			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+			&p.Labels, &p.Annotations, &p.WorkloadKind, &p.WorkloadName,
 			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 		)
 		if err != nil {
@@ -233,14 +223,14 @@ func GetPodsByWorkload(ctx context.Context, workloadType string, workloadName st
 	return pods, nil
 }
 
-// GetStandalonePodsByNamespace returns the pods that are not owned by a workload controller.
+// GetStandalonePodsByNamespace returns pods with no workload identity.
 func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
-		       labels, annotations, owner_kind, owner_name,
+		       labels, annotations, workload_kind, workload_name,
 		       created_at, updated_at, synced_at
 		FROM pods
-		WHERE namespace = @namespace AND owner_kind IS NULL
+		WHERE namespace = @namespace AND workload_kind IS NULL
 		ORDER BY name
 	`
 
@@ -257,7 +247,7 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 		var p Pod
 		err := rows.Scan(
 			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
-			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+			&p.Labels, &p.Annotations, &p.WorkloadKind, &p.WorkloadName,
 			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 		)
 		if err != nil {
@@ -273,24 +263,22 @@ func GetStandalonePodsByNamespace(ctx context.Context, namespace string) ([]*Pod
 	return pods, nil
 }
 
-func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string) ([]*Pod, error) {
+// GetNodePodsByNamespace returns Node-owned pods (system/mirror).
+func GetNodePodsByNamespace(ctx context.Context, namespace string) ([]*Pod, error) {
 	query := `
 		SELECT id, name, namespace, uid, node, pod_ip, phase, restart_policy,
-		       labels, annotations, owner_kind, owner_name,
+		       labels, annotations, workload_kind, workload_name,
 		       created_at, updated_at, synced_at
 		FROM pods
-		WHERE namespace = @namespace AND owner_kind = @owner_kind
+		WHERE namespace = @namespace AND workload_kind = 'Node'
 		ORDER BY name
 	`
 
 	rows, err := Pool.Query(ctx, query,
-		pgx.StrictNamedArgs{
-			"namespace":  namespace,
-			"owner_kind": ownerKind,
-		},
+		pgx.StrictNamedArgs{"namespace": namespace},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query pods by owner kind: %w", err)
+		return nil, fmt.Errorf("failed to query node pods by namespace: %w", err)
 	}
 	defer rows.Close()
 
@@ -299,7 +287,7 @@ func GetPodsByOwnerKind(ctx context.Context, ownerKind string, namespace string)
 		var p Pod
 		err := rows.Scan(
 			&p.ID, &p.Name, &p.Namespace, &p.UID, &p.Node, &p.PodIP, &p.Phase, &p.RestartPolicy,
-			&p.Labels, &p.Annotations, &p.OwnerKind, &p.OwnerName,
+			&p.Labels, &p.Annotations, &p.WorkloadKind, &p.WorkloadName,
 			&p.CreatedAt, &p.UpdatedAt, &p.SyncedAt,
 		)
 		if err != nil {
@@ -337,77 +325,4 @@ func PrunePods(ctx context.Context, namespace string, uids []string) error {
 		return fmt.Errorf("failed to prune pods: %w", err)
 	}
 	return nil
-}
-
-func getPodsByDeployment(ctx context.Context, deploymentName, namespace string) ([]*Pod, error) {
-	replicasets, err := GetReplicaSetsByDeployment(ctx, deploymentName, namespace)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(replicasets) == 0 {
-		return []*Pod{}, nil
-	}
-
-	podSets := make([][]*Pod, len(replicasets))
-	g, gctx := errgroup.WithContext(ctx)
-
-	for i, replicaset := range replicasets {
-		g.Go(func() error {
-			pods, err := GetPodsByWorkload(gctx, "ReplicaSet", replicaset.Name, namespace)
-			if err != nil {
-				// Best-effort: omit pods for one RS if the subquery fails, so caller still gets partial data.
-				return nil
-			}
-			podSets[i] = pods
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-
-	allPods := make([]*Pod, 0)
-	for _, pods := range podSets {
-		allPods = append(allPods, pods...)
-	}
-
-	return allPods, nil
-}
-
-func getPodsByCronJob(ctx context.Context, cronJobName, namespace string) ([]*Pod, error) {
-	jobs, err := GetJobsByCronJob(ctx, cronJobName, namespace)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(jobs) == 0 {
-		return []*Pod{}, nil
-	}
-
-	podSets := make([][]*Pod, len(jobs))
-	g, gctx := errgroup.WithContext(ctx)
-
-	for i, job := range jobs {
-		g.Go(func() error {
-			pods, err := GetPodsByWorkload(gctx, "Job", job.Name, namespace)
-			if err != nil {
-				return nil
-			}
-			podSets[i] = pods
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-
-	allPods := make([]*Pod, 0)
-	for _, pods := range podSets {
-		allPods = append(allPods, pods...)
-	}
-
-	return allPods, nil
 }

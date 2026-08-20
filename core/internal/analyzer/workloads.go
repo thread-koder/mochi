@@ -105,7 +105,7 @@ func AnalyzeWorkloads[T any](
 	})
 
 	g.Go(func() error {
-		standaloneJobs, err := database.GetStandaloneJobsByNamespace(gctx, namespace)
+		standaloneJobs, err := database.GetJobsByNamespace(gctx, namespace)
 		if err != nil {
 			return err
 		}
@@ -121,17 +121,6 @@ func AnalyzeWorkloads[T any](
 			return err
 		}
 		for _, pod := range standalonePods {
-			analyzeEntry("Pod", pod.Name, []*database.Pod{pod})
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		systemPods, err := database.GetPodsByOwnerKind(gctx, "Node", namespace)
-		if err != nil {
-			return err
-		}
-		for _, pod := range systemPods {
 			analyzeEntry("Pod", pod.Name, []*database.Pod{pod})
 		}
 		return nil

@@ -34,13 +34,13 @@ func ValidateWorkloadType(c *gin.Context, workloadType string) bool {
 	return false
 }
 
-// ValidateStandalonePod rejects controller-owned pods so callers use the owning workload route.
+// ValidateStandalonePod allows unowned and Node-owned pods. Other workload kinds must use their own route.
 func ValidateStandalonePod(c *gin.Context, pod *database.Pod, podName string) bool {
-	if pod.OwnerKind == nil || *pod.OwnerKind == "Node" {
+	if pod.WorkloadKind == nil || *pod.WorkloadKind == "Node" {
 		return true
 	}
 	err := fmt.Errorf("pod %s belongs to %s/%s, use workload endpoint with type %s instead",
-		podName, *pod.OwnerKind, *pod.OwnerName, *pod.OwnerKind)
+		podName, *pod.WorkloadKind, *pod.WorkloadName, *pod.WorkloadKind)
 	c.Error(err)
 	WriteValidationError(c, "pod_belongs_to_workload", "Requested pod is managed by a workload. Use the owning workload endpoint.")
 	return false

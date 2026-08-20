@@ -35,7 +35,7 @@ type Workload struct {
 	CreatedAt time.Time      `json:"created_at"`
 }
 
-// StandalonePod represents a pod that is not managed by a workload controller.
+// StandalonePod represents a pod that is not a first-class workload (unowned or Node-owned).
 type StandalonePod struct {
 	Name      string    `json:"name"`
 	Phase     string    `json:"phase"`
@@ -112,7 +112,7 @@ func GetNamespace(c *gin.Context) {
 
 	g.Go(func() error {
 		var err error
-		standaloneJobs, err = database.GetStandaloneJobsByNamespace(gctx, namespaceName)
+		standaloneJobs, err = database.GetJobsByNamespace(gctx, namespaceName)
 		if err != nil {
 			c.Error(err)
 		}
@@ -130,7 +130,7 @@ func GetNamespace(c *gin.Context) {
 
 	g.Go(func() error {
 		var err error
-		systemPods, err = database.GetPodsByOwnerKind(gctx, "Node", namespaceName)
+		systemPods, err = database.GetNodePodsByNamespace(gctx, namespaceName)
 		if err != nil {
 			c.Error(err)
 		}

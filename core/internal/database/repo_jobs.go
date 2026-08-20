@@ -23,18 +23,16 @@ func UpsertJobsBatch(ctx context.Context, jobs []*Job) error {
 	query := `
 		INSERT INTO jobs (
 			name, namespace, uid, active, succeeded, failed,
-			owner_kind, owner_name, labels, annotations, created_at, synced_at
+			labels, annotations, created_at, synced_at
 		) VALUES (
 			@name, @namespace, @uid, @active, @succeeded, @failed,
-			@owner_kind, @owner_name, @labels, @annotations, @created_at, @synced_at
+			@labels, @annotations, @created_at, @synced_at
 		)
 		ON CONFLICT (namespace, name) DO UPDATE SET
 			uid = EXCLUDED.uid,
 			active = EXCLUDED.active,
 			succeeded = EXCLUDED.succeeded,
 			failed = EXCLUDED.failed,
-			owner_kind = EXCLUDED.owner_kind,
-			owner_name = EXCLUDED.owner_name,
 			labels = EXCLUDED.labels,
 			annotations = EXCLUDED.annotations,
 			synced_at = EXCLUDED.synced_at
@@ -49,8 +47,6 @@ func UpsertJobsBatch(ctx context.Context, jobs []*Job) error {
 			"active":      job.Active,
 			"succeeded":   job.Succeeded,
 			"failed":      job.Failed,
-			"owner_kind":  job.OwnerKind,
-			"owner_name":  job.OwnerName,
 			"labels":      job.Labels,
 			"annotations": job.Annotations,
 			"created_at":  job.CreatedAt,
@@ -79,54 +75,12 @@ func UpsertJobsBatch(ctx context.Context, jobs []*Job) error {
 	return nil
 }
 
-func GetJobsByCronJob(ctx context.Context, cronJobName, namespace string) ([]*Job, error) {
+func GetJobsByNamespace(ctx context.Context, namespace string) ([]*Job, error) {
 	query := `
 		SELECT id, name, namespace, uid, active, succeeded, failed,
-		       owner_kind, owner_name, labels, annotations, created_at, updated_at, synced_at
+		       labels, annotations, created_at, updated_at, synced_at
 		FROM jobs
-		WHERE namespace = @namespace AND owner_kind = 'CronJob' AND owner_name = @owner_name
-		ORDER BY name ASC
-	`
-
-	rows, err := Pool.Query(ctx, query,
-		pgx.StrictNamedArgs{
-			"namespace":  namespace,
-			"owner_name": cronJobName,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query jobs by cronjob: %w", err)
-	}
-	defer rows.Close()
-
-	jobs := make([]*Job, 0)
-	for rows.Next() {
-		var job Job
-		if err := rows.Scan(
-			&job.ID, &job.Name, &job.Namespace, &job.UID,
-			&job.Active, &job.Succeeded, &job.Failed,
-			&job.OwnerKind, &job.OwnerName,
-			&job.Labels, &job.Annotations,
-			&job.CreatedAt, &job.UpdatedAt, &job.SyncedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan job: %w", err)
-		}
-		jobs = append(jobs, &job)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate jobs: %w", err)
-	}
-
-	return jobs, nil
-}
-
-func GetStandaloneJobsByNamespace(ctx context.Context, namespace string) ([]*Job, error) {
-	query := `
-		SELECT id, name, namespace, uid, active, succeeded, failed,
-		       owner_kind, owner_name, labels, annotations, created_at, updated_at, synced_at
-		FROM jobs
-		WHERE namespace = @namespace AND (owner_kind IS NULL OR owner_kind <> 'CronJob')
+		WHERE namespace = @namespace
 		ORDER BY name ASC
 	`
 
@@ -134,7 +88,7 @@ func GetStandaloneJobsByNamespace(ctx context.Context, namespace string) ([]*Job
 		pgx.StrictNamedArgs{"namespace": namespace},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query standalone jobs by namespace: %w", err)
+		return nil, fmt.Errorf("failed to query jobs by namespace: %w", err)
 	}
 	defer rows.Close()
 
@@ -144,7 +98,6 @@ func GetStandaloneJobsByNamespace(ctx context.Context, namespace string) ([]*Job
 		if err := rows.Scan(
 			&job.ID, &job.Name, &job.Namespace, &job.UID,
 			&job.Active, &job.Succeeded, &job.Failed,
-			&job.OwnerKind, &job.OwnerName,
 			&job.Labels, &job.Annotations,
 			&job.CreatedAt, &job.UpdatedAt, &job.SyncedAt,
 		); err != nil {
@@ -163,7 +116,7 @@ func GetStandaloneJobsByNamespace(ctx context.Context, namespace string) ([]*Job
 func GetJobByName(ctx context.Context, name string, namespace string) (*Job, error) {
 	query := `
 		SELECT id, name, namespace, uid, active, succeeded, failed,
-		       owner_kind, owner_name, labels, annotations, created_at, updated_at, synced_at
+		       labels, annotations, created_at, updated_at, synced_at
 		FROM jobs
 		WHERE name = @name AND namespace = @namespace
 		LIMIT 1
@@ -178,7 +131,6 @@ func GetJobByName(ctx context.Context, name string, namespace string) (*Job, err
 	).Scan(
 		&job.ID, &job.Name, &job.Namespace, &job.UID,
 		&job.Active, &job.Succeeded, &job.Failed,
-		&job.OwnerKind, &job.OwnerName,
 		&job.Labels, &job.Annotations,
 		&job.CreatedAt, &job.UpdatedAt, &job.SyncedAt,
 	)

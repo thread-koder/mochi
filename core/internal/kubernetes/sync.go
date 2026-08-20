@@ -180,21 +180,40 @@ func syncNamespace(ctx context.Context, namespace string) {
 		fn   func(context.Context, string) error
 	}{
 		{"deployments", syncDeployments},
-		{"replicasets", syncReplicaSets},
 		{"statefulsets", syncStatefulSets},
 		{"daemonsets", syncDaemonSets},
 		{"cronjobs", syncCronJobs},
-		{"jobs", syncJobs},
 		{"services", syncServices},
 		{"endpoint slices", syncEndpointSlices},
-		{"pods", syncPods},
-		{"containers", syncContainers},
 	}
 	for _, kind := range kinds {
 		if err := kind.fn(ctx, namespace); err != nil {
 			log.Warn().Err(err).Str("namespace", namespace).Str("kind", kind.name).Msg("Namespace sync stopped")
 			return
 		}
+	}
+
+	replicaSetToDeployment, err := indexReplicaSetDeployments(ctx, namespace)
+	if err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Str("kind", "replicasets").Msg("Namespace sync stopped")
+		return
+	}
+
+	jobToCronJob, err := syncJobs(ctx, namespace)
+	if err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Str("kind", "jobs").Msg("Namespace sync stopped")
+		return
+	}
+
+	pods, err := syncPods(ctx, namespace, replicaSetToDeployment, jobToCronJob)
+	if err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Str("kind", "pods").Msg("Namespace sync stopped")
+		return
+	}
+
+	if err := syncContainers(ctx, namespace, pods); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Str("kind", "containers").Msg("Namespace sync stopped")
+		return
 	}
 
 	log.Info().
@@ -254,64 +273,23 @@ func syncDeployments(ctx context.Context, namespace string) error {
 	return nil
 }
 
-func syncReplicaSets(ctx context.Context, namespace string) error {
-	log := logger.WithComponent("kubernetes")
-
+// indexReplicaSetDeployments lists ReplicaSets and returns ReplicaSet name -> Deployment name.
+// ReplicaSets are not persisted.
+func indexReplicaSetDeployments(ctx context.Context, namespace string) (map[string]string, error) {
 	replicasets, err := Clientset.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list replicasets: %w", err)
+		return nil, fmt.Errorf("failed to list replicasets: %w", err)
 	}
 
-	dbReplicaSets := make([]*database.ReplicaSet, 0, len(replicasets.Items))
-	now := time.Now()
-
-	rsUIDs := make([]string, 0, len(replicasets.Items))
-	for _, rs := range replicasets.Items {
-		// Skip scaled-to-zero sets to avoid persisting historical rollout artifacts.
-		if rs.Status.Replicas == 0 {
-			continue
+	replicaSetToDeployment := make(map[string]string)
+	for i := range replicasets.Items {
+		rs := &replicasets.Items[i]
+		kind, name := primaryOwner(rs)
+		if kind == "Deployment" {
+			replicaSetToDeployment[rs.Name] = name
 		}
-		rsUID := string(rs.UID)
-		rsUIDs = append(rsUIDs, rsUID)
-		labelsJSON, _ := mapToJSON(rs.Labels)
-		annotationsJSON, _ := mapToJSON(rs.Annotations)
-
-		replicas := int32(0)
-		if rs.Spec.Replicas != nil {
-			replicas = *rs.Spec.Replicas
-		}
-
-		var ownerKind, ownerName *string
-		for _, owner := range rs.OwnerReferences {
-			ownerKind, ownerName = optionalOwner(owner.Kind, owner.Name)
-			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Deployment).
-		}
-
-		dbReplicaSet := &database.ReplicaSet{
-			Name:          rs.Name,
-			Namespace:     rs.Namespace,
-			UID:           rsUID,
-			Replicas:      int(replicas),
-			ReadyReplicas: int(rs.Status.ReadyReplicas),
-			OwnerKind:     ownerKind,
-			OwnerName:     ownerName,
-			Labels:        labelsJSON,
-			Annotations:   annotationsJSON,
-			CreatedAt:     rs.CreationTimestamp.Time,
-			SyncedAt:      now,
-		}
-
-		dbReplicaSets = append(dbReplicaSets, dbReplicaSet)
 	}
-
-	if err := database.UpsertReplicaSetsBatch(ctx, dbReplicaSets); err != nil {
-		return err
-	}
-
-	if err := database.PruneReplicaSets(ctx, namespace, rsUIDs); err != nil {
-		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune replicasets not in current state")
-	}
-	return nil
+	return replicaSetToDeployment, nil
 }
 
 func syncStatefulSets(ctx context.Context, namespace string) error {
@@ -460,50 +438,49 @@ func syncCronJobs(ctx context.Context, namespace string) error {
 	return nil
 }
 
-func syncJobs(ctx context.Context, namespace string) error {
+// syncJobs persists standalone Jobs only and returns job name → CronJob name for climb.
+func syncJobs(ctx context.Context, namespace string) (map[string]string, error) {
 	log := logger.WithComponent("kubernetes")
 
 	jobs, err := Clientset.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list jobs: %w", err)
+		return nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
 
-	dbJobs := make([]*database.Job, 0, len(jobs.Items))
+	jobToCronJob := make(map[string]string)
+	dbJobs := make([]*database.Job, 0)
 	now := time.Now()
+	jobUIDs := make([]string, 0)
 
-	jobUIDs := make([]string, 0, len(jobs.Items))
-	for _, job := range jobs.Items {
+	for i := range jobs.Items {
+		job := &jobs.Items[i]
+		kind, name := primaryOwner(job)
+		if kind == "CronJob" {
+			jobToCronJob[job.Name] = name
+			continue
+		}
+
 		jobUID := string(job.UID)
 		jobUIDs = append(jobUIDs, jobUID)
 		labelsJSON, _ := mapToJSON(job.Labels)
 		annotationsJSON, _ := mapToJSON(job.Annotations)
 
-		var ownerKind, ownerName *string
-		for _, owner := range job.OwnerReferences {
-			ownerKind, ownerName = optionalOwner(owner.Kind, owner.Name)
-			break
-		}
-
-		dbJob := &database.Job{
+		dbJobs = append(dbJobs, &database.Job{
 			Name:        job.Name,
 			Namespace:   job.Namespace,
 			UID:         jobUID,
 			Active:      int(job.Status.Active),
 			Succeeded:   int(job.Status.Succeeded),
 			Failed:      int(job.Status.Failed),
-			OwnerKind:   ownerKind,
-			OwnerName:   ownerName,
 			Labels:      labelsJSON,
 			Annotations: annotationsJSON,
 			CreatedAt:   job.CreationTimestamp.Time,
 			SyncedAt:    now,
-		}
-
-		dbJobs = append(dbJobs, dbJob)
+		})
 	}
 
 	if err := database.UpsertJobsBatch(ctx, dbJobs); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := database.PruneJobs(ctx, namespace, jobUIDs); err != nil {
@@ -511,7 +488,7 @@ func syncJobs(ctx context.Context, namespace string) error {
 	} else if err := database.PruneComputeRecommendations(ctx, namespace, "Job"); err != nil {
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune compute recommendations for deleted jobs")
 	}
-	return nil
+	return jobToCronJob, nil
 }
 
 func syncServices(ctx context.Context, namespace string) error {
@@ -573,37 +550,32 @@ func syncEndpointSlices(ctx context.Context, namespace string) error {
 	now := time.Now()
 
 	esUIDs := make([]string, 0, len(endpointSlices.Items))
-	for _, es := range endpointSlices.Items {
+	for i := range endpointSlices.Items {
+		es := &endpointSlices.Items[i]
 		esUID := string(es.UID)
 		esUIDs = append(esUIDs, esUID)
 		labelsJSON, _ := mapToJSON(es.Labels)
 		annotationsJSON, _ := mapToJSON(es.Annotations)
 
-		var ownerKind, ownerName *string
-		for _, owner := range es.OwnerReferences {
-			ownerKind, ownerName = optionalOwner(owner.Kind, owner.Name)
-			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Service).
-		}
+		ownerKind, ownerName := primaryOwner(es)
 
 		endpointsJSON, _ := sliceToJSON(es.Endpoints)
 		portsJSON, _ := sliceToJSON(es.Ports)
 
-		dbEndpointSlice := &database.EndpointSlice{
+		dbEndpointSlices = append(dbEndpointSlices, &database.EndpointSlice{
 			Name:        es.Name,
 			Namespace:   es.Namespace,
 			UID:         esUID,
 			AddressType: string(es.AddressType),
-			OwnerKind:   ownerKind,
-			OwnerName:   ownerName,
+			OwnerKind:   optionalString(ownerKind),
+			OwnerName:   optionalString(ownerName),
 			Endpoints:   endpointsJSON,
 			Ports:       portsJSON,
 			Labels:      labelsJSON,
 			Annotations: annotationsJSON,
 			CreatedAt:   es.CreationTimestamp.Time,
 			SyncedAt:    now,
-		}
-
-		dbEndpointSlices = append(dbEndpointSlices, dbEndpointSlice)
+		})
 	}
 
 	if err := database.UpsertEndpointSlicesBatch(ctx, dbEndpointSlices); err != nil {
@@ -616,31 +588,29 @@ func syncEndpointSlices(ctx context.Context, namespace string) error {
 	return nil
 }
 
-func syncPods(ctx context.Context, namespace string) error {
+func syncPods(ctx context.Context, namespace string, replicaSetToDeployment, jobToCronJob map[string]string) ([]corev1.Pod, error) {
 	log := logger.WithComponent("kubernetes")
 
 	pods, err := Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list pods: %w", err)
+		return nil, fmt.Errorf("failed to list pods: %w", err)
 	}
 
 	dbPods := make([]*database.Pod, 0, len(pods.Items))
 	now := time.Now()
 
 	podUIDs := make([]string, 0, len(pods.Items))
-	for _, pod := range pods.Items {
+	for i := range pods.Items {
+		pod := &pods.Items[i]
 		podUID := string(pod.UID)
 		podUIDs = append(podUIDs, podUID)
 		labelsJSON, _ := mapToJSON(pod.Labels)
 		annotationsJSON, _ := mapToJSON(pod.Annotations)
 
-		var ownerKind, ownerName *string
-		for _, owner := range pod.OwnerReferences {
-			ownerKind, ownerName = optionalOwner(owner.Kind, owner.Name)
-			break // OwnerReferences are ordered by controller, so we only persist the primary owner (eg. Deployment).
-		}
+		controllerKind, controllerName := primaryOwner(pod)
+		workloadKind, workloadName := workloadIdentity(controllerKind, controllerName, replicaSetToDeployment, jobToCronJob)
 
-		dbPod := &database.Pod{
+		dbPods = append(dbPods, &database.Pod{
 			Name:          pod.Name,
 			Namespace:     pod.Namespace,
 			UID:           podUID,
@@ -650,17 +620,15 @@ func syncPods(ctx context.Context, namespace string) error {
 			RestartPolicy: string(pod.Spec.RestartPolicy),
 			Labels:        labelsJSON,
 			Annotations:   annotationsJSON,
-			OwnerKind:     ownerKind,
-			OwnerName:     ownerName,
+			WorkloadKind:  workloadKind,
+			WorkloadName:  workloadName,
 			CreatedAt:     pod.CreationTimestamp.Time,
 			SyncedAt:      now,
-		}
-
-		dbPods = append(dbPods, dbPod)
+		})
 	}
 
 	if err := database.UpsertPodsBatch(ctx, dbPods); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := database.PrunePods(ctx, namespace, podUIDs); err != nil {
@@ -668,26 +636,19 @@ func syncPods(ctx context.Context, namespace string) error {
 	} else if err := database.PruneComputeRecommendations(ctx, namespace, "Pod"); err != nil {
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune compute recommendations for deleted pods")
 	}
-	return nil
+	return pods.Items, nil
 }
 
-func syncContainers(ctx context.Context, namespace string) error {
+func syncContainers(ctx context.Context, namespace string, pods []corev1.Pod) error {
 	log := logger.WithComponent("kubernetes")
-
-	pods, err := Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to list pods: %w", err)
-	}
 
 	dbContainers := make([]*database.Container, 0)
 	now := time.Now()
 
-	podUIDs := make([]string, 0, len(pods.Items))
-	for _, pod := range pods.Items {
+	podUIDs := make([]string, 0, len(pods))
+	for _, pod := range pods {
 		podUID := string(pod.UID)
 		podUIDs = append(podUIDs, podUID)
-		podName := pod.Name
-		namespace := pod.Namespace
 
 		for _, container := range pod.Spec.Containers {
 			var cpuRequest, cpuLimit, memoryRequest, memoryLimit *string
@@ -711,11 +672,11 @@ func syncContainers(ctx context.Context, namespace string) error {
 
 			portsJSON, _ := sliceToJSON(container.Ports)
 
-			dbContainer := &database.Container{
+			dbContainers = append(dbContainers, &database.Container{
 				Name:            container.Name,
 				PodUID:          podUID,
-				PodName:         podName,
-				Namespace:       namespace,
+				PodName:         pod.Name,
+				Namespace:       pod.Namespace,
 				Image:           container.Image,
 				ImagePullPolicy: string(container.ImagePullPolicy),
 				Ports:           portsJSON,
@@ -725,16 +686,12 @@ func syncContainers(ctx context.Context, namespace string) error {
 				MemoryLimit:     memoryLimit,
 				CreatedAt:       pod.CreationTimestamp.Time,
 				SyncedAt:        now,
-			}
-
-			dbContainers = append(dbContainers, dbContainer)
+			})
 		}
 	}
 
-	if len(dbContainers) > 0 {
-		if err := database.UpsertContainersBatch(ctx, dbContainers); err != nil {
-			return err
-		}
+	if err := database.UpsertContainersBatch(ctx, dbContainers); err != nil {
+		return err
 	}
 
 	if err := database.PruneContainers(ctx, namespace, podUIDs); err != nil {
@@ -750,13 +707,37 @@ func optionalString(s string) *string {
 	return new(s)
 }
 
-func optionalOwner(kind, name string) (ownerKind, ownerName *string) {
-	ownerKind = optionalString(kind)
-	ownerName = optionalString(name)
-	if ownerKind == nil || ownerName == nil {
+// primaryOwner returns the controller OwnerReference, or the first ref if none is marked controller.
+func primaryOwner(obj metav1.Object) (kind, name string) {
+	if ref := metav1.GetControllerOf(obj); ref != nil {
+		return ref.Kind, ref.Name
+	}
+	refs := obj.GetOwnerReferences()
+	if len(refs) == 0 {
+		return "", ""
+	}
+	return refs[0].Kind, refs[0].Name
+}
+
+// workloadIdentity climbs ReplicaSet->Deployment and Job->CronJob for Mochi workload identity.
+func workloadIdentity(controllerKind, controllerName string, replicaSetToDeployment, jobToCronJob map[string]string) (kind, name *string) {
+	if controllerKind == "" {
 		return nil, nil
 	}
-	return ownerKind, ownerName
+	switch controllerKind {
+	case "ReplicaSet":
+		if deploy, ok := replicaSetToDeployment[controllerName]; ok {
+			return optionalString("Deployment"), optionalString(deploy)
+		}
+		return optionalString(controllerKind), optionalString(controllerName)
+	case "Job":
+		if cron, ok := jobToCronJob[controllerName]; ok {
+			return optionalString("CronJob"), optionalString(cron)
+		}
+		return optionalString(controllerKind), optionalString(controllerName)
+	default:
+		return optionalString(controllerKind), optionalString(controllerName)
+	}
 }
 
 func mapToJSON(m map[string]string) (json.RawMessage, error) {
