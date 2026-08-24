@@ -3,12 +3,14 @@ package compute
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -200,7 +202,7 @@ func GenerateWorkloadRecommendations(
 	workloadType string,
 	workloadName string,
 	namespace string,
-	pods []*database.Pod,
+	pods database.PodsForAnalysis,
 	config RecommendationConfig,
 	analysisOpts AnalysisOptions,
 ) (Recommendation, error) {
@@ -212,21 +214,40 @@ func GenerateWorkloadRecommendations(
 		return Recommendation{}, fmt.Errorf("invalid analysis options: %w", err)
 	}
 
-	podRecs := make([][]ContainerRecommendation, len(pods))
+	liveUIDs := make(map[string]struct{}, len(pods.Live))
+	for _, pod := range pods.Live {
+		liveUIDs[pod.UID] = struct{}{}
+	}
+
+	podRecs := make([][]ContainerRecommendation, len(pods.All))
+	podHadMetrics := make([]bool, len(pods.All))
 	g, gctx := errgroup.WithContext(ctx)
-	for i, pod := range pods {
+	for i, pod := range pods.All {
 		g.Go(func() error {
-			recs, err := recommendationsForPod(gctx, pod, config, analysisOpts)
+			_, isLive := liveUIDs[pod.UID]
+			recs, hadMetrics, err := recommendationsForPod(gctx, pod, isLive, config, analysisOpts)
 			if err != nil {
 				return err
 			}
 			podRecs[i] = recs
+			podHadMetrics[i] = hadMetrics
 			return nil
 		})
 	}
 
 	if err := g.Wait(); err != nil {
 		return Recommendation{}, err
+	}
+
+	hadMetrics := false
+	for _, ok := range podHadMetrics {
+		if ok {
+			hadMetrics = true
+			break
+		}
+	}
+	if !hadMetrics {
+		return Recommendation{}, apperrors.NewNoMetrics(fmt.Sprintf("workload %s/%s", namespace, workloadName))
 	}
 
 	containerRecsMap := make(map[string]*ContainerRecommendation)
@@ -266,20 +287,25 @@ func GenerateWorkloadRecommendations(
 func recommendationsForPod(
 	ctx context.Context,
 	pod *database.Pod,
+	isLive bool,
 	config RecommendationConfig,
 	analysisOpts AnalysisOptions,
-) ([]ContainerRecommendation, error) {
-	containers, err := database.GetContainersByPodUID(ctx, pod.UID)
+) ([]ContainerRecommendation, bool, error) {
+	containers, err := database.GetContainersForAnalysis(ctx, pod.UID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	containerRecs := make([]*ContainerRecommendation, len(containers))
+	containerHadMetrics := make([]bool, len(containers))
 	g, gctx := errgroup.WithContext(ctx)
 	for i, container := range containers {
 		g.Go(func() error {
 			containerAnalysis, err := AnalyzeContainer(gctx, container, analysisOpts)
 			if err != nil {
+				if !isLive && errors.Is(err, &apperrors.NoMetricsError{}) {
+					return nil
+				}
 				return fmt.Errorf("failed to analyze container %s: %w", container.Name, err)
 			}
 
@@ -295,22 +321,27 @@ func recommendationsForPod(
 			}
 
 			containerRecs[i] = rec
+			containerHadMetrics[i] = true
 			return nil
 		})
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
+	hadMetrics := false
 	recs := make([]ContainerRecommendation, 0, len(containers))
-	for _, rec := range containerRecs {
+	for i, rec := range containerRecs {
+		if containerHadMetrics[i] {
+			hadMetrics = true
+		}
 		if rec != nil {
 			recs = append(recs, *rec)
 		}
 	}
 
-	return recs, nil
+	return recs, hadMetrics, nil
 }
 
 // mergeContainerRecommendation keeps the higher recommended quantity per resource across replicas,

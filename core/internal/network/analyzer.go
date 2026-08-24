@@ -106,7 +106,7 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, opts AnalysisOptions) (P
 	return result, nil
 }
 
-func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName string, namespace string, pods []*database.Pod, opts AnalysisOptions, includePods bool) (WorkloadAnalysis, error) {
+func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName string, namespace string, pods database.PodsForAnalysis, opts AnalysisOptions, includePods bool) (WorkloadAnalysis, error) {
 	if err := opts.Validate(); err != nil {
 		return WorkloadAnalysis{}, fmt.Errorf("invalid analysis options: %w", err)
 	}
@@ -114,10 +114,10 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 	var podAnalyses []PodAnalysis
 	g, gctx := errgroup.WithContext(ctx)
 	if includePods {
-		podAnalyses = make([]PodAnalysis, len(pods))
+		podAnalyses = make([]PodAnalysis, len(pods.Live))
 		podOpts := opts
 		podOpts.IncludeTimeSeries = false
-		for i, pod := range pods {
+		for i, pod := range pods.Live {
 			g.Go(func() error {
 				podAnalysis, err := AnalyzePod(gctx, pod, podOpts)
 				if err != nil {
@@ -129,7 +129,7 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 		}
 	}
 
-	metrics, err := fetchWorkloadMetrics(ctx, pods, opts)
+	metrics, err := fetchWorkloadMetrics(ctx, pods.All, opts)
 	if err != nil {
 		return WorkloadAnalysis{}, err
 	}
@@ -172,12 +172,13 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 
 	workloadOpts := opts
 	workloadOpts.IncludeTimeSeries = false
+	since := time.Now().Add(-opts.TimeRange)
 
 	var workloadAnalyses []WorkloadAnalysis
 	g, gctx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		analyses, err := analyzer.AnalyzeWorkloads(gctx, namespace,
-			func(ctx context.Context, kind, name, namespace string, pods []*database.Pod) (WorkloadAnalysis, error) {
+		analyses, err := analyzer.AnalyzeWorkloads(gctx, namespace, since,
+			func(ctx context.Context, kind, name, namespace string, pods database.PodsForAnalysis) (WorkloadAnalysis, error) {
 				return AnalyzeWorkload(ctx, kind, name, namespace, pods, workloadOpts, false)
 			})
 		if err != nil {

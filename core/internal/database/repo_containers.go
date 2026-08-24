@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -119,6 +120,46 @@ func GetContainersByPodUID(ctx context.Context, podUID string) ([]*Container, er
 	}
 
 	return containers, nil
+}
+
+// GetContainersForAnalysis returns live containers, or attribution JSON when the live pod is gone.
+func GetContainersForAnalysis(ctx context.Context, podUID string) ([]*Container, error) {
+	containers, err := GetContainersByPodUID(ctx, podUID)
+	if err != nil {
+		return nil, err
+	}
+	if len(containers) > 0 {
+		return containers, nil
+	}
+
+	attr, err := getPodAttributionByUID(ctx, podUID)
+	if err != nil {
+		return nil, err
+	}
+	if attr == nil {
+		return []*Container{}, nil
+	}
+
+	var specs []AttributionContainerSpec
+	if err := json.Unmarshal(attr.Containers, &specs); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal attribution containers: %w", err)
+	}
+
+	results := make([]*Container, 0, len(specs))
+	for _, spec := range specs {
+		results = append(results, &Container{
+			Name:          spec.Name,
+			PodUID:        attr.UID,
+			PodName:       attr.Name,
+			Namespace:     attr.Namespace,
+			Image:         spec.Image,
+			CPURequest:    spec.CPURequest,
+			CPULimit:      spec.CPULimit,
+			MemoryRequest: spec.MemoryRequest,
+			MemoryLimit:   spec.MemoryLimit,
+		})
+	}
+	return results, nil
 }
 
 // PruneContainers deletes containers not listed in podUIDs.

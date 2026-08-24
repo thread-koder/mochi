@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
@@ -12,11 +13,12 @@ import (
 )
 
 // AnalyzeFunc is the per-workload callback each domain analyzer passes to AnalyzeWorkloads.
-type AnalyzeFunc[T any] func(ctx context.Context, kind, name, namespace string, pods []*database.Pod) (T, error)
+type AnalyzeFunc[T any] func(ctx context.Context, kind, name, namespace string, pods database.PodsForAnalysis) (T, error)
 
 func AnalyzeWorkloads[T any](
 	ctx context.Context,
 	namespace string,
+	since time.Time,
 	analyze AnalyzeFunc[T],
 ) ([]T, error) {
 	results := make([]T, 0)
@@ -24,7 +26,7 @@ func AnalyzeWorkloads[T any](
 
 	g, gctx := errgroup.WithContext(ctx)
 
-	runAnalyze := func(kind, name string, pods []*database.Pod) {
+	runAnalyze := func(kind, name string, pods database.PodsForAnalysis) {
 		g.Go(func() error {
 			result, err := analyze(gctx, kind, name, namespace, pods)
 			if err != nil {
@@ -41,18 +43,18 @@ func AnalyzeWorkloads[T any](
 		})
 	}
 
-	analyzeEntry := func(kind, name string, resolvedPods []*database.Pod) {
+	analyzeEntry := func(kind, name string, resolvedPods *database.PodsForAnalysis) {
 		if resolvedPods != nil {
-			runAnalyze(kind, name, resolvedPods)
+			runAnalyze(kind, name, *resolvedPods)
 			return
 		}
 
 		g.Go(func() error {
-			pods, err := database.GetPodsByWorkload(gctx, kind, name, namespace)
+			pods, err := database.GetPodsForAnalysis(gctx, kind, name, namespace, since)
 			if err != nil {
 				return fmt.Errorf("failed to fetch pods for workload %s/%s: %w", kind, name, err)
 			}
-			if len(pods) == 0 {
+			if len(pods.All) == 0 {
 				return nil
 			}
 			runAnalyze(kind, name, pods)
@@ -121,7 +123,11 @@ func AnalyzeWorkloads[T any](
 			return err
 		}
 		for _, pod := range standalonePods {
-			analyzeEntry("Pod", pod.Name, []*database.Pod{pod})
+			pods := database.PodsForAnalysis{
+				Live: []*database.Pod{pod},
+				All:  []*database.Pod{pod},
+			}
+			analyzeEntry("Pod", pod.Name, &pods)
 		}
 		return nil
 	})

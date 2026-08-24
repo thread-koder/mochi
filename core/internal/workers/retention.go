@@ -63,6 +63,7 @@ func (w *RetentionWorker) run() {
 	since := time.Now().Add(-w.cfg.MaxAgeDuration())
 	tasks := []retentionTask{
 		{name: "compute_recommendations", run: database.PruneExpiredComputeRecommendations},
+		{name: "pod_attributions", run: database.PruneExpiredPodAttributions},
 	}
 
 	log.Info().Msg("Starting retention pass...")

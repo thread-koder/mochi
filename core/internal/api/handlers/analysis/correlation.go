@@ -44,12 +44,12 @@ func AnalyzeWorkloadCorrelations(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
 	defer cancel()
 
-	pods, ok := common.ResolveWorkloadPods(c, ctx, workloadType, workloadName, namespace)
+	pods, ok := common.ResolveWorkloadPods(c, ctx, workloadType, workloadName, namespace, time.Now().Add(-opts.TimeRange))
 	if !ok {
 		return
 	}
 
-	result, err := analysis.AnalyzeWorkloadCorrelations(ctx, workloadType, workloadName, namespace, pods, opts)
+	result, err := analysis.AnalyzeWorkloadCorrelations(ctx, workloadType, workloadName, namespace, pods.All, opts)
 	if err != nil {
 		c.Error(err)
 		if errors.Is(err, &apperrors.NoMetricsError{}) {

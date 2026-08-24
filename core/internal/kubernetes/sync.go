@@ -597,6 +597,7 @@ func syncPods(ctx context.Context, namespace string, replicaSetToDeployment, job
 	}
 
 	dbPods := make([]*database.Pod, 0, len(pods.Items))
+	attributions := make([]*database.PodAttribution, 0, len(pods.Items))
 	now := time.Now()
 
 	podUIDs := make([]string, 0, len(pods.Items))
@@ -625,10 +626,42 @@ func syncPods(ctx context.Context, namespace string, replicaSetToDeployment, job
 			CreatedAt:     pod.CreationTimestamp.Time,
 			SyncedAt:      now,
 		})
+
+		if !isAttributableWorkload(workloadKind) {
+			continue
+		}
+
+		containersJSON, err := attributionContainersJSON(pod)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode attribution containers for pod %s: %w", pod.Name, err)
+		}
+
+		attr := &database.PodAttribution{
+			UID:          podUID,
+			Name:         pod.Name,
+			Namespace:    pod.Namespace,
+			WorkloadKind: workloadKind,
+			WorkloadName: workloadName,
+			Phase:        string(pod.Status.Phase),
+			Node:         optionalString(pod.Spec.NodeName),
+			Containers:   containersJSON,
+			FirstSeenAt:  now,
+			LastSeenAt:   now,
+		}
+		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+			attr.FinishedAt = &now
+		}
+		attributions = append(attributions, attr)
 	}
 
 	if err := database.UpsertPodsBatch(ctx, dbPods); err != nil {
 		return nil, err
+	}
+
+	if err := database.UpsertPodAttributionsBatch(ctx, attributions); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to upsert pod attributions")
+	} else if err := database.FinishUnlistedPodAttributions(ctx, namespace, podUIDs, now); err != nil {
+		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to finish unlisted pod attributions")
 	}
 
 	if err := database.PrunePods(ctx, namespace, podUIDs); err != nil {
@@ -651,25 +684,7 @@ func syncContainers(ctx context.Context, namespace string, pods []corev1.Pod) er
 		podUIDs = append(podUIDs, podUID)
 
 		for _, container := range pod.Spec.Containers {
-			var cpuRequest, cpuLimit, memoryRequest, memoryLimit *string
-
-			if container.Resources.Requests != nil {
-				if cpu := container.Resources.Requests[corev1.ResourceCPU]; !cpu.IsZero() {
-					cpuRequest = new(cpu.String())
-				}
-				if mem := container.Resources.Requests[corev1.ResourceMemory]; !mem.IsZero() {
-					memoryRequest = new(mem.String())
-				}
-			}
-			if container.Resources.Limits != nil {
-				if cpu := container.Resources.Limits[corev1.ResourceCPU]; !cpu.IsZero() {
-					cpuLimit = new(cpu.String())
-				}
-				if mem := container.Resources.Limits[corev1.ResourceMemory]; !mem.IsZero() {
-					memoryLimit = new(mem.String())
-				}
-			}
-
+			cpuRequest, cpuLimit, memoryRequest, memoryLimit := containerResourceStrings(container)
 			portsJSON, _ := sliceToJSON(container.Ports)
 
 			dbContainers = append(dbContainers, &database.Container{
@@ -698,6 +713,59 @@ func syncContainers(ctx context.Context, namespace string, pods []corev1.Pod) er
 		log.Warn().Err(err).Str("namespace", namespace).Msg("Failed to prune containers not in current state")
 	}
 	return nil
+}
+
+func containerResourceStrings(container corev1.Container) (cpuRequest, cpuLimit, memoryRequest, memoryLimit *string) {
+	if container.Resources.Requests != nil {
+		if cpu := container.Resources.Requests[corev1.ResourceCPU]; !cpu.IsZero() {
+			cpuRequest = new(cpu.String())
+		}
+		if mem := container.Resources.Requests[corev1.ResourceMemory]; !mem.IsZero() {
+			memoryRequest = new(mem.String())
+		}
+	}
+	if container.Resources.Limits != nil {
+		if cpu := container.Resources.Limits[corev1.ResourceCPU]; !cpu.IsZero() {
+			cpuLimit = new(cpu.String())
+		}
+		if mem := container.Resources.Limits[corev1.ResourceMemory]; !mem.IsZero() {
+			memoryLimit = new(mem.String())
+		}
+	}
+	return cpuRequest, cpuLimit, memoryRequest, memoryLimit
+}
+
+func attributionContainersJSON(pod *corev1.Pod) (json.RawMessage, error) {
+	specs := make([]database.AttributionContainerSpec, 0, len(pod.Spec.Containers))
+	for _, container := range pod.Spec.Containers {
+		cpuRequest, cpuLimit, memoryRequest, memoryLimit := containerResourceStrings(container)
+		specs = append(specs, database.AttributionContainerSpec{
+			Name:          container.Name,
+			Image:         container.Image,
+			CPURequest:    cpuRequest,
+			CPULimit:      cpuLimit,
+			MemoryRequest: memoryRequest,
+			MemoryLimit:   memoryLimit,
+		})
+	}
+	data, err := json.Marshal(specs)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(data), nil
+}
+
+// isAttributableWorkload matches first-class kinds plus standalone (nil kind).
+func isAttributableWorkload(kind *string) bool {
+	if kind == nil {
+		return true
+	}
+	switch *kind {
+	case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob":
+		return true
+	default:
+		return false
+	}
 }
 
 func optionalString(s string) *string {

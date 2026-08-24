@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
@@ -122,27 +123,30 @@ func EnsureWorkloadExists(c *gin.Context, ctx context.Context, workloadType, wor
 	return nil, true
 }
 
-func ResolveWorkloadPods(c *gin.Context, ctx context.Context, workloadType, workloadName, namespace string) ([]*database.Pod, bool) {
+func ResolveWorkloadPods(c *gin.Context, ctx context.Context, workloadType, workloadName, namespace string, since time.Time) (database.PodsForAnalysis, bool) {
 	pod, ok := EnsureWorkloadExists(c, ctx, workloadType, workloadName, namespace)
 	if !ok {
-		return nil, false
+		return database.PodsForAnalysis{}, false
 	}
 
 	if workloadType == "Pod" {
-		return []*database.Pod{pod}, true
+		return database.PodsForAnalysis{
+			Live: []*database.Pod{pod},
+			All:  []*database.Pod{pod},
+		}, true
 	}
 
-	pods, err := database.GetPodsByWorkload(ctx, workloadType, workloadName, namespace)
+	pods, err := database.GetPodsForAnalysis(ctx, workloadType, workloadName, namespace, since)
 	if err != nil {
 		c.Error(err)
 		WriteInternalError(c, "Failed to get pods for workload.")
-		return nil, false
+		return database.PodsForAnalysis{}, false
 	}
-	if len(pods) == 0 {
+	if len(pods.All) == 0 {
 		err := fmt.Errorf("no pods found for workload %s/%s", workloadName, namespace)
 		c.Error(err)
 		WriteNotFoundError(c, "pods_not_found", "No pods found for workload.")
-		return nil, false
+		return database.PodsForAnalysis{}, false
 	}
 
 	return pods, true

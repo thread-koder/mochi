@@ -58,7 +58,7 @@ func GenerateRecommendations(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
 	defer cancel()
 
-	pods, ok := common.ResolveWorkloadPods(c, ctx, workloadType, workloadName, namespace)
+	pods, ok := common.ResolveWorkloadPods(c, ctx, workloadType, workloadName, namespace, time.Now().Add(-analysisOpts.TimeRange))
 	if !ok {
 		return
 	}

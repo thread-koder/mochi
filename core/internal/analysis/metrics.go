@@ -31,10 +31,7 @@ func fetchWorkloadCorrelationMetrics(ctx context.Context, pods []*database.Pod, 
 		Step:  opts.RangeStep,
 	}
 
-	podNames := make([]string, len(pods))
-	for i, pod := range pods {
-		podNames[i] = pod.Name
-	}
+	podNames := database.UniquePodNames(pods)
 	queryOpts := prometheus.QueryOptions{
 		Namespace: pods[0].Namespace,
 		Pods:      podNames,
