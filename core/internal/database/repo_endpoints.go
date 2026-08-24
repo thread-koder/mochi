@@ -124,11 +124,8 @@ func GetHeadlessServicesByEndpointIP(ctx context.Context, ip string) ([]*Service
 		JOIN services s ON s.namespace = es.namespace AND s.name = es.owner_name
 		WHERE es.owner_kind = 'Service'
 		  AND (s.cluster_ip IS NULL OR s.cluster_ip = 'None')
-		  AND EXISTS (
-		    SELECT 1
-		    FROM jsonb_array_elements(es.endpoints) AS ep,
-		         jsonb_array_elements_text(ep->'addresses') AS addr
-		    WHERE addr = @ip
+		  AND es.endpoints @> jsonb_build_array(
+		    jsonb_build_object('addresses', jsonb_build_array(@ip::text))
 		  )
 		ORDER BY s.namespace, s.name
 	`

@@ -820,12 +820,12 @@ func mapToJSON(m map[string]string) (json.RawMessage, error) {
 }
 
 func sliceToJSON(s any) (json.RawMessage, error) {
-	if s == nil {
-		return json.RawMessage("[]"), nil
-	}
 	data, err := json.Marshal(s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal slice to JSON: %w", err)
+	}
+	if string(data) == "null" {
+		return json.RawMessage("[]"), nil
 	}
 	return json.RawMessage(data), nil
 }
