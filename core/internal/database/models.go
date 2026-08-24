@@ -165,6 +165,37 @@ type Pod struct {
 	SyncedAt      time.Time       `db:"synced_at"`
 }
 
+// PodAttribution is a bounded historical identity for a pod after live prune.
+type PodAttribution struct {
+	UID          string          `db:"uid"`
+	Name         string          `db:"name"`
+	Namespace    string          `db:"namespace"`
+	WorkloadKind *string         `db:"workload_kind"`
+	WorkloadName *string         `db:"workload_name"`
+	Phase        string          `db:"phase"`
+	Node         *string         `db:"node"`
+	Containers   json.RawMessage `db:"containers"`
+	FirstSeenAt  time.Time       `db:"first_seen_at"`
+	LastSeenAt   time.Time       `db:"last_seen_at"`
+	FinishedAt   *time.Time      `db:"finished_at"`
+}
+
+// AttributionContainerSpec is one container snapshot stored on a pod attribution.
+type AttributionContainerSpec struct {
+	Name          string  `json:"name"`
+	Image         string  `json:"image"`
+	CPURequest    *string `json:"cpu_request,omitempty"`
+	CPULimit      *string `json:"cpu_limit,omitempty"`
+	MemoryRequest *string `json:"memory_request,omitempty"`
+	MemoryLimit   *string `json:"memory_limit,omitempty"`
+}
+
+// PodsForAnalysis is the live inventory plus attributed identities for an analysis window.
+type PodsForAnalysis struct {
+	Live []*Pod
+	All  []*Pod
+}
+
 type Container struct {
 	ID              uuid.UUID       `db:"id"`
 	Name            string          `db:"name"`
