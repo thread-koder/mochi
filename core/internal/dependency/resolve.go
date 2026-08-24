@@ -87,7 +87,7 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 	if cached, hit := opts.cache.nodeRefByUID[series.SrcPodUID]; hit {
 		from, ok = cached.ref, cached.ok
 	} else {
-		srcPod, err := database.GetPodByUID(ctx, series.SrcPodUID)
+		srcPod, err := database.GetPodIdentityByUID(ctx, series.SrcPodUID)
 		if err != nil {
 			if errors.Is(err, &apperrors.NotFoundError{}) {
 				opts.cache.nodeRefByUID[series.SrcPodUID] = cachedNodeRef{}
