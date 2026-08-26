@@ -16,6 +16,7 @@ type ConnectionSeries struct {
 	SrcPodUID         string
 	SrcNamespace      string
 	SrcPod            string
+	DstPodUID         string
 	DstIP             string
 	DstPort           int
 	ActualDstIP       string
@@ -131,6 +132,7 @@ func vectorValuesByKey(vector model.Vector) map[string]float64 {
 			string(metric["src_pod_uid"]),
 			string(metric["src_namespace"]),
 			string(metric["src_pod"]),
+			string(metric["dst_pod_uid"]),
 			string(metric["dst_ip"]),
 			string(metric["dst_port"]),
 			string(metric["actual_dst_ip"]),
@@ -169,6 +171,7 @@ func connectionFromMetric(
 
 	srcNamespace := string(metric["src_namespace"])
 	srcPod := string(metric["src_pod"])
+	dstPodUID := string(metric["dst_pod_uid"])
 	dstIP := string(metric["dst_ip"])
 	actualDstIP := string(metric["actual_dst_ip"])
 	protocol := string(metric["protocol"])
@@ -180,6 +183,7 @@ func connectionFromMetric(
 		srcPodUID,
 		srcNamespace,
 		srcPod,
+		dstPodUID,
 		dstIP,
 		dstPortLabel,
 		actualDstIP,
@@ -191,6 +195,7 @@ func connectionFromMetric(
 		SrcPodUID:         srcPodUID,
 		SrcNamespace:      srcNamespace,
 		SrcPod:            srcPod,
+		DstPodUID:         dstPodUID,
 		DstIP:             dstIP,
 		DstPort:           dstPort,
 		ActualDstIP:       actualDstIP,

@@ -82,24 +82,9 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 		return ResolvedEdge{}, false, nil
 	}
 
-	var from NodeRef
-	var ok bool
-	if cached, hit := opts.cache.nodeRefByUID[series.SrcPodUID]; hit {
-		from, ok = cached.ref, cached.ok
-	} else {
-		srcPod, err := database.GetPodIdentityByUID(ctx, series.SrcPodUID)
-		if err != nil {
-			if errors.Is(err, &apperrors.NotFoundError{}) {
-				opts.cache.nodeRefByUID[series.SrcPodUID] = cachedNodeRef{}
-				return ResolvedEdge{}, false, nil
-			}
-			return ResolvedEdge{}, false, fmt.Errorf("lookup src pod %s: %w", series.SrcPodUID, err)
-		}
-		from, ok = nodeRefFromPod(srcPod)
-		opts.cache.nodeRefByUID[srcPod.UID] = cachedNodeRef{
-			ref: from,
-			ok:  ok,
-		}
+	from, ok, err := lookupNodeRefByUID(ctx, opts, series.SrcPodUID, "src")
+	if err != nil {
+		return ResolvedEdge{}, false, err
 	}
 	if !ok {
 		return ResolvedEdge{}, false, nil
@@ -124,6 +109,7 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 
 	evidence, err := json.Marshal(map[string]string{
 		"src_pod_uid":   series.SrcPodUID,
+		"dst_pod_uid":   series.DstPodUID,
 		"dst_ip":        series.DstIP,
 		"actual_dst_ip": series.ActualDstIP,
 	})
@@ -149,14 +135,24 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 }
 
 func resolveDestination(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (NodeRef, error) {
-	pods, err := lookupPodsByIP(ctx, opts, series.ActualDstIP)
-	if err != nil {
-		return NodeRef{}, err
-	}
-	if len(pods) > 0 {
-		ref, ok := resolvePodNodeRef(opts, pods[0])
+	if series.DstPodUID != "" {
+		ref, ok, err := lookupNodeRefByUID(ctx, opts, series.DstPodUID, "dest")
+		if err != nil {
+			return NodeRef{}, err
+		}
 		if ok {
 			return ref, nil
+		}
+	} else {
+		pods, err := lookupPodsByIP(ctx, opts, series.ActualDstIP)
+		if err != nil {
+			return NodeRef{}, err
+		}
+		if len(pods) > 0 {
+			ref, ok := resolvePodNodeRef(opts, pods[0])
+			if ok {
+				return ref, nil
+			}
 		}
 	}
 
@@ -195,6 +191,24 @@ func resolvePodNodeRef(opts ResolveOptions, pod *database.Pod) (NodeRef, bool) {
 		ok:  ok,
 	}
 	return ref, ok
+}
+
+func lookupNodeRefByUID(ctx context.Context, opts ResolveOptions, uid, what string) (NodeRef, bool, error) {
+	if cached, hit := opts.cache.nodeRefByUID[uid]; hit {
+		return cached.ref, cached.ok, nil
+	}
+
+	pod, err := database.GetPodIdentityByUID(ctx, uid)
+	if err != nil {
+		if errors.Is(err, &apperrors.NotFoundError{}) {
+			opts.cache.nodeRefByUID[uid] = cachedNodeRef{}
+			return NodeRef{}, false, nil
+		}
+		return NodeRef{}, false, fmt.Errorf("lookup %s pod %s: %w", what, uid, err)
+	}
+
+	ref, ok := resolvePodNodeRef(opts, pod)
+	return ref, ok, nil
 }
 
 func lookupPodsByIP(ctx context.Context, opts ResolveOptions, ip string) ([]*database.Pod, error) {
