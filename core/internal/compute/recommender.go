@@ -279,30 +279,30 @@ func recommendationsForPod(
 		return nil, false, err
 	}
 
-	recs, err := analyzer.SkipNoMetrics(ctx, containers, func(ctx context.Context, container *database.Container) (ContainerRecommendation, error) {
-		containerAnalysis, err := AnalyzeContainer(ctx, container, analysisOpts)
+	analyzed, err := analyzer.SkipNoMetrics(ctx, containers, func(ctx context.Context, container *database.Container) (*ContainerRecommendation, error) {
+		analysis, err := AnalyzeContainer(ctx, container, analysisOpts)
 		if err != nil {
-			return ContainerRecommendation{}, err
+			return nil, err
 		}
-
-		rec, err := GenerateContainerRecommendation(
-			ctx,
-			container,
-			containerAnalysis,
-			config,
-			analysisOpts.TimeRange,
-		)
+		rec, err := GenerateContainerRecommendation(ctx, container, analysis, config, analysisOpts.TimeRange)
 		if err != nil {
-			return ContainerRecommendation{}, fmt.Errorf("failed to generate container recommendation for %s: %w", container.Name, err)
+			return nil, fmt.Errorf("failed to generate container recommendation for %s: %w", container.Name, err)
 		}
-
-		return *rec, nil
+		return rec, nil
 	})
 	if err != nil {
 		return nil, false, err
 	}
 
-	return recs, len(recs) > 0, nil
+	recs := make([]ContainerRecommendation, 0, len(analyzed))
+	for _, rec := range analyzed {
+		if rec == nil {
+			continue
+		}
+		recs = append(recs, *rec)
+	}
+
+	return recs, len(analyzed) > 0, nil
 }
 
 // mergeContainerRecommendation keeps the higher recommended quantity per resource across replicas,
