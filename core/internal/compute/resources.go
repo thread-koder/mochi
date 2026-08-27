@@ -293,17 +293,13 @@ func CalculateCPULimitRecommendation(
 	var limitFromRequest float64
 	if effectiveRequest != nil && *effectiveRequest > 0 {
 		var multiplier float64
-		if *effectiveRequest <= MinCPURequestCores {
-			multiplier = 1.0
-		} else {
-			switch config.Mode {
-			case ModeCostOptimized:
-				multiplier = config.CostOptimizedLimitMultiplier
-			case ModeGuaranteed:
-				multiplier = config.LimitMultiplier
-			default:
-				multiplier = config.LimitMultiplier
-			}
+		switch config.Mode {
+		case ModeCostOptimized:
+			multiplier = config.CostOptimizedLimitMultiplier
+		case ModeGuaranteed:
+			multiplier = config.LimitMultiplier
+		default:
+			multiplier = config.LimitMultiplier
 		}
 		limitFromRequest = *effectiveRequest * multiplier
 	}
@@ -515,17 +511,13 @@ func CalculateMemoryLimitRecommendation(
 	var limitFromRequest float64
 	if effectiveRequest != nil && *effectiveRequest > 0 {
 		var multiplier float64
-		if *effectiveRequest <= float64(MinMemoryRequestBytes) {
-			multiplier = 1.0
-		} else {
-			switch config.Mode {
-			case ModeCostOptimized:
-				multiplier = config.CostOptimizedLimitMultiplier
-			case ModeGuaranteed:
-				multiplier = config.LimitMultiplier
-			default:
-				multiplier = config.LimitMultiplier
-			}
+		switch config.Mode {
+		case ModeCostOptimized:
+			multiplier = config.CostOptimizedLimitMultiplier
+		case ModeGuaranteed:
+			multiplier = config.LimitMultiplier
+		default:
+			multiplier = config.LimitMultiplier
 		}
 		limitFromRequest = *effectiveRequest * multiplier
 	}

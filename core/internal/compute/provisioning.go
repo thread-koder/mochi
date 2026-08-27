@@ -113,7 +113,7 @@ func analyzeCPUProvisioning(specs ResourceSpecs, utilization ResourceUtilization
 		var requestEfficiency float64
 		if result.RequestUtilization >= minThreshold && result.RequestUtilization <= OptimalUtilizationMax {
 			requestEfficiency = 1.0
-		} else if atFloor || lowThrottling {
+		} else if result.RequestUtilization < minThreshold && (atFloor || lowThrottling) {
 			requestEfficiency = 1.0
 		} else if result.RequestUtilization < minThreshold {
 			requestEfficiency = result.RequestUtilization / minThreshold
@@ -212,7 +212,7 @@ func analyzeMemoryProvisioning(specs ResourceSpecs, utilization ResourceUtilizat
 		var requestEfficiency float64
 		if result.RequestUtilization >= OptimalUtilizationMin && result.RequestUtilization <= OptimalUtilizationMax {
 			requestEfficiency = 1.0
-		} else if atFloor || lowMemoryPressure {
+		} else if result.RequestUtilization < OptimalUtilizationMin && (atFloor || lowMemoryPressure) {
 			requestEfficiency = 1.0
 		} else if result.RequestUtilization < OptimalUtilizationMin {
 			requestEfficiency = result.RequestUtilization / OptimalUtilizationMin
