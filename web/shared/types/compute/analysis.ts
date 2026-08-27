@@ -20,15 +20,7 @@ interface StabilityResult {
   stability_score: number
 }
 
-interface CPUUtilization {
-  current: number
-  stats: StatsResult
-  trend: TrendResult
-  anomalies: AnomalyResult
-  sample_size: number
-}
-
-interface MemoryUtilization {
+interface ResourceUtilization {
   current: number
   stats: StatsResult
   trend: TrendResult
@@ -37,22 +29,11 @@ interface MemoryUtilization {
 }
 
 interface UtilizationResult {
-  cpu: CPUUtilization
-  memory: MemoryUtilization
+  cpu: ResourceUtilization
+  memory: ResourceUtilization
 }
 
-interface CPUProvisioning {
-  request_utilization: number
-  limit_utilization: number
-  current_request: number | null
-  current_limit: number | null
-  is_over_provisioned: boolean
-  is_under_provisioned: boolean
-  efficiency: number
-  confidence: number
-}
-
-interface MemoryProvisioning {
+interface ResourceProvisioning {
   request_utilization: number
   limit_utilization: number
   current_request: number | null
@@ -64,8 +45,8 @@ interface MemoryProvisioning {
 }
 
 interface ProvisioningResult {
-  cpu: CPUProvisioning
-  memory: MemoryProvisioning
+  cpu: ResourceProvisioning
+  memory: ResourceProvisioning
   efficiency: number
 }
 
@@ -103,8 +84,6 @@ interface NamespaceAnalysis {
   time_series?: TimeSeries
   workloads: WorkloadAnalysis[]
 }
-
-type ResourceProvisioning = CPUProvisioning | MemoryProvisioning
 
 export type {
   UtilizationResult,

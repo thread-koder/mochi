@@ -51,19 +51,6 @@
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-if="filteredContainers.length === 0"
-              class="border-b border-primary/20 last:border-b-0"
-            >
-              <td
-                colspan="8"
-                class="py-8 px-4"
-              >
-                <div class="text-on-surface-secondary text-center font-medium">
-                  <span>No containers found</span>
-                </div>
-              </td>
-            </tr>
             <template
               v-for="container in filteredContainers"
               :key="`${container.pod_name}-${container.container_name}`"
@@ -80,78 +67,68 @@
                 </td>
                 <td class="py-3 px-4 text-right">
                   <div class="text-sm">
-                    <div class="text-on-surface">
-                      {{ formatCPU(container.utilization.cpu.current) }}
+                    <div :class="utilizationMetricClass(container.utilization.cpu.sample_size)">
+                      {{ formatUtilizationCPU(container.utilization.cpu.current, container.utilization.cpu.sample_size) }}
                     </div>
-                    <div class="text-on-surface-secondary text-sm">
-                      {{ formatBytes(container.utilization.memory.current) }}
-                    </div>
-                  </div>
-                </td>
-                <td class="py-3 px-4 text-right">
-                  <div class="text-sm">
-                    <div class="text-on-surface">
-                      {{ formatCPU(container.utilization.cpu.stats.percentile.p95) }}
-                    </div>
-                    <div class="text-on-surface-secondary text-sm">
-                      {{ formatBytes(container.utilization.memory.stats.percentile.p95) }}
+                    <div
+                      class="text-sm"
+                      :class="utilizationMetricClass(container.utilization.memory.sample_size, 'secondary')"
+                    >
+                      {{ formatUtilizationBytes(container.utilization.memory.current, container.utilization.memory.sample_size) }}
                     </div>
                   </div>
                 </td>
                 <td class="py-3 px-4 text-right">
                   <div class="text-sm">
-                    <div class="text-on-surface">
-                      {{ formatCPU(container.utilization.cpu.stats.mean) }}
+                    <div :class="utilizationMetricClass(container.utilization.cpu.sample_size)">
+                      {{ formatUtilizationCPU(container.utilization.cpu.stats.percentile.p95, container.utilization.cpu.sample_size) }}
                     </div>
-                    <div class="text-on-surface-secondary text-sm">
-                      {{ formatBytes(container.utilization.memory.stats.mean) }}
+                    <div
+                      class="text-sm"
+                      :class="utilizationMetricClass(container.utilization.memory.sample_size, 'secondary')"
+                    >
+                      {{ formatUtilizationBytes(container.utilization.memory.stats.percentile.p95, container.utilization.memory.sample_size) }}
                     </div>
                   </div>
                 </td>
                 <td class="py-3 px-4 text-right">
                   <div class="text-sm">
-                    <div class="text-on-surface">
-                      {{ formatCPU(container.utilization.cpu.stats.max) }}
+                    <div :class="utilizationMetricClass(container.utilization.cpu.sample_size)">
+                      {{ formatUtilizationCPU(container.utilization.cpu.stats.mean, container.utilization.cpu.sample_size) }}
                     </div>
-                    <div class="text-on-surface-secondary text-sm">
-                      {{ formatBytes(container.utilization.memory.stats.max) }}
+                    <div
+                      class="text-sm"
+                      :class="utilizationMetricClass(container.utilization.memory.sample_size, 'secondary')"
+                    >
+                      {{ formatUtilizationBytes(container.utilization.memory.stats.mean, container.utilization.memory.sample_size) }}
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-right">
+                  <div class="text-sm">
+                    <div :class="utilizationMetricClass(container.utilization.cpu.sample_size)">
+                      {{ formatUtilizationCPU(container.utilization.cpu.stats.max, container.utilization.cpu.sample_size) }}
+                    </div>
+                    <div
+                      class="text-sm"
+                      :class="utilizationMetricClass(container.utilization.memory.sample_size, 'secondary')"
+                    >
+                      {{ formatUtilizationBytes(container.utilization.memory.stats.max, container.utilization.memory.sample_size) }}
                     </div>
                   </div>
                 </td>
                 <td class="py-3 px-4 text-center">
                   <div class="flex flex-col items-center gap-1.5">
                     <div class="inline-flex items-center">
-                      <Icon
-                        v-if="container.utilization.cpu.trend.direction === 'increasing'"
-                        name="lucide:trending-up"
-                        class="text-xs text-error-light"
-                      />
-                      <Icon
-                        v-else-if="container.utilization.cpu.trend.direction === 'decreasing'"
-                        name="lucide:trending-down"
-                        class="text-xs text-success-light"
-                      />
-                      <Icon
-                        v-else
-                        name="lucide:arrow-right"
-                        class="text-xs text-on-surface-secondary"
+                      <UiTrendIcon
+                        :direction="container.utilization.cpu.trend.direction"
+                        :available="hasEnoughPoints(container.utilization.cpu.sample_size)"
                       />
                     </div>
                     <div class="inline-flex items-center">
-                      <Icon
-                        v-if="container.utilization.memory.trend.direction === 'increasing'"
-                        name="lucide:trending-up"
-                        class="text-xs text-error-light"
-                      />
-                      <Icon
-                        v-else-if="container.utilization.memory.trend.direction === 'decreasing'"
-                        name="lucide:trending-down"
-                        class="text-xs text-success-light"
-                      />
-                      <Icon
-                        v-else
-                        name="lucide:arrow-right"
-                        class="text-xs text-on-surface-secondary"
+                      <UiTrendIcon
+                        :direction="container.utilization.memory.trend.direction"
+                        :available="hasEnoughPoints(container.utilization.memory.sample_size)"
                       />
                     </div>
                   </div>
@@ -439,8 +416,14 @@ import {
   UTILIZATION_METRIC_OPTIONS,
   UTILIZATION_RESOURCE_OPTIONS,
 } from '#shared/constants/compute/utilization'
-import { utilizationSortMetricValue } from '#shared/utils/compute/utilization'
 import { formatCPU } from '#shared/utils/compute/format'
+import {
+  formatUtilizationBytes,
+  formatUtilizationCPU,
+  utilizationMetricClass,
+  utilizationSortMetricValue,
+} from '#shared/utils/compute/utilization'
+import { hasEnoughPoints } from '#shared/utils/timeseries'
 import type { PodAnalysis, ContainerAnalysis, ResourceProvisioning } from '#shared/types/compute'
 
 const props = defineProps<{

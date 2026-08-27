@@ -1,196 +1,218 @@
 <template>
   <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
     <!-- CPU -->
-    <div class="panel p-4 space-y-3">
+    <div class="panel p-4 flex flex-col space-y-3">
       <p class="text-lg font-semibold font-heading text-on-surface">
         CPU
       </p>
-      <div>
-        <p class="text-sm text-on-surface-secondary mb-1">
-          Current
-        </p>
-        <p class="text-on-surface text-2xl font-bold">
-          {{ formatCPU(utilization.cpu.current) }}
-        </p>
-      </div>
-      <div class="grid grid-cols-2 gap-3 text-sm">
+      <template v-if="hasEnoughPoints(utilization.cpu.sample_size)">
         <div>
-          <p class="text-on-surface-secondary mb-1">
-            Mean
+          <p class="text-sm text-on-surface-secondary mb-1">
+            Current
           </p>
-          <p class="text-on-surface font-medium">
-            {{ formatCPU(utilization.cpu.stats.mean) }}
+          <p class="text-on-surface text-2xl font-bold">
+            {{ formatCPU(utilization.cpu.current) }}
           </p>
         </div>
-        <div>
-          <p class="text-on-surface-secondary mb-1">
-            Median
-          </p>
-          <p class="text-on-surface font-medium">
-            {{ formatCPU(utilization.cpu.stats.median) }}
-          </p>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              Mean
+            </p>
+            <p class="text-on-surface font-medium">
+              {{ formatCPU(utilization.cpu.stats.mean) }}
+            </p>
+          </div>
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              Median
+            </p>
+            <p class="text-on-surface font-medium">
+              {{ formatCPU(utilization.cpu.stats.median) }}
+            </p>
+          </div>
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              P95
+            </p>
+            <p class="text-on-surface font-medium">
+              {{ formatCPU(utilization.cpu.stats.percentile.p95) }}
+            </p>
+          </div>
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              Max
+            </p>
+            <p class="text-on-surface font-medium">
+              {{ formatCPU(utilization.cpu.stats.max) }}
+            </p>
+          </div>
         </div>
-        <div>
-          <p class="text-on-surface-secondary mb-1">
-            P95
-          </p>
-          <p class="text-on-surface font-medium">
-            {{ formatCPU(utilization.cpu.stats.percentile.p95) }}
-          </p>
+        <div class="flex items-center gap-2 pt-2">
+          <span class="text-sm text-on-surface-secondary">Trend:</span>
+          <span
+            v-if="utilization.cpu.trend.direction === 'increasing'"
+            class="flex items-center gap-1 text-sm text-error-light"
+          >
+            <Icon
+              name="lucide:trending-up"
+              class="text-base"
+            />
+            <span>Increasing</span>
+          </span>
+          <span
+            v-else-if="utilization.cpu.trend.direction === 'decreasing'"
+            class="flex items-center gap-1 text-sm text-success-light"
+          >
+            <Icon
+              name="lucide:trending-down"
+              class="text-base"
+            />
+            <span>Decreasing</span>
+          </span>
+          <span
+            v-else
+            class="flex items-center gap-1 text-sm text-on-surface-secondary"
+          >
+            <Icon
+              name="lucide:arrow-right"
+              class="text-base"
+            />
+            <span>Stable</span>
+          </span>
         </div>
-        <div>
-          <p class="text-on-surface-secondary mb-1">
-            Max
-          </p>
-          <p class="text-on-surface font-medium">
-            {{ formatCPU(utilization.cpu.stats.max) }}
-          </p>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-on-surface-secondary">Anomalies:</span>
+          <span
+            v-if="utilization.cpu.anomalies.anomaly_count > 0"
+            class="text-sm font-medium text-error-light"
+          >
+            {{ utilization.cpu.anomalies.anomaly_count }} detected
+          </span>
+          <span
+            v-else
+            class="text-sm text-on-surface-secondary"
+          >
+            None
+          </span>
         </div>
-      </div>
-      <div class="flex items-center gap-2 pt-2">
-        <span class="text-sm text-on-surface-secondary">Trend:</span>
-        <span
-          v-if="utilization.cpu.trend.direction === 'increasing'"
-          class="flex items-center gap-1 text-sm text-error-light"
-        >
-          <Icon
-            name="lucide:trending-up"
-            class="text-base"
-          />
-          <span>Increasing</span>
-        </span>
-        <span
-          v-else-if="utilization.cpu.trend.direction === 'decreasing'"
-          class="flex items-center gap-1 text-sm text-success-light"
-        >
-          <Icon
-            name="lucide:trending-down"
-            class="text-base"
-          />
-          <span>Decreasing</span>
-        </span>
-        <span
-          v-else
-          class="flex items-center gap-1 text-sm text-on-surface-secondary"
-        >
-          <Icon
-            name="lucide:arrow-right"
-            class="text-base"
-          />
-          <span>Stable</span>
-        </span>
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-on-surface-secondary">Anomalies:</span>
-        <span
-          v-if="utilization.cpu.anomalies.anomaly_count > 0"
-          class="text-sm font-medium text-error-light"
-        >
-          {{ utilization.cpu.anomalies.anomaly_count }} detected
-        </span>
-        <span
-          v-else
-          class="text-sm text-on-surface-secondary"
-        >
-          None
-        </span>
+      </template>
+      <div
+        v-else
+        class="flex-1 flex flex-col items-center justify-center"
+      >
+        <UiEmptyState
+          icon="lucide:chart-no-axes-column"
+          title="No metrics"
+        />
       </div>
     </div>
 
     <!-- Memory -->
-    <div class="panel p-4 space-y-3">
+    <div class="panel p-4 flex flex-col space-y-3">
       <p class="text-lg font-semibold font-heading text-on-surface">
         Memory
       </p>
-      <div>
-        <p class="text-sm text-on-surface-secondary mb-1">
-          Current
-        </p>
-        <p class="text-on-surface text-2xl font-bold">
-          {{ formatBytes(utilization.memory.current) }}
-        </p>
-      </div>
-      <div class="grid grid-cols-2 gap-3 text-sm">
+      <template v-if="hasEnoughPoints(utilization.memory.sample_size)">
         <div>
-          <p class="text-on-surface-secondary mb-1">
-            Mean
+          <p class="text-sm text-on-surface-secondary mb-1">
+            Current
           </p>
-          <p class="text-on-surface font-medium">
-            {{ formatBytes(utilization.memory.stats.mean) }}
+          <p class="text-on-surface text-2xl font-bold">
+            {{ formatBytes(utilization.memory.current) }}
           </p>
         </div>
-        <div>
-          <p class="text-on-surface-secondary mb-1">
-            Median
-          </p>
-          <p class="text-on-surface font-medium">
-            {{ formatBytes(utilization.memory.stats.median) }}
-          </p>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              Mean
+            </p>
+            <p class="text-on-surface font-medium">
+              {{ formatBytes(utilization.memory.stats.mean) }}
+            </p>
+          </div>
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              Median
+            </p>
+            <p class="text-on-surface font-medium">
+              {{ formatBytes(utilization.memory.stats.median) }}
+            </p>
+          </div>
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              P95
+            </p>
+            <p class="text-on-surface font-medium">
+              {{ formatBytes(utilization.memory.stats.percentile.p95) }}
+            </p>
+          </div>
+          <div>
+            <p class="text-on-surface-secondary mb-1">
+              Max
+            </p>
+            <p class="text-on-surface font-medium">
+              {{ formatBytes(utilization.memory.stats.max) }}
+            </p>
+          </div>
         </div>
-        <div>
-          <p class="text-on-surface-secondary mb-1">
-            P95
-          </p>
-          <p class="text-on-surface font-medium">
-            {{ formatBytes(utilization.memory.stats.percentile.p95) }}
-          </p>
+        <div class="flex items-center gap-2 pt-2">
+          <span class="text-sm text-on-surface-secondary">Trend:</span>
+          <span
+            v-if="utilization.memory.trend.direction === 'increasing'"
+            class="flex items-center gap-1 text-sm text-error-light"
+          >
+            <Icon
+              name="lucide:trending-up"
+              class="text-base"
+            />
+            <span>Increasing</span>
+          </span>
+          <span
+            v-else-if="utilization.memory.trend.direction === 'decreasing'"
+            class="flex items-center gap-1 text-sm text-success-light"
+          >
+            <Icon
+              name="lucide:trending-down"
+              class="text-base"
+            />
+            <span>Decreasing</span>
+          </span>
+          <span
+            v-else
+            class="flex items-center gap-1 text-sm text-on-surface-secondary"
+          >
+            <Icon
+              name="lucide:arrow-right"
+              class="text-base"
+            />
+            <span>Stable</span>
+          </span>
         </div>
-        <div>
-          <p class="text-on-surface-secondary mb-1">
-            Max
-          </p>
-          <p class="text-on-surface font-medium">
-            {{ formatBytes(utilization.memory.stats.max) }}
-          </p>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-on-surface-secondary">Anomalies:</span>
+          <span
+            v-if="utilization.memory.anomalies.anomaly_count > 0"
+            class="text-sm font-medium text-error-light"
+          >
+            {{ utilization.memory.anomalies.anomaly_count }} detected
+          </span>
+          <span
+            v-else
+            class="text-sm text-on-surface-secondary"
+          >
+            None
+          </span>
         </div>
-      </div>
-      <div class="flex items-center gap-2 pt-2">
-        <span class="text-sm text-on-surface-secondary">Trend:</span>
-        <span
-          v-if="utilization.memory.trend.direction === 'increasing'"
-          class="flex items-center gap-1 text-sm text-error-light"
-        >
-          <Icon
-            name="lucide:trending-up"
-            class="text-base"
-          />
-          <span>Increasing</span>
-        </span>
-        <span
-          v-else-if="utilization.memory.trend.direction === 'decreasing'"
-          class="flex items-center gap-1 text-sm text-success-light"
-        >
-          <Icon
-            name="lucide:trending-down"
-            class="text-base"
-          />
-          <span>Decreasing</span>
-        </span>
-        <span
-          v-else
-          class="flex items-center gap-1 text-sm text-on-surface-secondary"
-        >
-          <Icon
-            name="lucide:arrow-right"
-            class="text-base"
-          />
-          <span>Stable</span>
-        </span>
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="text-sm text-on-surface-secondary">Anomalies:</span>
-        <span
-          v-if="utilization.memory.anomalies.anomaly_count > 0"
-          class="text-sm font-medium text-error-light"
-        >
-          {{ utilization.memory.anomalies.anomaly_count }} detected
-        </span>
-        <span
-          v-else
-          class="text-sm text-on-surface-secondary"
-        >
-          None
-        </span>
+      </template>
+      <div
+        v-else
+        class="flex-1 flex flex-col items-center justify-center"
+      >
+        <UiEmptyState
+          icon="lucide:chart-no-axes-column"
+          title="No metrics"
+        />
       </div>
     </div>
 
@@ -268,6 +290,7 @@
 
 <script setup lang="ts">
 import { formatCPU } from '#shared/utils/compute/format'
+import { hasEnoughPoints } from '#shared/utils/timeseries'
 import type { UtilizationResult, StabilityResult } from '#shared/types/compute'
 
 defineProps<{

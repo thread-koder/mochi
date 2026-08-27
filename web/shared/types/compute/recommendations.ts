@@ -1,15 +1,6 @@
 type RecommendationMode = 'cost_optimized' | 'burstable' | 'guaranteed'
 
-interface CPURecommendation {
-  current_request: string | null
-  recommended_request: string | null
-  request_change_percent: number | null
-  current_limit: string | null
-  recommended_limit: string | null
-  limit_change_percent: number | null
-}
-
-interface MemoryRecommendation {
+interface ResourceRecommendation {
   current_request: string | null
   recommended_request: string | null
   request_change_percent: number | null
@@ -20,8 +11,8 @@ interface MemoryRecommendation {
 
 interface ContainerRecommendation {
   container_name: string
-  cpu: CPURecommendation
-  memory: MemoryRecommendation
+  cpu: ResourceRecommendation
+  memory: ResourceRecommendation
   confidence: number
 }
 
@@ -58,6 +49,5 @@ export type {
   ContainerRecommendation,
   RecommendationsResponse,
   RecommendationMode,
-  CPURecommendation,
-  MemoryRecommendation,
+  ResourceRecommendation,
 }

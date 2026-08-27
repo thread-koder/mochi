@@ -93,78 +93,68 @@
               </td>
               <td class="py-3 px-4 text-right">
                 <div class="text-sm">
-                  <div class="text-on-surface">
-                    {{ formatCPU(workload.utilization.cpu.current) }}
+                  <div :class="utilizationMetricClass(workload.utilization.cpu.sample_size)">
+                    {{ formatUtilizationCPU(workload.utilization.cpu.current, workload.utilization.cpu.sample_size) }}
                   </div>
-                  <div class="text-on-surface-secondary text-sm">
-                    {{ formatBytes(workload.utilization.memory.current) }}
-                  </div>
-                </div>
-              </td>
-              <td class="py-3 px-4 text-right">
-                <div class="text-sm">
-                  <div class="text-on-surface">
-                    {{ formatCPU(workload.utilization.cpu.stats.percentile.p95) }}
-                  </div>
-                  <div class="text-on-surface-secondary text-sm">
-                    {{ formatBytes(workload.utilization.memory.stats.percentile.p95) }}
+                  <div
+                    class="text-sm"
+                    :class="utilizationMetricClass(workload.utilization.memory.sample_size, 'secondary')"
+                  >
+                    {{ formatUtilizationBytes(workload.utilization.memory.current, workload.utilization.memory.sample_size) }}
                   </div>
                 </div>
               </td>
               <td class="py-3 px-4 text-right">
                 <div class="text-sm">
-                  <div class="text-on-surface">
-                    {{ formatCPU(workload.utilization.cpu.stats.mean) }}
+                  <div :class="utilizationMetricClass(workload.utilization.cpu.sample_size)">
+                    {{ formatUtilizationCPU(workload.utilization.cpu.stats.percentile.p95, workload.utilization.cpu.sample_size) }}
                   </div>
-                  <div class="text-on-surface-secondary text-sm">
-                    {{ formatBytes(workload.utilization.memory.stats.mean) }}
+                  <div
+                    class="text-sm"
+                    :class="utilizationMetricClass(workload.utilization.memory.sample_size, 'secondary')"
+                  >
+                    {{ formatUtilizationBytes(workload.utilization.memory.stats.percentile.p95, workload.utilization.memory.sample_size) }}
                   </div>
                 </div>
               </td>
               <td class="py-3 px-4 text-right">
                 <div class="text-sm">
-                  <div class="text-on-surface">
-                    {{ formatCPU(workload.utilization.cpu.stats.max) }}
+                  <div :class="utilizationMetricClass(workload.utilization.cpu.sample_size)">
+                    {{ formatUtilizationCPU(workload.utilization.cpu.stats.mean, workload.utilization.cpu.sample_size) }}
                   </div>
-                  <div class="text-on-surface-secondary text-sm">
-                    {{ formatBytes(workload.utilization.memory.stats.max) }}
+                  <div
+                    class="text-sm"
+                    :class="utilizationMetricClass(workload.utilization.memory.sample_size, 'secondary')"
+                  >
+                    {{ formatUtilizationBytes(workload.utilization.memory.stats.mean, workload.utilization.memory.sample_size) }}
+                  </div>
+                </div>
+              </td>
+              <td class="py-3 px-4 text-right">
+                <div class="text-sm">
+                  <div :class="utilizationMetricClass(workload.utilization.cpu.sample_size)">
+                    {{ formatUtilizationCPU(workload.utilization.cpu.stats.max, workload.utilization.cpu.sample_size) }}
+                  </div>
+                  <div
+                    class="text-sm"
+                    :class="utilizationMetricClass(workload.utilization.memory.sample_size, 'secondary')"
+                  >
+                    {{ formatUtilizationBytes(workload.utilization.memory.stats.max, workload.utilization.memory.sample_size) }}
                   </div>
                 </div>
               </td>
               <td class="py-3 px-4 text-center">
                 <div class="flex flex-col items-center gap-1.5">
                   <div class="inline-flex items-center">
-                    <Icon
-                      v-if="workload.utilization.cpu.trend.direction === 'increasing'"
-                      name="lucide:trending-up"
-                      class="text-xs text-error-light"
-                    />
-                    <Icon
-                      v-else-if="workload.utilization.cpu.trend.direction === 'decreasing'"
-                      name="lucide:trending-down"
-                      class="text-xs text-success-light"
-                    />
-                    <Icon
-                      v-else
-                      name="lucide:arrow-right"
-                      class="text-xs text-on-surface-secondary"
+                    <UiTrendIcon
+                      :direction="workload.utilization.cpu.trend.direction"
+                      :available="hasEnoughPoints(workload.utilization.cpu.sample_size)"
                     />
                   </div>
                   <div class="inline-flex items-center">
-                    <Icon
-                      v-if="workload.utilization.memory.trend.direction === 'increasing'"
-                      name="lucide:trending-up"
-                      class="text-xs text-error-light"
-                    />
-                    <Icon
-                      v-else-if="workload.utilization.memory.trend.direction === 'decreasing'"
-                      name="lucide:trending-down"
-                      class="text-xs text-success-light"
-                    />
-                    <Icon
-                      v-else
-                      name="lucide:arrow-right"
-                      class="text-xs text-on-surface-secondary"
+                    <UiTrendIcon
+                      :direction="workload.utilization.memory.trend.direction"
+                      :available="hasEnoughPoints(workload.utilization.memory.sample_size)"
                     />
                   </div>
                 </div>
@@ -183,8 +173,13 @@ import {
   UTILIZATION_RESOURCE_OPTIONS,
 } from '#shared/constants/compute/utilization'
 import { WORKLOAD_TYPE_OPTIONS, workloadTypeLabel } from '#shared/constants/workload'
-import { utilizationSortMetricValue } from '#shared/utils/compute/utilization'
-import { formatCPU } from '#shared/utils/compute/format'
+import {
+  formatUtilizationBytes,
+  formatUtilizationCPU,
+  utilizationMetricClass,
+  utilizationSortMetricValue,
+} from '#shared/utils/compute/utilization'
+import { hasEnoughPoints } from '#shared/utils/timeseries'
 import type { WorkloadAnalysis } from '#shared/types/compute'
 
 const props = defineProps<{

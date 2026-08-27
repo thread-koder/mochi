@@ -43,10 +43,10 @@
 import {
   recommendationFieldState,
 } from '#shared/utils/compute/recommendations'
-import type { CPURecommendation, MemoryRecommendation } from '#shared/types/compute'
+import type { ResourceRecommendation } from '#shared/types/compute'
 
 const props = defineProps<{
-  resource: CPURecommendation | MemoryRecommendation
+  resource: ResourceRecommendation
 }>()
 
 const fields = computed(() => {
