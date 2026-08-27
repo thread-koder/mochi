@@ -3,13 +3,13 @@ package compute
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"sort"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/thread_koder/mochi/core/internal/analyzer"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
 	"golang.org/x/sync/errgroup"
@@ -26,23 +26,13 @@ type Recommendation struct {
 }
 
 type ContainerRecommendation struct {
-	ContainerName string               `json:"container_name"`
-	CPU           CPURecommendation    `json:"cpu"`
-	Memory        MemoryRecommendation `json:"memory"`
-	Confidence    float64              `json:"confidence"`
+	ContainerName string                 `json:"container_name"`
+	CPU           ResourceRecommendation `json:"cpu"`
+	Memory        ResourceRecommendation `json:"memory"`
+	Confidence    float64                `json:"confidence"`
 }
 
-type CPURecommendation struct {
-	CurrentRequest       *string  `json:"current_request"`
-	RecommendedRequest   *string  `json:"recommended_request"`
-	RequestChangePercent *float64 `json:"request_change_percent"`
-	CurrentLimit         *string  `json:"current_limit"`
-	RecommendedLimit     *string  `json:"recommended_limit"`
-	LimitChangePercent   *float64 `json:"limit_change_percent"`
-	Confidence           float64  `json:"-"`
-}
-
-type MemoryRecommendation struct {
+type ResourceRecommendation struct {
 	CurrentRequest       *string  `json:"current_request"`
 	RecommendedRequest   *string  `json:"recommended_request"`
 	RequestChangePercent *float64 `json:"request_change_percent"`
@@ -173,7 +163,7 @@ func GenerateContainerRecommendation(
 
 	recommendation := &ContainerRecommendation{
 		ContainerName: container.Name,
-		CPU: CPURecommendation{
+		CPU: ResourceRecommendation{
 			CurrentRequest:       container.CPURequest,
 			RecommendedRequest:   cpuRequestRec,
 			RequestChangePercent: cpuRequestChangePercent,
@@ -182,7 +172,7 @@ func GenerateContainerRecommendation(
 			LimitChangePercent:   cpuLimitChangePercent,
 			Confidence:           containerAnalysis.Provisioning.CPU.Confidence,
 		},
-		Memory: MemoryRecommendation{
+		Memory: ResourceRecommendation{
 			CurrentRequest:       container.MemoryRequest,
 			RecommendedRequest:   memoryRequestRec,
 			RequestChangePercent: memoryRequestChangePercent,
@@ -214,18 +204,12 @@ func GenerateWorkloadRecommendations(
 		return Recommendation{}, fmt.Errorf("invalid analysis options: %w", err)
 	}
 
-	liveUIDs := make(map[string]struct{}, len(pods.Live))
-	for _, pod := range pods.Live {
-		liveUIDs[pod.UID] = struct{}{}
-	}
-
 	podRecs := make([][]ContainerRecommendation, len(pods.All))
 	podHadMetrics := make([]bool, len(pods.All))
 	g, gctx := errgroup.WithContext(ctx)
 	for i, pod := range pods.All {
 		g.Go(func() error {
-			_, isLive := liveUIDs[pod.UID]
-			recs, hadMetrics, err := recommendationsForPod(gctx, pod, isLive, config, analysisOpts)
+			recs, hadMetrics, err := recommendationsForPod(gctx, pod, config, analysisOpts)
 			if err != nil {
 				return err
 			}
@@ -287,7 +271,6 @@ func GenerateWorkloadRecommendations(
 func recommendationsForPod(
 	ctx context.Context,
 	pod *database.Pod,
-	isLive bool,
 	config RecommendationConfig,
 	analysisOpts AnalysisOptions,
 ) ([]ContainerRecommendation, bool, error) {
@@ -296,52 +279,30 @@ func recommendationsForPod(
 		return nil, false, err
 	}
 
-	containerRecs := make([]*ContainerRecommendation, len(containers))
-	containerHadMetrics := make([]bool, len(containers))
-	g, gctx := errgroup.WithContext(ctx)
-	for i, container := range containers {
-		g.Go(func() error {
-			containerAnalysis, err := AnalyzeContainer(gctx, container, analysisOpts)
-			if err != nil {
-				if !isLive && errors.Is(err, &apperrors.NoMetricsError{}) {
-					return nil
-				}
-				return fmt.Errorf("failed to analyze container %s: %w", container.Name, err)
-			}
+	recs, err := analyzer.SkipNoMetrics(ctx, containers, func(ctx context.Context, container *database.Container) (ContainerRecommendation, error) {
+		containerAnalysis, err := AnalyzeContainer(ctx, container, analysisOpts)
+		if err != nil {
+			return ContainerRecommendation{}, err
+		}
 
-			rec, err := GenerateContainerRecommendation(
-				gctx,
-				container,
-				containerAnalysis,
-				config,
-				analysisOpts.TimeRange,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to generate container recommendation for %s: %w", container.Name, err)
-			}
+		rec, err := GenerateContainerRecommendation(
+			ctx,
+			container,
+			containerAnalysis,
+			config,
+			analysisOpts.TimeRange,
+		)
+		if err != nil {
+			return ContainerRecommendation{}, fmt.Errorf("failed to generate container recommendation for %s: %w", container.Name, err)
+		}
 
-			containerRecs[i] = rec
-			containerHadMetrics[i] = true
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
+		return *rec, nil
+	})
+	if err != nil {
 		return nil, false, err
 	}
 
-	hadMetrics := false
-	recs := make([]ContainerRecommendation, 0, len(containers))
-	for i, rec := range containerRecs {
-		if containerHadMetrics[i] {
-			hadMetrics = true
-		}
-		if rec != nil {
-			recs = append(recs, *rec)
-		}
-	}
-
-	return recs, hadMetrics, nil
+	return recs, len(recs) > 0, nil
 }
 
 // mergeContainerRecommendation keeps the higher recommended quantity per resource across replicas,

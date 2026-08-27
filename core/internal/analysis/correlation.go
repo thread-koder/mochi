@@ -126,7 +126,7 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 	// At least one of CPU or memory is required as it anchors
 	// workload characterization.
 	// Network and disk are best-effort as some pods may not expose those metrics.
-	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
+	if !timeseries.HasEnoughPoints(metrics.CPU) && !timeseries.HasEnoughPoints(metrics.Memory) {
 		return WorkloadCorrelationResult{}, apperrors.NewNoMetrics(fmt.Sprintf("workload %s/%s", namespace, workloadName))
 	}
 
@@ -139,7 +139,7 @@ func AnalyzeWorkloadCorrelations(ctx context.Context, workloadType string, workl
 
 		pairCorr := PairCorrelation{
 			Pair:          pair,
-			DataAvailable: len(dataA) >= 2 && len(dataB) >= 2,
+			DataAvailable: timeseries.HasEnoughPoints(dataA) && timeseries.HasEnoughPoints(dataB),
 		}
 
 		if pairCorr.DataAvailable {

@@ -12,18 +12,7 @@ type ResourceSpecs struct {
 	MemoryLimit   *float64 `json:"memory_limit"`
 }
 
-type CPUProvisioning struct {
-	RequestUtilization float64  `json:"request_utilization"`
-	LimitUtilization   float64  `json:"limit_utilization"`
-	CurrentRequest     *float64 `json:"current_request"`
-	CurrentLimit       *float64 `json:"current_limit"`
-	IsOverProvisioned  bool     `json:"is_over_provisioned"`
-	IsUnderProvisioned bool     `json:"is_under_provisioned"`
-	Efficiency         float64  `json:"efficiency"`
-	Confidence         float64  `json:"confidence"`
-}
-
-type MemoryProvisioning struct {
+type ResourceProvisioning struct {
 	RequestUtilization float64  `json:"request_utilization"`
 	LimitUtilization   float64  `json:"limit_utilization"`
 	CurrentRequest     *float64 `json:"current_request"`
@@ -35,9 +24,9 @@ type MemoryProvisioning struct {
 }
 
 type ProvisioningResult struct {
-	CPU        CPUProvisioning    `json:"cpu"`
-	Memory     MemoryProvisioning `json:"memory"`
-	Efficiency float64            `json:"efficiency"`
+	CPU        ResourceProvisioning `json:"cpu"`
+	Memory     ResourceProvisioning `json:"memory"`
+	Efficiency float64              `json:"efficiency"`
 }
 
 const (
@@ -63,8 +52,8 @@ const (
 	confidenceDataFactorFloor = 0.5
 )
 
-func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, stability StabilityResult, minSamples int) CPUProvisioning {
-	result := CPUProvisioning{
+func analyzeCPUProvisioning(specs ResourceSpecs, utilization ResourceUtilization, stability StabilityResult, minSamples int) ResourceProvisioning {
+	result := ResourceProvisioning{
 		IsOverProvisioned:  false,
 		IsUnderProvisioned: false,
 		Efficiency:         1.0,
@@ -162,8 +151,8 @@ func AnalyzeCPUProvisioning(specs ResourceSpecs, utilization CPUUtilization, sta
 	return result
 }
 
-func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilization, stability StabilityResult, minSamples int) MemoryProvisioning {
-	result := MemoryProvisioning{
+func analyzeMemoryProvisioning(specs ResourceSpecs, utilization ResourceUtilization, stability StabilityResult, minSamples int) ResourceProvisioning {
+	result := ResourceProvisioning{
 		IsOverProvisioned:  false,
 		IsUnderProvisioned: false,
 		Efficiency:         1.0,
@@ -263,8 +252,8 @@ func AnalyzeMemoryProvisioning(specs ResourceSpecs, utilization MemoryUtilizatio
 
 func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, stability StabilityResult, minSamples int) ProvisioningResult {
 	result := ProvisioningResult{
-		CPU:    AnalyzeCPUProvisioning(specs, utilization.CPU, stability, minSamples),
-		Memory: AnalyzeMemoryProvisioning(specs, utilization.Memory, stability, minSamples),
+		CPU:    analyzeCPUProvisioning(specs, utilization.CPU, stability, minSamples),
+		Memory: analyzeMemoryProvisioning(specs, utilization.Memory, stability, minSamples),
 	}
 
 	const cpuWeight = 0.3

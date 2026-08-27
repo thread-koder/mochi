@@ -122,8 +122,8 @@ func (config RecommendationConfig) Validate() error {
 
 func CalculateCPURequestRecommendation(
 	currentRequest *float64,
-	utilization CPUUtilization,
-	provisioning CPUProvisioning,
+	utilization ResourceUtilization,
+	provisioning ResourceProvisioning,
 	stability StabilityResult,
 	config RecommendationConfig,
 ) *float64 {
@@ -232,8 +232,8 @@ func CalculateCPURequestRecommendation(
 
 func CalculateCPULimitRecommendation(
 	currentLimit *float64,
-	utilization CPUUtilization,
-	provisioning CPUProvisioning,
+	utilization ResourceUtilization,
+	provisioning ResourceProvisioning,
 	stability StabilityResult,
 	config RecommendationConfig,
 	recommendedRequest *float64,
@@ -335,8 +335,8 @@ func CalculateCPULimitRecommendation(
 
 func CalculateMemoryRequestRecommendation(
 	currentRequest *float64,
-	utilization MemoryUtilization,
-	provisioning MemoryProvisioning,
+	utilization ResourceUtilization,
+	provisioning ResourceProvisioning,
 	stability StabilityResult,
 	config RecommendationConfig,
 	analysisWindow time.Duration,
@@ -448,8 +448,8 @@ func CalculateMemoryRequestRecommendation(
 
 func CalculateMemoryLimitRecommendation(
 	currentLimit *float64,
-	utilization MemoryUtilization,
-	provisioning MemoryProvisioning,
+	utilization ResourceUtilization,
+	provisioning ResourceProvisioning,
 	stability StabilityResult,
 	config RecommendationConfig,
 	recommendedRequest *float64,

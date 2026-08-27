@@ -33,7 +33,7 @@ func AnalyzeWorkloads[T any](
 				if errors.Is(err, &apperrors.NoMetricsError{}) {
 					return nil
 				}
-				return fmt.Errorf("failed to analyze workload %s/%s: %w", kind, name, err)
+				return err
 			}
 
 			mu.Lock()

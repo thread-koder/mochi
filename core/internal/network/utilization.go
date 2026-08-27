@@ -12,10 +12,11 @@ type TimeSeries struct {
 }
 
 type DirectionUtilization struct {
-	Current   float64                  `json:"current"`
-	Stats     timeseries.StatsResult   `json:"stats"`
-	Trend     timeseries.TrendResult   `json:"trend"`
-	Anomalies timeseries.AnomalyResult `json:"anomalies"`
+	Current    float64                  `json:"current"`
+	Stats      timeseries.StatsResult   `json:"stats"`
+	Trend      timeseries.TrendResult   `json:"trend"`
+	Anomalies  timeseries.AnomalyResult `json:"anomalies"`
+	SampleSize int                      `json:"sample_size"`
 }
 
 type ErrorsResult struct {
@@ -34,9 +35,13 @@ type UtilizationResult struct {
 
 const anomalyStdDevs = 4.0
 
-func AnalyzeReceiveUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
-	if len(data) == 0 {
-		return DirectionUtilization{}, fmt.Errorf("cannot analyze receive utilization from empty dataset")
+func hasAnalyzableNetworkMetrics(metrics NetworkMetrics) bool {
+	return timeseries.HasEnoughPoints(metrics.ReceiveBytes) || timeseries.HasEnoughPoints(metrics.TransmitBytes)
+}
+
+func analyzeDirectionUtilization(data []timeseries.DataPoint, label string) (DirectionUtilization, error) {
+	if !timeseries.HasEnoughPoints(data) {
+		return DirectionUtilization{}, fmt.Errorf("cannot analyze %s utilization from dataset with fewer than %d points", label, timeseries.MinPointsForAnalysis)
 	}
 
 	current := data[len(data)-1].Value
@@ -57,44 +62,15 @@ func AnalyzeReceiveUtilization(data []timeseries.DataPoint) (DirectionUtilizatio
 	}
 
 	return DirectionUtilization{
-		Current:   current,
-		Stats:     stats,
-		Trend:     trend,
-		Anomalies: anomalies,
+		Current:    current,
+		Stats:      stats,
+		Trend:      trend,
+		Anomalies:  anomalies,
+		SampleSize: len(data),
 	}, nil
 }
 
-func AnalyzeTransmitUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
-	if len(data) == 0 {
-		return DirectionUtilization{}, fmt.Errorf("cannot analyze transmit utilization from empty dataset")
-	}
-
-	current := data[len(data)-1].Value
-
-	stats, err := timeseries.CalculateStats(data)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	trend, err := timeseries.AnalyzeTrend(data)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	return DirectionUtilization{
-		Current:   current,
-		Stats:     stats,
-		Trend:     trend,
-		Anomalies: anomalies,
-	}, nil
-}
-
-func AnalyzeErrors(data []timeseries.DataPoint) ErrorsResult {
+func analyzeErrors(data []timeseries.DataPoint) ErrorsResult {
 	if len(data) == 0 {
 		return ErrorsResult{Current: 0, Total: 0}
 	}
@@ -112,31 +88,31 @@ func AnalyzeErrors(data []timeseries.DataPoint) ErrorsResult {
 }
 
 func AnalyzeUtilization(metrics NetworkMetrics) (UtilizationResult, error) {
-	if len(metrics.ReceiveBytes) == 0 && len(metrics.TransmitBytes) == 0 {
+	if !hasAnalyzableNetworkMetrics(metrics) {
 		return UtilizationResult{}, fmt.Errorf("no metrics provided for utilization analysis")
 	}
 
 	var result UtilizationResult
 	var err error
 
-	if len(metrics.ReceiveBytes) > 0 {
-		result.Receive, err = AnalyzeReceiveUtilization(metrics.ReceiveBytes)
+	if timeseries.HasEnoughPoints(metrics.ReceiveBytes) {
+		result.Receive, err = analyzeDirectionUtilization(metrics.ReceiveBytes, "receive")
 		if err != nil {
 			return UtilizationResult{}, err
 		}
 	}
 
-	if len(metrics.TransmitBytes) > 0 {
-		result.Transmit, err = AnalyzeTransmitUtilization(metrics.TransmitBytes)
+	if timeseries.HasEnoughPoints(metrics.TransmitBytes) {
+		result.Transmit, err = analyzeDirectionUtilization(metrics.TransmitBytes, "transmit")
 		if err != nil {
 			return UtilizationResult{}, err
 		}
 	}
 
-	result.ReceiveErrors = AnalyzeErrors(metrics.ReceiveErrors)
-	result.TransmitErrors = AnalyzeErrors(metrics.TransmitErrors)
-	result.ReceiveDropped = AnalyzeErrors(metrics.ReceiveDropped)
-	result.TransmitDropped = AnalyzeErrors(metrics.TransmitDropped)
+	result.ReceiveErrors = analyzeErrors(metrics.ReceiveErrors)
+	result.TransmitErrors = analyzeErrors(metrics.TransmitErrors)
+	result.ReceiveDropped = analyzeErrors(metrics.ReceiveDropped)
+	result.TransmitDropped = analyzeErrors(metrics.TransmitDropped)
 
 	return result, nil
 }

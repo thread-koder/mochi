@@ -11,15 +11,7 @@ type TimeSeries struct {
 	Memory []timeseries.DataPoint `json:"memory"`
 }
 
-type CPUUtilization struct {
-	Current    float64                  `json:"current"`
-	Stats      timeseries.StatsResult   `json:"stats"`
-	Trend      timeseries.TrendResult   `json:"trend"`
-	Anomalies  timeseries.AnomalyResult `json:"anomalies"`
-	SampleSize int                      `json:"sample_size"`
-}
-
-type MemoryUtilization struct {
+type ResourceUtilization struct {
 	Current    float64                  `json:"current"`
 	Stats      timeseries.StatsResult   `json:"stats"`
 	Trend      timeseries.TrendResult   `json:"trend"`
@@ -28,91 +20,64 @@ type MemoryUtilization struct {
 }
 
 type UtilizationResult struct {
-	CPU    CPUUtilization    `json:"cpu"`
-	Memory MemoryUtilization `json:"memory"`
+	CPU    ResourceUtilization `json:"cpu"`
+	Memory ResourceUtilization `json:"memory"`
 }
 
 const anomalyStdDevs = 4.0
 
-func AnalyzeCPUUtilization(cpuData []timeseries.DataPoint) (CPUUtilization, error) {
-	if len(cpuData) == 0 {
-		return CPUUtilization{}, fmt.Errorf("cannot analyze CPU utilization from empty dataset")
-	}
-
-	current := cpuData[len(cpuData)-1].Value
-
-	stats, err := timeseries.CalculateStats(cpuData)
-	if err != nil {
-		return CPUUtilization{}, err
-	}
-
-	trend, err := timeseries.AnalyzeTrend(cpuData)
-	if err != nil {
-		return CPUUtilization{}, err
-	}
-
-	anomalies, err := timeseries.DetectAnomalies(cpuData, anomalyStdDevs)
-	if err != nil {
-		return CPUUtilization{}, err
-	}
-
-	return CPUUtilization{
-		Current:    current,
-		Stats:      stats,
-		Trend:      trend,
-		Anomalies:  anomalies,
-		SampleSize: len(cpuData),
-	}, nil
+func hasAnalyzableComputeMetrics(metrics ResourceMetrics) bool {
+	return timeseries.HasEnoughPoints(metrics.CPU) || timeseries.HasEnoughPoints(metrics.Memory)
 }
 
-func AnalyzeMemoryUtilization(memoryData []timeseries.DataPoint) (MemoryUtilization, error) {
-	if len(memoryData) == 0 {
-		return MemoryUtilization{}, fmt.Errorf("cannot analyze memory utilization from empty dataset")
+func analyzeResourceUtilization(data []timeseries.DataPoint, label string) (ResourceUtilization, error) {
+	if !timeseries.HasEnoughPoints(data) {
+		return ResourceUtilization{}, fmt.Errorf("cannot analyze %s utilization from dataset with fewer than %d points", label, timeseries.MinPointsForAnalysis)
 	}
 
-	current := memoryData[len(memoryData)-1].Value
+	current := data[len(data)-1].Value
 
-	stats, err := timeseries.CalculateStats(memoryData)
+	stats, err := timeseries.CalculateStats(data)
 	if err != nil {
-		return MemoryUtilization{}, err
+		return ResourceUtilization{}, err
 	}
 
-	trend, err := timeseries.AnalyzeTrend(memoryData)
+	trend, err := timeseries.AnalyzeTrend(data)
 	if err != nil {
-		return MemoryUtilization{}, err
+		return ResourceUtilization{}, err
 	}
 
-	anomalies, err := timeseries.DetectAnomalies(memoryData, anomalyStdDevs)
+	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
 	if err != nil {
-		return MemoryUtilization{}, err
+		return ResourceUtilization{}, err
 	}
 
-	return MemoryUtilization{
+	return ResourceUtilization{
 		Current:    current,
 		Stats:      stats,
 		Trend:      trend,
 		Anomalies:  anomalies,
-		SampleSize: len(memoryData),
+		SampleSize: len(data),
 	}, nil
 }
 
 func AnalyzeUtilization(metrics ResourceMetrics) (UtilizationResult, error) {
-	if len(metrics.CPU) == 0 && len(metrics.Memory) == 0 {
+	if !hasAnalyzableComputeMetrics(metrics) {
 		return UtilizationResult{}, fmt.Errorf("no metrics provided for utilization analysis")
 	}
 
 	var result UtilizationResult
 	var err error
 
-	if len(metrics.CPU) > 0 {
-		result.CPU, err = AnalyzeCPUUtilization(metrics.CPU)
+	if timeseries.HasEnoughPoints(metrics.CPU) {
+		result.CPU, err = analyzeResourceUtilization(metrics.CPU, "CPU")
 		if err != nil {
 			return UtilizationResult{}, err
 		}
 	}
 
-	if len(metrics.Memory) > 0 {
-		result.Memory, err = AnalyzeMemoryUtilization(metrics.Memory)
+	if timeseries.HasEnoughPoints(metrics.Memory) {
+		result.Memory, err = analyzeResourceUtilization(metrics.Memory, "memory")
 		if err != nil {
 			return UtilizationResult{}, err
 		}

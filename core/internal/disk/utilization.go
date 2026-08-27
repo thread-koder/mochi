@@ -14,10 +14,11 @@ type TimeSeries struct {
 }
 
 type DirectionUtilization struct {
-	Current   float64                  `json:"current"`
-	Stats     timeseries.StatsResult   `json:"stats"`
-	Trend     timeseries.TrendResult   `json:"trend"`
-	Anomalies timeseries.AnomalyResult `json:"anomalies"`
+	Current    float64                  `json:"current"`
+	Stats      timeseries.StatsResult   `json:"stats"`
+	Trend      timeseries.TrendResult   `json:"trend"`
+	Anomalies  timeseries.AnomalyResult `json:"anomalies"`
+	SampleSize int                      `json:"sample_size"`
 }
 
 type UtilizationResult struct {
@@ -29,39 +30,16 @@ type UtilizationResult struct {
 
 const anomalyStdDevs = 4.0
 
-func AnalyzeReadBytesUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
-	if len(data) == 0 {
-		return DirectionUtilization{}, fmt.Errorf("cannot analyze read bytes utilization from empty dataset")
-	}
-
-	current := data[len(data)-1].Value
-
-	stats, err := timeseries.CalculateStats(data)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	trend, err := timeseries.AnalyzeTrend(data)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	return DirectionUtilization{
-		Current:   current,
-		Stats:     stats,
-		Trend:     trend,
-		Anomalies: anomalies,
-	}, nil
+func hasAnalyzableDiskMetrics(metrics DiskMetrics) bool {
+	return timeseries.HasEnoughPoints(metrics.ReadBytes) ||
+		timeseries.HasEnoughPoints(metrics.WriteBytes) ||
+		timeseries.HasEnoughPoints(metrics.ReadOps) ||
+		timeseries.HasEnoughPoints(metrics.WriteOps)
 }
 
-func AnalyzeWriteBytesUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
-	if len(data) == 0 {
-		return DirectionUtilization{}, fmt.Errorf("cannot analyze write bytes utilization from empty dataset")
+func analyzeDirectionUtilization(data []timeseries.DataPoint, label string) (DirectionUtilization, error) {
+	if !timeseries.HasEnoughPoints(data) {
+		return DirectionUtilization{}, fmt.Errorf("cannot analyze %s utilization from dataset with fewer than %d points", label, timeseries.MinPointsForAnalysis)
 	}
 
 	current := data[len(data)-1].Value
@@ -82,104 +60,45 @@ func AnalyzeWriteBytesUtilization(data []timeseries.DataPoint) (DirectionUtiliza
 	}
 
 	return DirectionUtilization{
-		Current:   current,
-		Stats:     stats,
-		Trend:     trend,
-		Anomalies: anomalies,
-	}, nil
-}
-
-func AnalyzeReadOpsUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
-	if len(data) == 0 {
-		return DirectionUtilization{}, fmt.Errorf("cannot analyze read ops utilization from empty dataset")
-	}
-
-	current := data[len(data)-1].Value
-
-	stats, err := timeseries.CalculateStats(data)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	trend, err := timeseries.AnalyzeTrend(data)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	return DirectionUtilization{
-		Current:   current,
-		Stats:     stats,
-		Trend:     trend,
-		Anomalies: anomalies,
-	}, nil
-}
-
-func AnalyzeWriteOpsUtilization(data []timeseries.DataPoint) (DirectionUtilization, error) {
-	if len(data) == 0 {
-		return DirectionUtilization{}, fmt.Errorf("cannot analyze write ops utilization from empty dataset")
-	}
-
-	current := data[len(data)-1].Value
-
-	stats, err := timeseries.CalculateStats(data)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	trend, err := timeseries.AnalyzeTrend(data)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	anomalies, err := timeseries.DetectAnomalies(data, anomalyStdDevs)
-	if err != nil {
-		return DirectionUtilization{}, err
-	}
-
-	return DirectionUtilization{
-		Current:   current,
-		Stats:     stats,
-		Trend:     trend,
-		Anomalies: anomalies,
+		Current:    current,
+		Stats:      stats,
+		Trend:      trend,
+		Anomalies:  anomalies,
+		SampleSize: len(data),
 	}, nil
 }
 
 func AnalyzeUtilization(metrics DiskMetrics) (UtilizationResult, error) {
-	if len(metrics.ReadBytes) == 0 && len(metrics.WriteBytes) == 0 {
+	if !hasAnalyzableDiskMetrics(metrics) {
 		return UtilizationResult{}, fmt.Errorf("no metrics provided for utilization analysis")
 	}
 
 	var result UtilizationResult
 	var err error
 
-	if len(metrics.ReadBytes) > 0 {
-		result.ReadBytes, err = AnalyzeReadBytesUtilization(metrics.ReadBytes)
+	if timeseries.HasEnoughPoints(metrics.ReadBytes) {
+		result.ReadBytes, err = analyzeDirectionUtilization(metrics.ReadBytes, "read bytes")
 		if err != nil {
 			return UtilizationResult{}, err
 		}
 	}
 
-	if len(metrics.WriteBytes) > 0 {
-		result.WriteBytes, err = AnalyzeWriteBytesUtilization(metrics.WriteBytes)
+	if timeseries.HasEnoughPoints(metrics.WriteBytes) {
+		result.WriteBytes, err = analyzeDirectionUtilization(metrics.WriteBytes, "write bytes")
 		if err != nil {
 			return UtilizationResult{}, err
 		}
 	}
 
-	if len(metrics.ReadOps) > 0 {
-		result.ReadOps, err = AnalyzeReadOpsUtilization(metrics.ReadOps)
+	if timeseries.HasEnoughPoints(metrics.ReadOps) {
+		result.ReadOps, err = analyzeDirectionUtilization(metrics.ReadOps, "read ops")
 		if err != nil {
 			return UtilizationResult{}, err
 		}
 	}
 
-	if len(metrics.WriteOps) > 0 {
-		result.WriteOps, err = AnalyzeWriteOpsUtilization(metrics.WriteOps)
+	if timeseries.HasEnoughPoints(metrics.WriteOps) {
+		result.WriteOps, err = analyzeDirectionUtilization(metrics.WriteOps, "write ops")
 		if err != nil {
 			return UtilizationResult{}, err
 		}

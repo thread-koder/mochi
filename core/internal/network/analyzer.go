@@ -78,16 +78,16 @@ func AnalyzePod(ctx context.Context, pod *database.Pod, opts AnalysisOptions) (P
 
 	metrics, err := fetchPodMetrics(ctx, pod, opts)
 	if err != nil {
-		return PodAnalysis{}, err
+		return PodAnalysis{}, fmt.Errorf("failed to analyze pod %s: %w", pod.Name, err)
 	}
 
-	if len(metrics.ReceiveBytes) == 0 && len(metrics.TransmitBytes) == 0 {
+	if !hasAnalyzableNetworkMetrics(metrics) {
 		return PodAnalysis{}, apperrors.NewNoMetrics(fmt.Sprintf("pod %s", pod.Name))
 	}
 
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
-		return PodAnalysis{}, err
+		return PodAnalysis{}, fmt.Errorf("failed to analyze pod %s: %w", pod.Name, err)
 	}
 
 	result := PodAnalysis{
@@ -114,33 +114,32 @@ func AnalyzeWorkload(ctx context.Context, workloadType string, workloadName stri
 	var podAnalyses []PodAnalysis
 	g, gctx := errgroup.WithContext(ctx)
 	if includePods {
-		podAnalyses = make([]PodAnalysis, len(pods.Live))
 		podOpts := opts
 		podOpts.IncludeTimeSeries = false
-		for i, pod := range pods.Live {
-			g.Go(func() error {
-				podAnalysis, err := AnalyzePod(gctx, pod, podOpts)
-				if err != nil {
-					return fmt.Errorf("failed to analyze pod %s: %w", pod.Name, err)
-				}
-				podAnalyses[i] = podAnalysis
-				return nil
+		g.Go(func() error {
+			analyses, err := analyzer.SkipNoMetrics(gctx, pods.Live, func(ctx context.Context, pod *database.Pod) (PodAnalysis, error) {
+				return AnalyzePod(ctx, pod, podOpts)
 			})
-		}
+			if err != nil {
+				return err
+			}
+			podAnalyses = analyses
+			return nil
+		})
 	}
 
 	metrics, err := fetchWorkloadMetrics(ctx, pods.All, opts)
 	if err != nil {
-		return WorkloadAnalysis{}, err
+		return WorkloadAnalysis{}, fmt.Errorf("failed to analyze workload %s/%s/%s: %w", workloadType, namespace, workloadName, err)
 	}
 
-	if len(metrics.ReceiveBytes) == 0 && len(metrics.TransmitBytes) == 0 {
+	if !hasAnalyzableNetworkMetrics(metrics) {
 		return WorkloadAnalysis{}, apperrors.NewNoMetrics(fmt.Sprintf("workload %s/%s", namespace, workloadName))
 	}
 
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
-		return WorkloadAnalysis{}, err
+		return WorkloadAnalysis{}, fmt.Errorf("failed to analyze workload %s/%s/%s: %w", workloadType, namespace, workloadName, err)
 	}
 
 	if err := g.Wait(); err != nil {
@@ -190,16 +189,16 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 
 	metrics, err := fetchNamespaceMetrics(ctx, namespace, opts)
 	if err != nil {
-		return NamespaceAnalysis{}, err
+		return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace %s: %w", namespace, err)
 	}
 
-	if len(metrics.ReceiveBytes) == 0 && len(metrics.TransmitBytes) == 0 {
+	if !hasAnalyzableNetworkMetrics(metrics) {
 		return NamespaceAnalysis{}, apperrors.NewNoMetrics(fmt.Sprintf("namespace %s", namespace))
 	}
 
 	utilization, err := AnalyzeUtilization(metrics)
 	if err != nil {
-		return NamespaceAnalysis{}, err
+		return NamespaceAnalysis{}, fmt.Errorf("failed to analyze namespace %s: %w", namespace, err)
 	}
 
 	if err := g.Wait(); err != nil {
