@@ -11,6 +11,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@floating-ui/vue": "^2.0.1",
     "@nuxt/eslint": "1.16.0",
     "@nuxt/icon": "2.2.4",
     "@tailwindcss/vite": "^4.3.1",

@@ -63,6 +63,7 @@ export default defineNuxtConfig({
     plugins: [tailwindcss()],
     optimizeDeps: {
       include: [
+        '@floating-ui/vue',
         'echarts/charts',
         'echarts/components',
         'echarts/core',

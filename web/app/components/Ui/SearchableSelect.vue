@@ -1,8 +1,5 @@
 <template>
-  <div
-    ref="containerRef"
-    class="relative"
-  >
+  <div>
     <!-- Trigger Button -->
     <button
       ref="triggerRef"
@@ -38,13 +35,13 @@
         <div
           v-if="isOpen"
           ref="dropdownRef"
-          class="fixed z-9999 panel rounded-lg border border-on-surface-muted/20 shadow-lg overflow-hidden"
-          :style="dropdownStyle"
+          class="z-9999 panel flex flex-col rounded-lg border border-on-surface-muted/20 shadow-lg overflow-hidden"
+          :style="floatingStyles"
         >
           <!-- Search Input -->
           <div
             v-if="searchable"
-            class="p-2 border-b border-on-surface-muted/10"
+            class="shrink-0 p-2 border-b border-on-surface-muted/10"
           >
             <div class="relative">
               <Icon
@@ -64,7 +61,7 @@
           </div>
 
           <!-- Options List -->
-          <div class="max-h-60 overflow-y-auto">
+          <div class="flex-1 min-h-0 max-h-60 overflow-y-auto">
             <!-- Null Option -->
             <button
               v-if="nullOption"
@@ -103,6 +100,15 @@
 </template>
 
 <script setup lang="ts">
+import {
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  size,
+  useFloating,
+} from '@floating-ui/vue'
+
 interface Props {
   options: Array<string | { value: string, label: string }>
   placeholder?: string
@@ -131,20 +137,29 @@ const emit = defineEmits<{
 const isOpen = ref(false)
 const searchQuery = ref('')
 const searchInputRef = ref<HTMLInputElement | null>(null)
-const containerRef = ref<HTMLDivElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
 const dropdownRef = ref<HTMLDivElement | null>(null)
 
-const triggerBounding = useElementBounding(triggerRef)
-
-const dropdownStyle = computed(() => {
-  if (!triggerBounding.width.value) return {}
-
-  return {
-    top: `${triggerBounding.bottom.value + 8}px`,
-    left: `${triggerBounding.left.value}px`,
-    width: `${triggerBounding.width.value}px`,
-  }
+const { floatingStyles, isPositioned } = useFloating(triggerRef, dropdownRef, {
+  open: isOpen,
+  placement: 'bottom-start',
+  strategy: 'fixed',
+  transform: false,
+  middleware: [
+    offset(8),
+    flip({ padding: 8 }),
+    shift({ padding: 8 }),
+    size({
+      padding: 8,
+      apply({ rects, availableHeight, elements }) {
+        Object.assign(elements.floating.style, {
+          width: `${rects.reference.width}px`,
+          maxHeight: `${availableHeight}px`,
+        })
+      },
+    }),
+  ],
+  whileElementsMounted: autoUpdate,
 })
 
 const optionValue = (option: string | { value: string, label: string }): string => {
@@ -185,14 +200,12 @@ const toggleDropdown = () => {
     return
   }
 
-  isOpen.value = !isOpen.value
   if (isOpen.value) {
-    triggerBounding.update()
-    nextTick(() => {
-      searchInputRef.value?.focus()
-      searchQuery.value = ''
-    })
+    closeDropdown()
+    return
   }
+
+  isOpen.value = true
 }
 
 const closeDropdown = () => {
@@ -224,7 +237,7 @@ const selectOption = (option: string | { value: string, label: string }) => {
   closeDropdown()
 }
 
-onClickOutside(containerRef, () => {
+onClickOutside(triggerRef, () => {
   if (isOpen.value) {
     closeDropdown()
   }
@@ -233,6 +246,12 @@ onClickOutside(containerRef, () => {
 onKeyStroke('Escape', () => {
   if (isOpen.value) {
     closeDropdown()
+  }
+})
+
+watch(isPositioned, (positioned) => {
+  if (positioned) {
+    searchInputRef.value?.focus()
   }
 })
 </script>
