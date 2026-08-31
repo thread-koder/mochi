@@ -51,7 +51,7 @@ func syncNodes(ctx context.Context) error {
 		return fmt.Errorf("failed to list cluster nodes: %w", err)
 	}
 
-	dbNodes := make([]*database.Node, 0, len(nodes.Items))
+	dbNodes := make([]*database.NodeUpsert, 0, len(nodes.Items))
 	now := time.Now()
 
 	nodeUIDs := make([]string, 0, len(nodes.Items))
@@ -61,15 +61,7 @@ func syncNodes(ctx context.Context) error {
 		labelsJSON, _ := mapToJSON(node.Labels)
 		annotationsJSON, _ := mapToJSON(node.Annotations)
 
-		var internalIP, externalIP *string
-		for _, addr := range node.Status.Addresses {
-			switch addr.Type {
-			case corev1.NodeInternalIP:
-				internalIP = new(addr.Address)
-			case corev1.NodeExternalIP:
-				externalIP = new(addr.Address)
-			}
-		}
+		internalIP, externalIP, dialIPs := nodeDialIPs(node.Status.Addresses)
 
 		cpuCapacity := node.Status.Capacity[corev1.ResourceCPU]
 		memoryCapacity := node.Status.Capacity[corev1.ResourceMemory]
@@ -83,27 +75,28 @@ func syncNodes(ctx context.Context) error {
 
 		conditionsJSON, _ := sliceToJSON(node.Status.Conditions)
 
-		dbNode := &database.Node{
-			Name:                    node.Name,
-			UID:                     nodeUID,
-			InternalIP:              internalIP,
-			ExternalIP:              externalIP,
-			OSImage:                 node.Status.NodeInfo.OSImage,
-			KernelVersion:           node.Status.NodeInfo.KernelVersion,
-			ContainerRuntimeVersion: node.Status.NodeInfo.ContainerRuntimeVersion,
-			KubeletVersion:          node.Status.NodeInfo.KubeletVersion,
-			CPUCapacity:             cpuCapacityStr,
-			MemoryCapacity:          memoryCapacityStr,
-			CPUAllocatable:          cpuAllocatableStr,
-			MemoryAllocatable:       memoryAllocatableStr,
-			Labels:                  labelsJSON,
-			Annotations:             annotationsJSON,
-			Conditions:              conditionsJSON,
-			CreatedAt:               node.CreationTimestamp.Time,
-			SyncedAt:                now,
-		}
-
-		dbNodes = append(dbNodes, dbNode)
+		dbNodes = append(dbNodes, &database.NodeUpsert{
+			Node: &database.Node{
+				Name:                    node.Name,
+				UID:                     nodeUID,
+				InternalIP:              internalIP,
+				ExternalIP:              externalIP,
+				OSImage:                 node.Status.NodeInfo.OSImage,
+				KernelVersion:           node.Status.NodeInfo.KernelVersion,
+				ContainerRuntimeVersion: node.Status.NodeInfo.ContainerRuntimeVersion,
+				KubeletVersion:          node.Status.NodeInfo.KubeletVersion,
+				CPUCapacity:             cpuCapacityStr,
+				MemoryCapacity:          memoryCapacityStr,
+				CPUAllocatable:          cpuAllocatableStr,
+				MemoryAllocatable:       memoryAllocatableStr,
+				Labels:                  labelsJSON,
+				Annotations:             annotationsJSON,
+				Conditions:              conditionsJSON,
+				CreatedAt:               node.CreationTimestamp.Time,
+				SyncedAt:                now,
+			},
+			IPs: dialIPs,
+		})
 	}
 
 	if err := database.UpsertNodesBatch(ctx, dbNodes); err != nil {
@@ -499,7 +492,7 @@ func syncServices(ctx context.Context, namespace string) error {
 		return fmt.Errorf("failed to list services: %w", err)
 	}
 
-	dbServices := make([]*database.Service, 0, len(services.Items))
+	dbServices := make([]*database.ServiceUpsert, 0, len(services.Items))
 	now := time.Now()
 
 	svcUIDs := make([]string, 0, len(services.Items))
@@ -511,21 +504,23 @@ func syncServices(ctx context.Context, namespace string) error {
 		selectorJSON, _ := mapToJSON(svc.Spec.Selector)
 		portsJSON, _ := sliceToJSON(svc.Spec.Ports)
 
-		dbService := &database.Service{
-			Name:        svc.Name,
-			Namespace:   svc.Namespace,
-			UID:         svcUID,
-			Type:        string(svc.Spec.Type),
-			ClusterIP:   optionalString(svc.Spec.ClusterIP),
-			Ports:       portsJSON,
-			Selector:    selectorJSON,
-			Labels:      labelsJSON,
-			Annotations: annotationsJSON,
-			CreatedAt:   svc.CreationTimestamp.Time,
-			SyncedAt:    now,
-		}
-
-		dbServices = append(dbServices, dbService)
+		dbServices = append(dbServices, &database.ServiceUpsert{
+			Service: &database.Service{
+				Name:        svc.Name,
+				Namespace:   svc.Namespace,
+				UID:         svcUID,
+				Type:        string(svc.Spec.Type),
+				ClusterIP:   optionalString(svc.Spec.ClusterIP),
+				Ports:       portsJSON,
+				Selector:    selectorJSON,
+				Labels:      labelsJSON,
+				Annotations: annotationsJSON,
+				CreatedAt:   svc.CreationTimestamp.Time,
+				SyncedAt:    now,
+			},
+			VIPs:      serviceVIPs(&svc),
+			NodePorts: serviceNodePorts(&svc),
+		})
 	}
 
 	if err := database.UpsertServicesBatch(ctx, dbServices); err != nil {
