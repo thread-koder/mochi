@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const SourceMochiEBPF = "mochi-ebpf"
@@ -25,6 +27,7 @@ type ResolvedEdge struct {
 	Port                int
 	ViaServiceNamespace *string
 	ViaServiceName      *string
+	ViaServicePort      *int
 	Source              string
 	Connects            float64
 	TxBytes             float64
@@ -39,11 +42,13 @@ type ResolveOptions struct {
 }
 
 type resolveCache struct {
-	serviceByClusterIP  map[string]*database.Service
-	serviceByEndpointIP map[string]*database.Service
-	nodeRefByClusterIP  map[string]cachedNodeRef
-	podsByIP            map[string][]*database.Pod
-	nodeRefByUID        map[string]cachedNodeRef
+	serviceByClusterIP      map[string]*database.Service
+	serviceByEndpointIP     map[string]*database.Service
+	nodeRefByClusterIP      map[string]cachedNodeRef
+	podsByIP                map[string][]*database.Pod
+	nodeRefByUID            map[string]cachedNodeRef
+	servicePorts            map[string][]corev1.ServicePort
+	endpointSlicesByService map[string][]*database.EndpointSlice
 }
 
 type cachedNodeRef struct {
@@ -58,11 +63,13 @@ func DefaultResolveOptions() ResolveOptions {
 	return ResolveOptions{
 		IncludeDNS: false,
 		cache: resolveCache{
-			serviceByClusterIP:  make(map[string]*database.Service),
-			serviceByEndpointIP: make(map[string]*database.Service),
-			nodeRefByClusterIP:  make(map[string]cachedNodeRef),
-			podsByIP:            make(map[string][]*database.Pod),
-			nodeRefByUID:        make(map[string]cachedNodeRef),
+			serviceByClusterIP:      make(map[string]*database.Service),
+			serviceByEndpointIP:     make(map[string]*database.Service),
+			nodeRefByClusterIP:      make(map[string]cachedNodeRef),
+			podsByIP:                make(map[string][]*database.Pod),
+			nodeRefByUID:            make(map[string]cachedNodeRef),
+			servicePorts:            make(map[string][]corev1.ServicePort),
+			endpointSlicesByService: make(map[string][]*database.EndpointSlice),
 		},
 	}
 }
@@ -102,16 +109,26 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 		return ResolvedEdge{}, false, nil
 	}
 
-	viaNS, viaName, err := viaService(ctx, series, opts)
+	via, err := viaService(ctx, series, opts)
 	if err != nil {
 		return ResolvedEdge{}, false, err
 	}
 
+	var viaNS, viaName *string
+	var viaPort *int
+	if via != nil {
+		viaNS = new(via.namespace)
+		viaName = new(via.name)
+		viaPort = via.port
+	}
+
 	evidence, err := json.Marshal(map[string]string{
-		"src_pod_uid":   series.SrcPodUID,
-		"dst_pod_uid":   series.DstPodUID,
-		"dst_ip":        series.DstIP,
-		"actual_dst_ip": series.ActualDstIP,
+		"src_pod_uid":     series.SrcPodUID,
+		"dst_pod_uid":     series.DstPodUID,
+		"dst_ip":          series.DstIP,
+		"actual_dst_ip":   series.ActualDstIP,
+		"dst_port":        strconv.Itoa(series.DstPort),
+		"actual_dst_port": strconv.Itoa(series.ActualDstPort),
 	})
 	if err != nil {
 		return ResolvedEdge{}, false, fmt.Errorf("marshal evidence: %w", err)
@@ -124,6 +141,7 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 		Port:                series.ActualDstPort,
 		ViaServiceNamespace: viaNS,
 		ViaServiceName:      viaName,
+		ViaServicePort:      viaPort,
 		Source:              SourceMochiEBPF,
 		Connects:            series.Connects,
 		TxBytes:             series.TxBytes,
@@ -259,6 +277,20 @@ func lookupHeadlessService(ctx context.Context, opts ResolveOptions, ip string) 
 	return services[0], true, nil
 }
 
+func lookupEndpointSlices(ctx context.Context, opts ResolveOptions, namespace, serviceName string) ([]*database.EndpointSlice, error) {
+	key := serviceCacheKey(namespace, serviceName)
+	if slices, hit := opts.cache.endpointSlicesByService[key]; hit {
+		return slices, nil
+	}
+
+	slices, err := database.GetEndpointSlicesByService(ctx, namespace, serviceName)
+	if err != nil {
+		return nil, fmt.Errorf("lookup endpoint slices for %s/%s: %w", namespace, serviceName, err)
+	}
+	opts.cache.endpointSlicesByService[key] = slices
+	return slices, nil
+}
+
 func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, clusterIP string) (NodeRef, bool, error) {
 	if cached, hit := opts.cache.nodeRefByClusterIP[clusterIP]; hit {
 		return cached.ref, cached.ok, nil
@@ -273,9 +305,9 @@ func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, cluste
 		return NodeRef{}, false, nil
 	}
 
-	slices, err := database.GetEndpointSlicesByService(ctx, svc.Namespace, svc.Name)
+	slices, err := lookupEndpointSlices(ctx, opts, svc.Namespace, svc.Name)
 	if err != nil {
-		return NodeRef{}, false, fmt.Errorf("lookup endpoint slices for %s/%s: %w", svc.Namespace, svc.Name, err)
+		return NodeRef{}, false, err
 	}
 
 	for _, es := range slices {
@@ -321,36 +353,4 @@ func endpointAddresses(raw json.RawMessage) ([]string, error) {
 		results = append(results, ep.Addresses...)
 	}
 	return results, nil
-}
-
-func viaService(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (*string, *string, error) {
-	// NAT hit (dst=ClusterIP, actual=pod) or NAT miss (both ClusterIP): attribute the Service.
-	for _, ip := range []string{series.DstIP, series.ActualDstIP} {
-		if ip == "" {
-			continue
-		}
-		svc, found, err := lookupService(ctx, opts, ip)
-		if err != nil {
-			return nil, nil, err
-		}
-		if !found {
-			continue
-		}
-		return new(svc.Namespace), new(svc.Name), nil
-	}
-	// Headless clients dial pod IPs. Unique headless EndpointSlice membership only.
-	for _, ip := range []string{series.DstIP, series.ActualDstIP} {
-		if ip == "" {
-			continue
-		}
-		svc, found, err := lookupHeadlessService(ctx, opts, ip)
-		if err != nil {
-			return nil, nil, err
-		}
-		if !found {
-			continue
-		}
-		return new(svc.Namespace), new(svc.Name), nil
-	}
-	return nil, nil, nil
 }

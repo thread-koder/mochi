@@ -78,6 +78,7 @@ func Discover(ctx context.Context) error {
 				Port:                edge.Port,
 				ViaServiceNamespace: edge.ViaServiceNamespace,
 				ViaServiceName:      edge.ViaServiceName,
+				ViaServicePort:      edge.ViaServicePort,
 				Source:              edge.Source,
 				Connects:            edge.Connects,
 				TxBytes:             edge.TxBytes,
@@ -129,6 +130,7 @@ func mergeResolvedEdge(merged map[string]*ResolvedEdge, edge ResolvedEdge) {
 	if existing.ViaServiceName == nil && edge.ViaServiceName != nil {
 		existing.ViaServiceNamespace = edge.ViaServiceNamespace
 		existing.ViaServiceName = edge.ViaServiceName
+		existing.ViaServicePort = edge.ViaServicePort
 	}
 	if len(existing.Evidence) == 0 && len(edge.Evidence) > 0 {
 		existing.Evidence = edge.Evidence

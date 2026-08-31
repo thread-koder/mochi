@@ -40,6 +40,7 @@ type EdgeDTO struct {
 	Port                int       `json:"port"`
 	ViaServiceNamespace *string   `json:"via_service_namespace"`
 	ViaServiceName      *string   `json:"via_service_name"`
+	ViaServicePort      *int      `json:"via_service_port"`
 	Source              string    `json:"source"`
 	Connects            float64   `json:"connects"`
 	TxBytes             float64   `json:"tx_bytes"`
@@ -215,6 +216,7 @@ func toEdgeDTO(e *database.DependencyEdge) EdgeDTO {
 		Port:                e.Port,
 		ViaServiceNamespace: e.ViaServiceNamespace,
 		ViaServiceName:      e.ViaServiceName,
+		ViaServicePort:      e.ViaServicePort,
 		Source:              e.Source,
 		Connects:            e.Connects,
 		TxBytes:             e.TxBytes,
