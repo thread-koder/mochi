@@ -42,35 +42,24 @@ func Discover(ctx context.Context) error {
 	}
 
 	if len(merged) > 0 {
-		nodesByKey := make(map[string]*database.DependencyNode)
+		uniqueNodes := make(map[string]struct{})
+		edges := make([]*database.DependencyEdgeUpsert, 0, len(merged))
 		for _, edge := range merged {
-			addDiscoveryNode(nodesByKey, edge.From, now)
-			addDiscoveryNode(nodesByKey, edge.To, now)
-		}
-
-		nodes := make([]*database.DependencyNode, 0, len(nodesByKey))
-		for _, node := range nodesByKey {
-			nodes = append(nodes, node)
-		}
-
-		if err := database.UpsertDependencyNodesBatch(ctx, nodes); err != nil {
-			return fmt.Errorf("upsert dependency nodes: %w", err)
-		}
-
-		edges := make([]*database.DependencyEdge, 0, len(merged))
-		for _, edge := range merged {
-			fromNode, ok := nodesByKey[nodeKey(edge.From.Kind, edge.From.Namespace, edge.From.Name)]
-			if !ok {
-				return fmt.Errorf("missing node id for from %s/%s/%s", edge.From.Kind, edge.From.Namespace, edge.From.Name)
+			from := database.DependencyNodeKey{
+				Kind:      edge.From.Kind,
+				Namespace: edge.From.Namespace,
+				Name:      edge.From.Name,
 			}
-			toNode, ok := nodesByKey[nodeKey(edge.To.Kind, edge.To.Namespace, edge.To.Name)]
-			if !ok {
-				return fmt.Errorf("missing node id for to %s/%s/%s", edge.To.Kind, edge.To.Namespace, edge.To.Name)
+			to := database.DependencyNodeKey{
+				Kind:      edge.To.Kind,
+				Namespace: edge.To.Namespace,
+				Name:      edge.To.Name,
 			}
-
-			edges = append(edges, &database.DependencyEdge{
-				FromNodeID:          fromNode.ID,
-				ToNodeID:            toNode.ID,
+			uniqueNodes[nodeKey(from.Kind, from.Namespace, from.Name)] = struct{}{}
+			uniqueNodes[nodeKey(to.Kind, to.Namespace, to.Name)] = struct{}{}
+			edges = append(edges, &database.DependencyEdgeUpsert{
+				From:                from,
+				To:                  to,
 				Protocol:            edge.Protocol,
 				Port:                edge.Port,
 				ViaServiceNamespace: edge.ViaServiceNamespace,
@@ -87,14 +76,14 @@ func Discover(ctx context.Context) error {
 			})
 		}
 
-		if err := database.UpsertDependencyEdgesBatch(ctx, edges); err != nil {
-			return fmt.Errorf("upsert dependency edges: %w", err)
+		if err := database.UpsertDependencyGraph(ctx, edges); err != nil {
+			return fmt.Errorf("upsert dependency graph: %w", err)
 		}
 
 		log.Info().
 			Int("series", len(series)).
 			Int("edges", len(edges)).
-			Int("nodes", len(nodes)).
+			Int("nodes", len(uniqueNodes)).
 			Msg("Discovery pass upserted dependency graph")
 	}
 
@@ -121,20 +110,6 @@ func mergeResolvedEdge(merged map[string]*ResolvedEdge, edge ResolvedEdge) {
 	}
 	if len(existing.Evidence) == 0 && len(edge.Evidence) > 0 {
 		existing.Evidence = edge.Evidence
-	}
-}
-
-func addDiscoveryNode(nodesByKey map[string]*database.DependencyNode, ref NodeRef, now time.Time) {
-	key := nodeKey(ref.Kind, ref.Namespace, ref.Name)
-	if _, ok := nodesByKey[key]; ok {
-		return
-	}
-	nodesByKey[key] = &database.DependencyNode{
-		Kind:        ref.Kind,
-		Namespace:   ref.Namespace,
-		Name:        ref.Name,
-		FirstSeenAt: now,
-		LastSeenAt:  now,
 	}
 }
 
