@@ -19,7 +19,7 @@ type viaServiceMatch struct {
 }
 
 func viaService(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (*viaServiceMatch, error) {
-	// NAT hit (dst=ClusterIP, actual=pod) or NAT miss (both ClusterIP): attribute the Service.
+	// NAT hit (dst=Service VIP, actual=pod) or NAT miss (both VIP): attribute the Service.
 	for _, pair := range []struct {
 		ip   string
 		port int
@@ -30,7 +30,7 @@ func viaService(ctx context.Context, series ConnectionSeries, opts ResolveOption
 		if pair.ip == "" {
 			continue
 		}
-		svc, found, err := lookupService(ctx, opts, pair.ip)
+		svc, found, err := lookupService(ctx, opts, pair.ip, pair.port, series.Protocol)
 		if err != nil {
 			return nil, err
 		}
@@ -72,6 +72,23 @@ func viaService(ctx context.Context, series ConnectionSeries, opts ResolveOption
 	return nil, nil
 }
 
+func uniqueServiceSpecPortMatch(ports []corev1.ServicePort, protocol string, port int) bool {
+	var matches int
+	for _, p := range ports {
+		if !protocolMatches(protocol, p.Protocol) {
+			continue
+		}
+		if int(p.Port) != port {
+			continue
+		}
+		matches++
+		if matches > 1 {
+			return false
+		}
+	}
+	return matches == 1
+}
+
 func mapServicePort(ctx context.Context, opts ResolveOptions, svc *database.Service, series ConnectionSeries, candidatePort int) (*int, error) {
 	ports, err := parsedServicePorts(opts, svc)
 	if err != nil {
@@ -81,20 +98,27 @@ func mapServicePort(ctx context.Context, opts ResolveOptions, svc *database.Serv
 		return nil, nil
 	}
 
-	var directPort int
-	var directMatches int
+	if uniqueServiceSpecPortMatch(ports, series.Protocol, candidatePort) {
+		return &candidatePort, nil
+	}
+
+	var nodePortSpecPort int
+	var nodePortMatches int
 	for _, p := range ports {
 		if !protocolMatches(series.Protocol, p.Protocol) {
 			continue
 		}
-		if int(p.Port) != candidatePort {
+		if p.NodePort == 0 || int(p.NodePort) != candidatePort {
 			continue
 		}
-		directMatches++
-		directPort = int(p.Port)
+		nodePortMatches++
+		nodePortSpecPort = int(p.Port)
+		if nodePortMatches > 1 {
+			break
+		}
 	}
-	if directMatches == 1 {
-		return &directPort, nil
+	if nodePortMatches == 1 {
+		return &nodePortSpecPort, nil
 	}
 
 	var reversePort int

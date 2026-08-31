@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
@@ -42,9 +43,11 @@ type ResolveOptions struct {
 }
 
 type resolveCache struct {
-	serviceByClusterIP      map[string]*database.Service
+	serviceByIP             map[string]*database.Service
+	serviceByNodePort       map[string]*database.Service
+	nodeIP                  map[string]bool
 	serviceByEndpointIP     map[string]*database.Service
-	nodeRefByClusterIP      map[string]cachedNodeRef
+	nodeRefByServiceDest    map[string]cachedNodeRef
 	podsByIP                map[string][]*database.Pod
 	nodeRefByUID            map[string]cachedNodeRef
 	servicePorts            map[string][]corev1.ServicePort
@@ -63,9 +66,11 @@ func DefaultResolveOptions() ResolveOptions {
 	return ResolveOptions{
 		IncludeDNS: false,
 		cache: resolveCache{
-			serviceByClusterIP:      make(map[string]*database.Service),
+			serviceByIP:             make(map[string]*database.Service),
+			serviceByNodePort:       make(map[string]*database.Service),
+			nodeIP:                  make(map[string]bool),
 			serviceByEndpointIP:     make(map[string]*database.Service),
-			nodeRefByClusterIP:      make(map[string]cachedNodeRef),
+			nodeRefByServiceDest:    make(map[string]cachedNodeRef),
 			podsByIP:                make(map[string][]*database.Pod),
 			nodeRefByUID:            make(map[string]cachedNodeRef),
 			servicePorts:            make(map[string][]corev1.ServicePort),
@@ -162,20 +167,26 @@ func resolveDestination(ctx context.Context, series ConnectionSeries, opts Resol
 			return ref, nil
 		}
 	} else {
-		pods, err := lookupPodsByIP(ctx, opts, series.ActualDstIP)
+		isNode, err := nodeIPExists(ctx, opts, series.ActualDstIP)
 		if err != nil {
 			return NodeRef{}, err
 		}
-		if len(pods) > 0 {
-			ref, ok := resolvePodNodeRef(opts, pods[0])
-			if ok {
-				return ref, nil
+		if !isNode {
+			pods, err := lookupPodsByIP(ctx, opts, series.ActualDstIP)
+			if err != nil {
+				return NodeRef{}, err
+			}
+			if len(pods) > 0 {
+				ref, ok := resolvePodNodeRef(opts, pods[0])
+				if ok {
+					return ref, nil
+				}
 			}
 		}
 	}
 
-	// NAT miss: actual_dst_ip is often still the ClusterIP. Map via Service endpoints.
-	ref, ok, err := resolveViaServiceEndpoints(ctx, opts, series.ActualDstIP)
+	// Service VIP/NodePort dest (including node-address skip of GetPodsByIP) maps through EndpointSlice backends.
+	ref, ok, err := resolveViaServiceEndpoints(ctx, opts, series.ActualDstIP, series.ActualDstPort, series.Protocol)
 	if err != nil {
 		return NodeRef{}, err
 	}
@@ -183,7 +194,7 @@ func resolveDestination(ctx context.Context, series ConnectionSeries, opts Resol
 		return ref, nil
 	}
 	if series.DstIP != "" && series.DstIP != series.ActualDstIP {
-		ref, ok, err := resolveViaServiceEndpoints(ctx, opts, series.DstIP)
+		ref, ok, err := resolveViaServiceEndpoints(ctx, opts, series.DstIP, series.DstPort, series.Protocol)
 		if err != nil {
 			return NodeRef{}, err
 		}
@@ -241,21 +252,77 @@ func lookupPodsByIP(ctx context.Context, opts ResolveOptions, ip string) ([]*dat
 	return pods, nil
 }
 
-func lookupService(ctx context.Context, opts ResolveOptions, clusterIP string) (*database.Service, bool, error) {
-	if svc, hit := opts.cache.serviceByClusterIP[clusterIP]; hit {
+func nodeIPExists(ctx context.Context, opts ResolveOptions, ip string) (bool, error) {
+	if exists, hit := opts.cache.nodeIP[ip]; hit {
+		return exists, nil
+	}
+	exists, err := database.NodeIPExists(ctx, ip)
+	if err != nil {
+		return false, fmt.Errorf("lookup node IP %s: %w", ip, err)
+	}
+	opts.cache.nodeIP[ip] = exists
+	return exists, nil
+}
+
+func lookupService(ctx context.Context, opts ResolveOptions, ip string, port int, protocol string) (*database.Service, bool, error) {
+	if ip == "" {
+		return nil, false, nil
+	}
+
+	var vipSvc *database.Service
+	if cached, hit := opts.cache.serviceByIP[ip]; hit {
+		vipSvc = cached
+	} else {
+		svc, err := database.GetServiceByIP(ctx, ip)
+		if err != nil {
+			if errors.Is(err, &apperrors.NotFoundError{}) {
+				opts.cache.serviceByIP[ip] = nil
+			} else {
+				return nil, false, fmt.Errorf("lookup service by IP %s: %w", ip, err)
+			}
+		} else {
+			opts.cache.serviceByIP[ip] = svc
+			vipSvc = svc
+		}
+	}
+
+	// kube-proxy portals are IP+spec.port. A unique portal match applies everywhere
+	// (ClusterIP, ExternalIP/LB on a node address) without consulting NodePort.
+	if vipSvc != nil {
+		ports, err := parsedServicePorts(opts, vipSvc)
+		if err != nil {
+			return nil, false, err
+		}
+		if uniqueServiceSpecPortMatch(ports, protocol, port) {
+			return vipSvc, true, nil
+		}
+	}
+
+	isNode, err := nodeIPExists(ctx, opts, ip)
+	if err != nil {
+		return nil, false, err
+	}
+	if vipSvc != nil && !isNode {
+		return vipSvc, true, nil
+	}
+	if !isNode {
+		return nil, false, nil
+	}
+
+	npKey := nodePortCacheKey(protocol, port)
+	if svc, hit := opts.cache.serviceByNodePort[npKey]; hit {
 		return svc, svc != nil, nil
 	}
 
-	svc, err := database.GetServiceByClusterIP(ctx, clusterIP)
+	svc, err := database.GetServiceByNodePort(ctx, protocol, port)
 	if err != nil {
 		if errors.Is(err, &apperrors.NotFoundError{}) {
-			opts.cache.serviceByClusterIP[clusterIP] = nil
+			opts.cache.serviceByNodePort[npKey] = nil
 			return nil, false, nil
 		}
-		return nil, false, fmt.Errorf("lookup service by cluster IP %s: %w", clusterIP, err)
+		return nil, false, fmt.Errorf("lookup service by node port %s: %w", npKey, err)
 	}
-
-	opts.cache.serviceByClusterIP[clusterIP] = svc
+	opts.cache.serviceByNodePort[npKey] = svc
 	return svc, true, nil
 }
 
@@ -291,17 +358,21 @@ func lookupEndpointSlices(ctx context.Context, opts ResolveOptions, namespace, s
 	return slices, nil
 }
 
-func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, clusterIP string) (NodeRef, bool, error) {
-	if cached, hit := opts.cache.nodeRefByClusterIP[clusterIP]; hit {
+func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, destIP string, destPort int, protocol string) (NodeRef, bool, error) {
+	if destIP == "" {
+		return NodeRef{}, false, nil
+	}
+	destKey := serviceDestCacheKey(destIP, protocol, destPort)
+	if cached, hit := opts.cache.nodeRefByServiceDest[destKey]; hit {
 		return cached.ref, cached.ok, nil
 	}
 
-	svc, found, err := lookupService(ctx, opts, clusterIP)
+	svc, found, err := lookupService(ctx, opts, destIP, destPort, protocol)
 	if err != nil {
 		return NodeRef{}, false, err
 	}
 	if !found {
-		opts.cache.nodeRefByClusterIP[clusterIP] = cachedNodeRef{}
+		opts.cache.nodeRefByServiceDest[destKey] = cachedNodeRef{}
 		return NodeRef{}, false, nil
 	}
 
@@ -325,7 +396,7 @@ func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, cluste
 			}
 			ref, ok := resolvePodNodeRef(opts, pods[0])
 			if ok {
-				opts.cache.nodeRefByClusterIP[clusterIP] = cachedNodeRef{
+				opts.cache.nodeRefByServiceDest[destKey] = cachedNodeRef{
 					ref: ref,
 					ok:  true,
 				}
@@ -334,7 +405,7 @@ func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, cluste
 		}
 	}
 
-	opts.cache.nodeRefByClusterIP[clusterIP] = cachedNodeRef{}
+	opts.cache.nodeRefByServiceDest[destKey] = cachedNodeRef{}
 	return NodeRef{}, false, nil
 }
 
@@ -353,4 +424,12 @@ func endpointAddresses(raw json.RawMessage) ([]string, error) {
 		results = append(results, ep.Addresses...)
 	}
 	return results, nil
+}
+
+func nodePortCacheKey(protocol string, port int) string {
+	return strings.Join([]string{strings.ToLower(protocol), strconv.Itoa(port)}, "\x00")
+}
+
+func serviceDestCacheKey(ip, protocol string, port int) string {
+	return strings.Join([]string{ip, strings.ToLower(protocol), strconv.Itoa(port)}, "\x00")
 }
