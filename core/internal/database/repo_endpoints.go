@@ -118,8 +118,7 @@ func GetEndpointSlicesByService(ctx context.Context, namespace, serviceName stri
 
 func GetHeadlessServicesByEndpointIP(ctx context.Context, ip string) ([]*Service, error) {
 	query := `
-		SELECT DISTINCT s.id, s.name, s.namespace, s.uid, s.type, s.cluster_ip, s.ports, s.selector,
-		       s.labels, s.annotations, s.created_at, s.updated_at, s.synced_at
+		SELECT DISTINCT ` + serviceSelectColumns + `
 		FROM endpoint_slices es
 		JOIN services s ON s.namespace = es.namespace AND s.name = es.owner_name
 		WHERE es.owner_kind = 'Service'
@@ -138,21 +137,7 @@ func GetHeadlessServicesByEndpointIP(ctx context.Context, ip string) ([]*Service
 	}
 	defer rows.Close()
 
-	var services []*Service
-	for rows.Next() {
-		var s Service
-		if err := rows.Scan(
-			&s.ID, &s.Name, &s.Namespace, &s.UID, &s.Type, &s.ClusterIP, &s.Ports, &s.Selector,
-			&s.Labels, &s.Annotations, &s.CreatedAt, &s.UpdatedAt, &s.SyncedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan service: %w", err)
-		}
-		services = append(services, &s)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate services: %w", err)
-	}
-	return services, nil
+	return collectServices(rows)
 }
 
 // PruneEndpointSlices deletes EndpointSlices not listed in uids.

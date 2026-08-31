@@ -7,7 +7,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
+// NodeUpsert is a Node row plus all dialable node addresses rebuilt on sync.
+type NodeUpsert struct {
+	Node *Node
+	IPs  []string
+}
+
+func UpsertNodesBatch(ctx context.Context, nodes []*NodeUpsert) error {
 	if len(nodes) == 0 {
 		return nil
 	}
@@ -18,7 +24,7 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 	}
 	defer tx.Rollback(ctx)
 
-	query := `
+	upsertQuery := `
 		INSERT INTO nodes (
 			name, uid, internal_ip, external_ip, os_image, kernel_version,
 			container_runtime_version, kubelet_version, cpu_capacity, memory_capacity,
@@ -47,8 +53,9 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 	`
 
 	batch := &pgx.Batch{}
-	for _, node := range nodes {
-		batch.Queue(query, pgx.StrictNamedArgs{
+	for _, upsert := range nodes {
+		node := upsert.Node
+		batch.Queue(upsertQuery, pgx.StrictNamedArgs{
 			"name":                      node.Name,
 			"uid":                       node.UID,
 			"internal_ip":               node.InternalIP,
@@ -67,18 +74,16 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 			"created_at":                node.CreatedAt,
 			"synced_at":                 node.SyncedAt,
 		})
+		queueNodeIPRebuild(batch, node.Name, upsert.IPs)
 	}
 
 	results := tx.SendBatch(ctx, batch)
-
-	for i := range nodes {
-		_, err := results.Exec()
-		if err != nil {
+	for i := 0; i < batch.Len(); i++ {
+		if _, err := results.Exec(); err != nil {
 			results.Close()
-			return fmt.Errorf("failed to execute batch upsert for node %d: %w", i, err)
+			return fmt.Errorf("failed to execute batch upsert for nodes: %w", err)
 		}
 	}
-
 	if err := results.Close(); err != nil {
 		return fmt.Errorf("failed to close batch results: %w", err)
 	}
@@ -88,6 +93,35 @@ func UpsertNodesBatch(ctx context.Context, nodes []*Node) error {
 	}
 
 	return nil
+}
+
+func queueNodeIPRebuild(batch *pgx.Batch, nodeName string, ips []string) {
+	batch.Queue(
+		`DELETE FROM node_ips WHERE node_name = @node_name`,
+		pgx.StrictNamedArgs{"node_name": nodeName},
+	)
+	if len(ips) > 0 {
+		batch.Queue(
+			`INSERT INTO node_ips (ip, node_name)
+			 SELECT unnest(@ips::text[]), @node_name`,
+			pgx.StrictNamedArgs{"ips": ips, "node_name": nodeName},
+		)
+	}
+}
+
+func NodeIPExists(ctx context.Context, ip string) (bool, error) {
+	if ip == "" {
+		return false, nil
+	}
+	var exists bool
+	err := Pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM node_ips WHERE ip = @ip)`,
+		pgx.StrictNamedArgs{"ip": ip},
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to query node IP %s: %w", ip, err)
+	}
+	return exists, nil
 }
 
 // PruneNodes deletes nodes not listed in uids.
