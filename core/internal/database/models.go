@@ -248,6 +248,7 @@ type DependencyEdge struct {
 	Port                int             `db:"port"`
 	ViaServiceNamespace *string         `db:"via_service_namespace"`
 	ViaServiceName      *string         `db:"via_service_name"`
+	ViaServicePort      *int            `db:"via_service_port"`
 	Source              string          `db:"source"`
 	Connects            float64         `db:"connects"`
 	TxBytes             float64         `db:"tx_bytes"`

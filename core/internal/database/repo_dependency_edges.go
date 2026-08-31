@@ -23,18 +23,19 @@ func UpsertDependencyEdgesBatch(ctx context.Context, edges []*DependencyEdge) er
 	query := `
 		INSERT INTO dependency_edges (
 			from_node_id, to_node_id, protocol, port,
-			via_service_namespace, via_service_name, source,
+			via_service_namespace, via_service_name, via_service_port, source,
 			connects, tx_bytes, rx_bytes, active_connections,
 			first_seen_at, last_seen_at, evidence, attrs
 		) VALUES (
 			@from_node_id, @to_node_id, @protocol, @port,
-			@via_service_namespace, @via_service_name, @source,
+			@via_service_namespace, @via_service_name, @via_service_port, @source,
 			@connects, @tx_bytes, @rx_bytes, @active_connections,
 			@first_seen_at, @last_seen_at, @evidence, @attrs
 		)
 		ON CONFLICT (from_node_id, to_node_id, protocol, port) DO UPDATE SET
 			via_service_namespace = EXCLUDED.via_service_namespace,
 			via_service_name = EXCLUDED.via_service_name,
+			via_service_port = EXCLUDED.via_service_port,
 			source = EXCLUDED.source,
 			connects = EXCLUDED.connects,
 			tx_bytes = EXCLUDED.tx_bytes,
@@ -54,6 +55,7 @@ func UpsertDependencyEdgesBatch(ctx context.Context, edges []*DependencyEdge) er
 			"port":                  edge.Port,
 			"via_service_namespace": edge.ViaServiceNamespace,
 			"via_service_name":      edge.ViaServiceName,
+			"via_service_port":      edge.ViaServicePort,
 			"source":                edge.Source,
 			"connects":              edge.Connects,
 			"tx_bytes":              edge.TxBytes,
@@ -89,7 +91,7 @@ func UpsertDependencyEdgesBatch(ctx context.Context, edges []*DependencyEdge) er
 
 const dependencyEdgeSelectColumns = `
 	e.id, e.from_node_id, e.to_node_id, e.protocol, e.port,
-	e.via_service_namespace, e.via_service_name, e.source,
+	e.via_service_namespace, e.via_service_name, e.via_service_port, e.source,
 	e.connects, e.tx_bytes, e.rx_bytes, e.active_connections,
 	e.first_seen_at, e.last_seen_at, e.evidence, e.attrs, e.created_at, e.updated_at
 `
@@ -169,7 +171,7 @@ func collectDependencyEdges(rows pgx.Rows) ([]*DependencyEdge, error) {
 		var edge DependencyEdge
 		if err := rows.Scan(
 			&edge.ID, &edge.FromNodeID, &edge.ToNodeID, &edge.Protocol, &edge.Port,
-			&edge.ViaServiceNamespace, &edge.ViaServiceName, &edge.Source,
+			&edge.ViaServiceNamespace, &edge.ViaServiceName, &edge.ViaServicePort, &edge.Source,
 			&edge.Connects, &edge.TxBytes, &edge.RxBytes, &edge.ActiveConnections,
 			&edge.FirstSeenAt, &edge.LastSeenAt, &edge.Evidence, &edge.Attrs,
 			&edge.CreatedAt, &edge.UpdatedAt,
