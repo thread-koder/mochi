@@ -133,7 +133,7 @@ func GetDependencyNodesByIDs(ctx context.Context, ids []uuid.UUID) ([]*Dependenc
 	return nodes, nil
 }
 
-func PruneOrphanDependencyNodes(ctx context.Context) error {
+func pruneOrphanDependencyNodes(ctx context.Context) error {
 	query := `
 		DELETE FROM dependency_nodes n
 		WHERE NOT EXISTS (

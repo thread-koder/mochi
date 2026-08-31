@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -186,13 +187,25 @@ func collectDependencyEdges(rows pgx.Rows) ([]*DependencyEdge, error) {
 	return edges, nil
 }
 
-func PruneStaleDependencyEdges(ctx context.Context, before time.Time) error {
-	query := `DELETE FROM dependency_edges WHERE last_seen_at < @before`
-	_, err := Pool.Exec(ctx, query,
-		pgx.StrictNamedArgs{"before": before},
+func pruneExpiredDependencyEdges(ctx context.Context, since time.Time) error {
+	_, err := Pool.Exec(ctx,
+		`DELETE FROM dependency_edges WHERE last_seen_at < @last_seen_at`,
+		pgx.StrictNamedArgs{"last_seen_at": since},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to prune stale dependency edges: %w", err)
+		return fmt.Errorf("failed to prune expired dependency edges: %w", err)
 	}
 	return nil
+}
+
+// PruneExpiredDependencyGraph deletes aged edges then removes nodes with no edges.
+func PruneExpiredDependencyGraph(ctx context.Context, since time.Time) error {
+	var errs []error
+	if err := pruneExpiredDependencyEdges(ctx, since); err != nil {
+		errs = append(errs, err)
+	}
+	if err := pruneOrphanDependencyNodes(ctx); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }

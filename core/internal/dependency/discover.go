@@ -11,10 +11,7 @@ import (
 	"github.com/thread_koder/mochi/core/internal/prometheus"
 )
 
-const (
-	discoveryWindow = "1h"
-	gcMaxAge        = 30 * 24 * time.Hour
-)
+const discoveryWindow = "1h"
 
 func Discover(ctx context.Context) error {
 	log := logger.WithComponent("dependency")
@@ -101,16 +98,6 @@ func Discover(ctx context.Context) error {
 			Msg("Discovery pass upserted dependency graph")
 	}
 
-	return pruneStale(ctx, now)
-}
-
-func pruneStale(ctx context.Context, now time.Time) error {
-	if err := database.PruneStaleDependencyEdges(ctx, now.Add(-gcMaxAge)); err != nil {
-		return err
-	}
-	if err := database.PruneOrphanDependencyNodes(ctx); err != nil {
-		return err
-	}
 	return nil
 }
 
