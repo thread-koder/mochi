@@ -15,6 +15,7 @@ const discoveryWindow = "1h"
 
 func Discover(ctx context.Context) error {
 	log := logger.WithComponent("dependency")
+	start := time.Now()
 
 	series, err := FetchConnectionSeries(ctx, prometheus.QueryOptions{
 		RangeDuration: discoveryWindow,
@@ -84,6 +85,7 @@ func Discover(ctx context.Context) error {
 			Int("series", len(series)).
 			Int("edges", len(edges)).
 			Int("nodes", len(uniqueNodes)).
+			Str("duration", time.Since(start).Round(time.Millisecond).String()).
 			Msg("Discovery pass upserted dependency graph")
 	}
 
