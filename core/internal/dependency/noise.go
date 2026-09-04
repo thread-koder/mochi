@@ -37,3 +37,19 @@ func sameNode(a, b NodeRef) bool {
 func isValidIPAddress(ip string) bool {
 	return ip != "" && net.ParseIP(ip) != nil
 }
+
+// Presentation-form FQDN max length (RFC 1035).
+const maxHostnameLen = 253
+
+func normalizeHostname(name string) string {
+	name = strings.TrimSpace(name)
+	name = strings.TrimSuffix(name, ".")
+	name = strings.ToLower(name)
+	if name == "" || len(name) > maxHostnameLen {
+		return ""
+	}
+	if strings.ContainsAny(name, " \t\r\n") {
+		return ""
+	}
+	return name
+}

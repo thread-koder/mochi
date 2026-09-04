@@ -22,6 +22,7 @@ type ConnectionSeries struct {
 	ActualDstIP       string
 	ActualDstPort     int
 	Protocol          string
+	DstHostname       string
 	Connects          float64
 	TxBytes           float64
 	RxBytes           float64
@@ -138,6 +139,7 @@ func vectorValuesByKey(vector model.Vector) map[string]float64 {
 			string(metric["actual_dst_ip"]),
 			string(metric["actual_dst_port"]),
 			string(metric["protocol"]),
+			string(metric["dst_hostname"]),
 		)] = float64(sample.Value)
 	}
 	return byKey
@@ -175,6 +177,7 @@ func connectionFromMetric(
 	dstIP := string(metric["dst_ip"])
 	actualDstIP := string(metric["actual_dst_ip"])
 	protocol := string(metric["protocol"])
+	dstHostname := string(metric["dst_hostname"])
 	if !isKnownProtocol(protocol) {
 		return ConnectionSeries{}, "", false
 	}
@@ -189,6 +192,7 @@ func connectionFromMetric(
 		actualDstIP,
 		actualDstPortLabel,
 		protocol,
+		dstHostname,
 	)
 
 	return ConnectionSeries{
@@ -201,6 +205,7 @@ func connectionFromMetric(
 		ActualDstIP:       actualDstIP,
 		ActualDstPort:     actualDstPort,
 		Protocol:          protocol,
+		DstHostname:       dstHostname,
 		Connects:          connects,
 		TxBytes:           txByKey[key],
 		RxBytes:           rxByKey[key],

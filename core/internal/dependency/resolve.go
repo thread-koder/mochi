@@ -134,6 +134,7 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 		"actual_dst_ip":   series.ActualDstIP,
 		"dst_port":        strconv.Itoa(series.DstPort),
 		"actual_dst_port": strconv.Itoa(series.ActualDstPort),
+		"dst_hostname":    series.DstHostname,
 	})
 	if err != nil {
 		return ResolvedEdge{}, false, fmt.Errorf("marshal evidence: %w", err)
@@ -203,10 +204,14 @@ func resolveDestination(ctx context.Context, series ConnectionSeries, opts Resol
 		}
 	}
 
+	name := series.ActualDstIP
+	if hostname := normalizeHostname(series.DstHostname); hostname != "" {
+		name = hostname
+	}
 	return NodeRef{
 		Kind:      KindExternal,
 		Namespace: "",
-		Name:      series.ActualDstIP,
+		Name:      name,
 	}, nil
 }
 
