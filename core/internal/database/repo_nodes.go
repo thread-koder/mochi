@@ -7,10 +7,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// NodeUpsert is a Node row plus all dialable node addresses rebuilt on sync.
+// NodeUpsert is a Node row plus dialable addresses and podCIDRs rebuilt on sync.
 type NodeUpsert struct {
-	Node *Node
-	IPs  []string
+	Node     *Node
+	IPs      []string
+	PodCIDRs []string
 }
 
 func UpsertNodesBatch(ctx context.Context, nodes []*NodeUpsert) error {
@@ -75,6 +76,7 @@ func UpsertNodesBatch(ctx context.Context, nodes []*NodeUpsert) error {
 			"synced_at":                 node.SyncedAt,
 		})
 		queueNodeIPRebuild(batch, node.Name, upsert.IPs)
+		queueNodePodCIDRRebuild(batch, node.Name, upsert.PodCIDRs)
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -109,6 +111,20 @@ func queueNodeIPRebuild(batch *pgx.Batch, nodeName string, ips []string) {
 	}
 }
 
+func queueNodePodCIDRRebuild(batch *pgx.Batch, nodeName string, cidrs []string) {
+	batch.Queue(
+		`DELETE FROM node_pod_cidrs WHERE node_name = @node_name`,
+		pgx.StrictNamedArgs{"node_name": nodeName},
+	)
+	if len(cidrs) > 0 {
+		batch.Queue(
+			`INSERT INTO node_pod_cidrs (cidr, node_name)
+			 SELECT unnest(@cidrs::text[]), @node_name`,
+			pgx.StrictNamedArgs{"cidrs": cidrs, "node_name": nodeName},
+		)
+	}
+}
+
 func NodeIPExists(ctx context.Context, ip string) (bool, error) {
 	if ip == "" {
 		return false, nil
@@ -122,6 +138,27 @@ func NodeIPExists(ctx context.Context, ip string) (bool, error) {
 		return false, fmt.Errorf("failed to query node IP %s: %w", ip, err)
 	}
 	return exists, nil
+}
+
+func GetNodePodCIDRs(ctx context.Context) ([]string, error) {
+	rows, err := Pool.Query(ctx, `SELECT DISTINCT cidr FROM node_pod_cidrs`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node pod CIDRs: %w", err)
+	}
+	defer rows.Close()
+
+	var cidrs []string
+	for rows.Next() {
+		var cidr string
+		if err := rows.Scan(&cidr); err != nil {
+			return nil, fmt.Errorf("failed to scan node pod CIDR: %w", err)
+		}
+		cidrs = append(cidrs, cidr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed iterating node pod CIDRs: %w", err)
+	}
+	return cidrs, nil
 }
 
 // PruneNodes deletes nodes not listed in uids.

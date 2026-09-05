@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"net"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -94,4 +95,27 @@ func nodeDialIPs(addresses []corev1.NodeAddress) (internalIP, externalIP *string
 		externalIP = new(external[0])
 	}
 	return internalIP, externalIP, allIPs
+}
+
+func nodePodCIDRs(node *corev1.Node) []string {
+	seen := make(map[string]struct{})
+	var cidrs []string
+	add := func(cidr string) {
+		if cidr == "" {
+			return
+		}
+		if _, _, err := net.ParseCIDR(cidr); err != nil {
+			return
+		}
+		if _, ok := seen[cidr]; ok {
+			return
+		}
+		seen[cidr] = struct{}{}
+		cidrs = append(cidrs, cidr)
+	}
+	add(node.Spec.PodCIDR)
+	for _, cidr := range node.Spec.PodCIDRs {
+		add(cidr)
+	}
+	return cidrs
 }

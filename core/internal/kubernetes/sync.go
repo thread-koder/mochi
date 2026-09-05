@@ -95,7 +95,8 @@ func syncNodes(ctx context.Context) error {
 				CreatedAt:               node.CreationTimestamp.Time,
 				SyncedAt:                now,
 			},
-			IPs: dialIPs,
+			IPs:      dialIPs,
+			PodCIDRs: nodePodCIDRs(&node),
 		})
 	}
 

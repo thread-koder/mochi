@@ -13,6 +13,14 @@ CREATE TABLE IF NOT EXISTS node_ips (
 
 CREATE INDEX IF NOT EXISTS idx_node_ips_node_name ON node_ips(node_name);
 
+CREATE TABLE IF NOT EXISTS node_pod_cidrs (
+    cidr VARCHAR(50) NOT NULL,
+    node_name VARCHAR(255) NOT NULL REFERENCES nodes(name) ON DELETE CASCADE,
+    PRIMARY KEY (cidr, node_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_node_pod_cidrs_node_name ON node_pod_cidrs(node_name);
+
 CREATE TABLE IF NOT EXISTS service_node_ports (
     protocol VARCHAR(50) NOT NULL,
     port INT NOT NULL,

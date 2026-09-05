@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS dependency_nodes (
     id UUID PRIMARY KEY DEFAULT uuidv7(),
     kind VARCHAR(50) NOT NULL
-        CHECK (kind IN ('Deployment', 'StatefulSet', 'DaemonSet', 'Job', 'CronJob', 'Pod', 'External')),
+        CHECK (kind IN ('Deployment', 'StatefulSet', 'DaemonSet', 'Job', 'CronJob', 'Pod', 'External', 'Unknown')),
     namespace VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
     metadata JSONB,
