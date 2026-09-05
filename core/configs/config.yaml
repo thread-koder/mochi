@@ -37,6 +37,10 @@ kubernetes:
   request_timeout: 30 # seconds
   qps: 50
   burst: 100
+  # Optional. Extra pod/Service CIDRs when cluster leftovers are mislabeled as External.
+  # Leave empty unless that happens. service_cidrs is the ClusterIP range.
+  pod_cidrs: []
+  service_cidrs: []
 
 prometheus:
   url: "http://localhost:9090"
@@ -72,7 +76,6 @@ workers:
     interval: 120 # seconds
     exclude_namespaces:
       - "default"
-      - "kube-system"
       - "kube-public"
       - "kube-node-lease"
     include_namespaces: [] # if non-empty, only these namespaces (exclude_namespaces ignored)

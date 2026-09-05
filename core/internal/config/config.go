@@ -14,6 +14,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"slices"
@@ -86,12 +87,14 @@ func (c *DatabaseConfig) ConnMaxIdleTimeDuration() time.Duration {
 }
 
 type KubernetesConfig struct {
-	KubeconfigPath string `mapstructure:"kubeconfig_path"`
-	InCluster      bool   `mapstructure:"in_cluster"`
-	ClusterName    string `mapstructure:"cluster_name"`
-	RequestTimeout int    `mapstructure:"request_timeout"`
-	QPS            int    `mapstructure:"qps"`
-	Burst          int    `mapstructure:"burst"`
+	KubeconfigPath string   `mapstructure:"kubeconfig_path"`
+	InCluster      bool     `mapstructure:"in_cluster"`
+	ClusterName    string   `mapstructure:"cluster_name"`
+	RequestTimeout int      `mapstructure:"request_timeout"`
+	QPS            int      `mapstructure:"qps"`
+	Burst          int      `mapstructure:"burst"`
+	PodCIDRs       []string `mapstructure:"pod_cidrs"`
+	ServiceCIDRs   []string `mapstructure:"service_cidrs"`
 }
 
 func (c *KubernetesConfig) RequestTimeoutDuration() time.Duration {
@@ -234,6 +237,8 @@ func setDefaults() {
 	viper.SetDefault("kubernetes.request_timeout", 30)
 	viper.SetDefault("kubernetes.qps", 50)
 	viper.SetDefault("kubernetes.burst", 100)
+	viper.SetDefault("kubernetes.pod_cidrs", []string{})
+	viper.SetDefault("kubernetes.service_cidrs", []string{})
 
 	viper.SetDefault("prometheus.url", "http://localhost:9090")
 	viper.SetDefault("prometheus.timeout", 30)
@@ -261,7 +266,7 @@ func setDefaults() {
 	viper.SetDefault("redis.tls.client_key_path", "")
 
 	viper.SetDefault("workers.sync.interval", 120)
-	viper.SetDefault("workers.sync.exclude_namespaces", []string{"default", "kube-system", "kube-public", "kube-node-lease"})
+	viper.SetDefault("workers.sync.exclude_namespaces", []string{"default", "kube-public", "kube-node-lease"})
 	viper.SetDefault("workers.sync.include_namespaces", []string{})
 	viper.SetDefault("workers.retention.interval", 86400)
 	viper.SetDefault("workers.retention.max_age", 90)
@@ -414,6 +419,22 @@ func (c *KubernetesConfig) Validate() error {
 	}
 	if c.ClusterName == "" {
 		return fmt.Errorf("cluster_name cannot be empty")
+	}
+	if c.PodCIDRs == nil {
+		c.PodCIDRs = []string{}
+	}
+	if c.ServiceCIDRs == nil {
+		c.ServiceCIDRs = []string{}
+	}
+	for _, cidr := range c.PodCIDRs {
+		if _, _, err := net.ParseCIDR(cidr); err != nil {
+			return fmt.Errorf("pod_cidrs entry %q is invalid: %w", cidr, err)
+		}
+	}
+	for _, cidr := range c.ServiceCIDRs {
+		if _, _, err := net.ParseCIDR(cidr); err != nil {
+			return fmt.Errorf("service_cidrs entry %q is invalid: %w", cidr, err)
+		}
 	}
 	return nil
 }
