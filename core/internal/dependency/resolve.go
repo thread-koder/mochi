@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,9 @@ import (
 )
 
 const SourceMochiEBPF = "mochi-ebpf"
+
+// Presentation-form FQDN max length (RFC 1035).
+const maxHostnameLen = 253
 
 type NodeRef struct {
 	Kind      string
@@ -38,43 +42,79 @@ type ResolvedEdge struct {
 }
 
 type ResolveOptions struct {
-	IncludeDNS bool
-	cache      resolveCache
+	cache *resolveCache
 }
 
 type resolveCache struct {
+	podCIDRs                []string
+	serviceCIDRs            []string
 	serviceByIP             map[string]*database.Service
 	serviceByNodePort       map[string]*database.Service
 	nodeIP                  map[string]bool
 	serviceByEndpointIP     map[string]*database.Service
-	nodeRefByServiceDest    map[string]cachedNodeRef
+	serviceDestByKey        map[string]cachedServiceDest
 	podsByIP                map[string][]*database.Pod
 	nodeRefByUID            map[string]cachedNodeRef
 	servicePorts            map[string][]corev1.ServicePort
 	endpointSlicesByService map[string][]*database.EndpointSlice
+	endpointAddrsBySlice    map[string][]string
+	endpointPortsBySlice    map[string][]endpointSlicePort
+	clusterPrefixes         []*net.IPNet
+	prefixesReady           bool
 }
+
+// uidHit distinguishes modeled dest, inventory miss, and skip-kind (unmodeled/Node) for pods.
+type uidHit int
+
+const (
+	uidMissing uidHit = iota
+	uidModeled
+	uidSkipKind
+)
 
 type cachedNodeRef struct {
 	ref NodeRef
-	ok  bool
+	hit uidHit
+}
+
+// serviceDestHit is VIP/NodePort → EndpointSlice resolution (not pod uidHit).
+type serviceDestHit int
+
+const (
+	serviceDestNone serviceDestHit = iota
+	serviceDestModeled
+	serviceDestUnmapped // Service found, no modeled backend
+)
+
+type cachedServiceDest struct {
+	ref NodeRef
+	hit serviceDestHit
+}
+
+type endpointSlicePort struct {
+	Name *string `json:"name"`
+	Port *int32  `json:"port"`
 }
 
 // DefaultResolveOptions returns options with a ready pass-local cache.
 // Callers of Resolve must use this (or equivalent initialized maps),
 // a zero value panics on cache write.
-func DefaultResolveOptions() ResolveOptions {
+func DefaultResolveOptions(podCIDRs, serviceCIDRs []string) ResolveOptions {
 	return ResolveOptions{
-		IncludeDNS: false,
-		cache: resolveCache{
+		cache: &resolveCache{
+			podCIDRs:                podCIDRs,
+			serviceCIDRs:            serviceCIDRs,
 			serviceByIP:             make(map[string]*database.Service),
 			serviceByNodePort:       make(map[string]*database.Service),
 			nodeIP:                  make(map[string]bool),
 			serviceByEndpointIP:     make(map[string]*database.Service),
-			nodeRefByServiceDest:    make(map[string]cachedNodeRef),
+			serviceDestByKey:        make(map[string]cachedServiceDest),
 			podsByIP:                make(map[string][]*database.Pod),
 			nodeRefByUID:            make(map[string]cachedNodeRef),
 			servicePorts:            make(map[string][]corev1.ServicePort),
 			endpointSlicesByService: make(map[string][]*database.EndpointSlice),
+			endpointAddrsBySlice:    make(map[string][]string),
+			endpointPortsBySlice:    make(map[string][]endpointSlicePort),
 		},
 	}
 }
@@ -87,30 +127,32 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 	if !isKnownProtocol(series.Protocol) {
 		return ResolvedEdge{}, false, nil
 	}
-	if !isValidIPAddress(series.ActualDstIP) {
+
+	dstIP := net.ParseIP(series.ActualDstIP)
+	if dstIP == nil {
 		return ResolvedEdge{}, false, nil
 	}
-	if isLinkLocalOrMetadata(series.ActualDstIP) {
+	if isLinkLocal(dstIP) {
 		return ResolvedEdge{}, false, nil
 	}
 
-	from, ok, err := lookupNodeRefByUID(ctx, opts, series.SrcPodUID, "src")
+	from, hit, err := lookupNodeRefByUID(ctx, opts, series.SrcPodUID, "src")
 	if err != nil {
 		return ResolvedEdge{}, false, err
 	}
-	if !ok {
+	if hit != uidModeled {
 		return ResolvedEdge{}, false, nil
 	}
 
-	to, err := resolveDestination(ctx, series, opts)
+	to, kept, err := resolveDestination(ctx, series, opts)
 	if err != nil {
 		return ResolvedEdge{}, false, err
+	}
+	if !kept {
+		return ResolvedEdge{}, false, nil
 	}
 
 	if sameNode(from, to) {
-		return ResolvedEdge{}, false, nil
-	}
-	if !opts.IncludeDNS && isDNSNoise(to) {
 		return ResolvedEdge{}, false, nil
 	}
 
@@ -158,50 +200,93 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 	return edge, true, nil
 }
 
-func resolveDestination(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (NodeRef, error) {
+// resolveDestination returns a NodeRef when kept. kept=false drops the series (skip-kind dest).
+func resolveDestination(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (NodeRef, bool, error) {
+	uidMiss := false
 	if series.DstPodUID != "" {
-		ref, ok, err := lookupNodeRefByUID(ctx, opts, series.DstPodUID, "dest")
+		ref, hit, err := lookupNodeRefByUID(ctx, opts, series.DstPodUID, "dest")
 		if err != nil {
-			return NodeRef{}, err
+			return NodeRef{}, false, err
 		}
-		if ok {
-			return ref, nil
+		switch hit {
+		case uidModeled:
+			return ref, true, nil
+		case uidSkipKind:
+			return NodeRef{}, false, nil
+		case uidMissing:
+			uidMiss = true
 		}
 	} else {
 		isNode, err := nodeIPExists(ctx, opts, series.ActualDstIP)
 		if err != nil {
-			return NodeRef{}, err
+			return NodeRef{}, false, err
 		}
 		if !isNode {
 			pods, err := lookupPodsByIP(ctx, opts, series.ActualDstIP)
 			if err != nil {
-				return NodeRef{}, err
+				return NodeRef{}, false, err
 			}
 			if len(pods) > 0 {
-				ref, ok := resolvePodNodeRef(opts, pods[0])
-				if ok {
-					return ref, nil
+				ref, hit := resolvePodNodeRef(opts, pods[0])
+				switch hit {
+				case uidModeled:
+					return ref, true, nil
+				case uidSkipKind:
+					return NodeRef{}, false, nil
 				}
 			}
 		}
 	}
 
 	// Service VIP/NodePort dest (including node-address skip of GetPodsByIP) maps through EndpointSlice backends.
-	ref, ok, err := resolveViaServiceEndpoints(ctx, opts, series.ActualDstIP, series.ActualDstPort, series.Protocol)
+	ref, hit, err := resolveViaServiceEndpoints(ctx, opts, series.ActualDstIP, series.ActualDstPort, series.Protocol)
+	if err != nil {
+		return NodeRef{}, false, err
+	}
+	switch hit {
+	case serviceDestModeled:
+		return ref, true, nil
+	case serviceDestUnmapped:
+		return NodeRef{Kind: KindUnknown, Namespace: "", Name: series.ActualDstIP}, true, nil
+	}
+	if series.DstIP != "" && series.DstIP != series.ActualDstIP {
+		ref, hit, err := resolveViaServiceEndpoints(ctx, opts, series.DstIP, series.DstPort, series.Protocol)
+		if err != nil {
+			return NodeRef{}, false, err
+		}
+		switch hit {
+		case serviceDestModeled:
+			return ref, true, nil
+		case serviceDestUnmapped:
+			return NodeRef{Kind: KindUnknown, Namespace: "", Name: series.ActualDstIP}, true, nil
+		}
+	}
+
+	to, err := leftoverDestination(ctx, series, opts, uidMiss)
+	if err != nil {
+		return NodeRef{}, false, err
+	}
+	return to, true, nil
+}
+
+func leftoverDestination(ctx context.Context, series ConnectionSeries, opts ResolveOptions, uidMiss bool) (NodeRef, error) {
+	if uidMiss {
+		return NodeRef{Kind: KindUnknown, Namespace: "", Name: series.ActualDstIP}, nil
+	}
+
+	isNode, err := nodeIPExists(ctx, opts, series.ActualDstIP)
 	if err != nil {
 		return NodeRef{}, err
 	}
-	if ok {
-		return ref, nil
+	if isNode {
+		return NodeRef{Kind: KindUnknown, Namespace: "", Name: series.ActualDstIP}, nil
 	}
-	if series.DstIP != "" && series.DstIP != series.ActualDstIP {
-		ref, ok, err := resolveViaServiceEndpoints(ctx, opts, series.DstIP, series.DstPort, series.Protocol)
-		if err != nil {
-			return NodeRef{}, err
-		}
-		if ok {
-			return ref, nil
-		}
+
+	if err := loadClusterPrefixes(ctx, opts); err != nil {
+		return NodeRef{}, err
+	}
+	if ipInClusterPrefixes(opts, series.ActualDstIP) {
+		return NodeRef{Kind: KindUnknown, Namespace: "", Name: series.ActualDstIP}, nil
 	}
 
 	name := series.ActualDstIP
@@ -215,34 +300,98 @@ func resolveDestination(ctx context.Context, series ConnectionSeries, opts Resol
 	}, nil
 }
 
-func resolvePodNodeRef(opts ResolveOptions, pod *database.Pod) (NodeRef, bool) {
-	if cached, hit := opts.cache.nodeRefByUID[pod.UID]; hit {
-		return cached.ref, cached.ok
+func normalizeHostname(name string) string {
+	name = strings.TrimSpace(name)
+	name = strings.TrimSuffix(name, ".")
+	name = strings.ToLower(name)
+	if name == "" || len(name) > maxHostnameLen {
+		return ""
 	}
-	ref, ok := nodeRefFromPod(pod)
-	opts.cache.nodeRefByUID[pod.UID] = cachedNodeRef{
-		ref: ref,
-		ok:  ok,
+	if strings.ContainsAny(name, " \t\r\n") {
+		return ""
 	}
-	return ref, ok
+	return name
 }
 
-func lookupNodeRefByUID(ctx context.Context, opts ResolveOptions, uid, what string) (NodeRef, bool, error) {
+func loadClusterPrefixes(ctx context.Context, opts ResolveOptions) error {
+	if opts.cache.prefixesReady {
+		return nil
+	}
+
+	raw := make([]string, 0, len(opts.cache.podCIDRs)+len(opts.cache.serviceCIDRs))
+	raw = append(raw, opts.cache.podCIDRs...)
+	raw = append(raw, opts.cache.serviceCIDRs...)
+
+	dbCIDRs, err := database.GetNodePodCIDRs(ctx)
+	if err != nil {
+		return fmt.Errorf("load node pod CIDRs: %w", err)
+	}
+	raw = append(raw, dbCIDRs...)
+
+	seen := make(map[string]struct{}, len(raw))
+	prefixes := make([]*net.IPNet, 0, len(raw))
+	for _, cidr := range raw {
+		if _, ok := seen[cidr]; ok {
+			continue
+		}
+		seen[cidr] = struct{}{}
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return fmt.Errorf("parse cluster CIDR %q: %w", cidr, err)
+		}
+		prefixes = append(prefixes, network)
+	}
+
+	opts.cache.clusterPrefixes = prefixes
+	opts.cache.prefixesReady = true
+	return nil
+}
+
+func ipInClusterPrefixes(opts ResolveOptions, ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	for _, prefix := range opts.cache.clusterPrefixes {
+		if prefix.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func resolvePodNodeRef(opts ResolveOptions, pod *database.Pod) (NodeRef, uidHit) {
+	if cached, hit := opts.cache.nodeRefByUID[pod.UID]; hit {
+		return cached.ref, cached.hit
+	}
+	ref, ok := nodeRefFromPod(pod)
+	hit := uidSkipKind
+	if ok {
+		hit = uidModeled
+	}
+	opts.cache.nodeRefByUID[pod.UID] = cachedNodeRef{
+		ref: ref,
+		hit: hit,
+	}
+	return ref, hit
+}
+
+func lookupNodeRefByUID(ctx context.Context, opts ResolveOptions, uid, what string) (NodeRef, uidHit, error) {
 	if cached, hit := opts.cache.nodeRefByUID[uid]; hit {
-		return cached.ref, cached.ok, nil
+		return cached.ref, cached.hit, nil
 	}
 
 	pod, err := database.GetPodIdentityByUID(ctx, uid)
 	if err != nil {
 		if errors.Is(err, &apperrors.NotFoundError{}) {
-			opts.cache.nodeRefByUID[uid] = cachedNodeRef{}
-			return NodeRef{}, false, nil
+			opts.cache.nodeRefByUID[uid] = cachedNodeRef{hit: uidMissing}
+			return NodeRef{}, uidMissing, nil
 		}
-		return NodeRef{}, false, fmt.Errorf("lookup %s pod %s: %w", what, uid, err)
+		return NodeRef{}, uidMissing, fmt.Errorf("lookup %s pod %s: %w", what, uid, err)
 	}
 
-	ref, ok := resolvePodNodeRef(opts, pod)
-	return ref, ok, nil
+	ref, hit := resolvePodNodeRef(opts, pod)
+	return ref, hit, nil
 }
 
 func lookupPodsByIP(ctx context.Context, opts ResolveOptions, ip string) ([]*database.Pod, error) {
@@ -270,10 +419,6 @@ func nodeIPExists(ctx context.Context, opts ResolveOptions, ip string) (bool, er
 }
 
 func lookupService(ctx context.Context, opts ResolveOptions, ip string, port int, protocol string) (*database.Service, bool, error) {
-	if ip == "" {
-		return nil, false, nil
-	}
-
 	var vipSvc *database.Service
 	if cached, hit := opts.cache.serviceByIP[ip]; hit {
 		vipSvc = cached
@@ -331,24 +476,6 @@ func lookupService(ctx context.Context, opts ResolveOptions, ip string, port int
 	return svc, true, nil
 }
 
-func lookupHeadlessService(ctx context.Context, opts ResolveOptions, ip string) (*database.Service, bool, error) {
-	if svc, hit := opts.cache.serviceByEndpointIP[ip]; hit {
-		return svc, svc != nil, nil
-	}
-
-	services, err := database.GetHeadlessServicesByEndpointIP(ctx, ip)
-	if err != nil {
-		return nil, false, fmt.Errorf("lookup headless service by endpoint IP %s: %w", ip, err)
-	}
-	if len(services) != 1 {
-		opts.cache.serviceByEndpointIP[ip] = nil
-		return nil, false, nil
-	}
-
-	opts.cache.serviceByEndpointIP[ip] = services[0]
-	return services[0], true, nil
-}
-
 func lookupEndpointSlices(ctx context.Context, opts ResolveOptions, namespace, serviceName string) ([]*database.EndpointSlice, error) {
 	key := serviceCacheKey(namespace, serviceName)
 	if slices, hit := opts.cache.endpointSlicesByService[key]; hit {
@@ -363,55 +490,65 @@ func lookupEndpointSlices(ctx context.Context, opts ResolveOptions, namespace, s
 	return slices, nil
 }
 
-func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, destIP string, destPort int, protocol string) (NodeRef, bool, error) {
-	if destIP == "" {
-		return NodeRef{}, false, nil
-	}
+func resolveViaServiceEndpoints(ctx context.Context, opts ResolveOptions, destIP string, destPort int, protocol string) (NodeRef, serviceDestHit, error) {
 	destKey := serviceDestCacheKey(destIP, protocol, destPort)
-	if cached, hit := opts.cache.nodeRefByServiceDest[destKey]; hit {
-		return cached.ref, cached.ok, nil
+	if cached, hit := opts.cache.serviceDestByKey[destKey]; hit {
+		return cached.ref, cached.hit, nil
 	}
 
 	svc, found, err := lookupService(ctx, opts, destIP, destPort, protocol)
 	if err != nil {
-		return NodeRef{}, false, err
+		return NodeRef{}, serviceDestNone, err
 	}
 	if !found {
-		opts.cache.nodeRefByServiceDest[destKey] = cachedNodeRef{}
-		return NodeRef{}, false, nil
+		opts.cache.serviceDestByKey[destKey] = cachedServiceDest{hit: serviceDestNone}
+		return NodeRef{}, serviceDestNone, nil
 	}
 
 	slices, err := lookupEndpointSlices(ctx, opts, svc.Namespace, svc.Name)
 	if err != nil {
-		return NodeRef{}, false, err
+		return NodeRef{}, serviceDestNone, err
 	}
 
 	for _, es := range slices {
-		addrs, err := endpointAddresses(es.Endpoints)
+		addrs, err := cachedEndpointAddresses(opts, es)
 		if err != nil {
-			return NodeRef{}, false, fmt.Errorf("parse endpoints for %s/%s: %w", es.Namespace, es.Name, err)
+			return NodeRef{}, serviceDestNone, fmt.Errorf("parse endpoints for %s/%s: %w", es.Namespace, es.Name, err)
 		}
 		for _, addr := range addrs {
 			pods, err := lookupPodsByIP(ctx, opts, addr)
 			if err != nil {
-				return NodeRef{}, false, err
+				return NodeRef{}, serviceDestNone, err
 			}
 			if len(pods) == 0 {
 				continue
 			}
-			ref, ok := resolvePodNodeRef(opts, pods[0])
-			if ok {
-				opts.cache.nodeRefByServiceDest[destKey] = cachedNodeRef{
+			ref, hit := resolvePodNodeRef(opts, pods[0])
+			if hit == uidModeled {
+				opts.cache.serviceDestByKey[destKey] = cachedServiceDest{
 					ref: ref,
-					ok:  true,
+					hit: serviceDestModeled,
 				}
-				return ref, true, nil
+				return ref, serviceDestModeled, nil
 			}
 		}
 	}
 
-	opts.cache.nodeRefByServiceDest[destKey] = cachedNodeRef{}
-	return NodeRef{}, false, nil
+	opts.cache.serviceDestByKey[destKey] = cachedServiceDest{hit: serviceDestUnmapped}
+	return NodeRef{}, serviceDestUnmapped, nil
+}
+
+func cachedEndpointAddresses(opts ResolveOptions, es *database.EndpointSlice) ([]string, error) {
+	key := endpointSliceCacheKey(es.Namespace, es.Name)
+	if addrs, hit := opts.cache.endpointAddrsBySlice[key]; hit {
+		return addrs, nil
+	}
+	addrs, err := endpointAddresses(es.Endpoints)
+	if err != nil {
+		return nil, err
+	}
+	opts.cache.endpointAddrsBySlice[key] = addrs
+	return addrs, nil
 }
 
 func endpointAddresses(raw json.RawMessage) ([]string, error) {
@@ -437,4 +574,8 @@ func nodePortCacheKey(protocol string, port int) string {
 
 func serviceDestCacheKey(ip, protocol string, port int) string {
 	return strings.Join([]string{ip, strings.ToLower(protocol), strconv.Itoa(port)}, "\x00")
+}
+
+func endpointSliceCacheKey(namespace, name string) string {
+	return strings.Join([]string{namespace, name}, "\x00")
 }

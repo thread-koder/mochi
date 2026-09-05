@@ -15,7 +15,7 @@ import (
 func AnalyzeNamespace(c *gin.Context) {
 	namespace := c.Param("namespace")
 
-	opts := dependency.DefaultAnalyzeOptions()
+	opts := dependency.DefaultAnalysisOptions()
 	if q := c.Query("timeRange"); q != "" {
 		timeRange, err := common.ParseTimeRange(q)
 		if err != nil {
@@ -26,13 +26,31 @@ func AnalyzeNamespace(c *gin.Context) {
 		opts.TimeRange = timeRange
 	}
 	if q := c.Query("includeExternal"); q != "" {
-		includeExternal, err := strconv.ParseBool(q)
+		v, err := strconv.ParseBool(q)
 		if err != nil {
 			c.Error(err)
 			common.WriteValidationError(c, "invalid_include_external", "Invalid includeExternal query parameter. Use true or false.")
 			return
 		}
-		opts.IncludeExternal = includeExternal
+		opts.IncludeExternal = v
+	}
+	if q := c.Query("includeDns"); q != "" {
+		v, err := strconv.ParseBool(q)
+		if err != nil {
+			c.Error(err)
+			common.WriteValidationError(c, "invalid_include_dns", "Invalid includeDns query parameter. Use true or false.")
+			return
+		}
+		opts.IncludeDNS = v
+	}
+	if q := c.Query("includeUnknown"); q != "" {
+		v, err := strconv.ParseBool(q)
+		if err != nil {
+			c.Error(err)
+			common.WriteValidationError(c, "invalid_include_unknown", "Invalid includeUnknown query parameter. Use true or false.")
+			return
+		}
+		opts.IncludeUnknown = v
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)
@@ -68,7 +86,7 @@ func AnalyzeWorkload(c *gin.Context) {
 		return
 	}
 
-	opts := dependency.DefaultAnalyzeOptions()
+	opts := dependency.DefaultAnalysisOptions()
 	if q := c.Query("timeRange"); q != "" {
 		timeRange, err := common.ParseTimeRange(q)
 		if err != nil {
@@ -79,13 +97,31 @@ func AnalyzeWorkload(c *gin.Context) {
 		opts.TimeRange = timeRange
 	}
 	if q := c.Query("includeExternal"); q != "" {
-		includeExternal, err := strconv.ParseBool(q)
+		v, err := strconv.ParseBool(q)
 		if err != nil {
 			c.Error(err)
 			common.WriteValidationError(c, "invalid_include_external", "Invalid includeExternal query parameter. Use true or false.")
 			return
 		}
-		opts.IncludeExternal = includeExternal
+		opts.IncludeExternal = v
+	}
+	if q := c.Query("includeDns"); q != "" {
+		v, err := strconv.ParseBool(q)
+		if err != nil {
+			c.Error(err)
+			common.WriteValidationError(c, "invalid_include_dns", "Invalid includeDns query parameter. Use true or false.")
+			return
+		}
+		opts.IncludeDNS = v
+	}
+	if q := c.Query("includeUnknown"); q != "" {
+		v, err := strconv.ParseBool(q)
+		if err != nil {
+			c.Error(err)
+			common.WriteValidationError(c, "invalid_include_unknown", "Invalid includeUnknown query parameter. Use true or false.")
+			return
+		}
+		opts.IncludeUnknown = v
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Minute)

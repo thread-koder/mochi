@@ -20,13 +20,20 @@ type viaServiceMatch struct {
 
 func viaService(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (*viaServiceMatch, error) {
 	// NAT hit (dst=Service VIP, actual=pod) or NAT miss (both VIP): attribute the Service.
-	for _, pair := range []struct {
+	pairs := []struct {
 		ip   string
 		port int
 	}{
 		{series.DstIP, series.DstPort},
-		{series.ActualDstIP, series.ActualDstPort},
-	} {
+	}
+	if series.ActualDstIP != series.DstIP || series.ActualDstPort != series.DstPort {
+		pairs = append(pairs, struct {
+			ip   string
+			port int
+		}{series.ActualDstIP, series.ActualDstPort})
+	}
+
+	for _, pair := range pairs {
 		if pair.ip == "" {
 			continue
 		}
@@ -47,8 +54,13 @@ func viaService(ctx context.Context, series ConnectionSeries, opts ResolveOption
 			port:      port,
 		}, nil
 	}
+
 	// Headless clients dial pod IPs. Unique headless EndpointSlice membership only.
-	for _, ip := range []string{series.DstIP, series.ActualDstIP} {
+	ips := []string{series.DstIP}
+	if series.ActualDstIP != series.DstIP {
+		ips = append(ips, series.ActualDstIP)
+	}
+	for _, ip := range ips {
 		if ip == "" {
 			continue
 		}
@@ -198,7 +210,7 @@ func endpointSlicePortByName(ctx context.Context, opts ResolveOptions, namespace
 
 	var matches int
 	for _, es := range slices {
-		ports, err := endpointSlicePorts(es.Ports)
+		ports, err := cachedEndpointPorts(opts, es)
 		if err != nil {
 			return 0, false, err
 		}
@@ -218,17 +230,42 @@ func endpointSlicePortByName(ctx context.Context, opts ResolveOptions, namespace
 	return actualDstPort, true, nil
 }
 
-func endpointSlicePorts(raw json.RawMessage) ([]struct {
-	Name *string `json:"name"`
-	Port *int32  `json:"port"`
-}, error) {
+func lookupHeadlessService(ctx context.Context, opts ResolveOptions, ip string) (*database.Service, bool, error) {
+	if svc, hit := opts.cache.serviceByEndpointIP[ip]; hit {
+		return svc, svc != nil, nil
+	}
+
+	services, err := database.GetHeadlessServicesByEndpointIP(ctx, ip)
+	if err != nil {
+		return nil, false, fmt.Errorf("lookup headless service by endpoint IP %s: %w", ip, err)
+	}
+	if len(services) != 1 {
+		opts.cache.serviceByEndpointIP[ip] = nil
+		return nil, false, nil
+	}
+
+	opts.cache.serviceByEndpointIP[ip] = services[0]
+	return services[0], true, nil
+}
+
+func cachedEndpointPorts(opts ResolveOptions, es *database.EndpointSlice) ([]endpointSlicePort, error) {
+	key := endpointSliceCacheKey(es.Namespace, es.Name)
+	if ports, hit := opts.cache.endpointPortsBySlice[key]; hit {
+		return ports, nil
+	}
+	ports, err := parseEndpointSlicePorts(es.Ports)
+	if err != nil {
+		return nil, err
+	}
+	opts.cache.endpointPortsBySlice[key] = ports
+	return ports, nil
+}
+
+func parseEndpointSlicePorts(raw json.RawMessage) ([]endpointSlicePort, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
-	var ports []struct {
-		Name *string `json:"name"`
-		Port *int32  `json:"port"`
-	}
+	var ports []endpointSlicePort
 	if err := json.Unmarshal(raw, &ports); err != nil {
 		return nil, fmt.Errorf("parse endpoint slice ports: %w", err)
 	}

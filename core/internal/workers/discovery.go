@@ -13,11 +13,17 @@ const discoveryInterval = 300 * time.Second
 
 // DependencyDiscoveryWorker periodically builds the dependency graph snapshot from Prometheus.
 type DependencyDiscoveryWorker struct {
-	ctx context.Context
+	ctx          context.Context
+	podCIDRs     []string
+	serviceCIDRs []string
 }
 
-func NewDependencyDiscoveryWorker(ctx context.Context) *DependencyDiscoveryWorker {
-	return &DependencyDiscoveryWorker{ctx: ctx}
+func NewDependencyDiscoveryWorker(ctx context.Context, podCIDRs, serviceCIDRs []string) *DependencyDiscoveryWorker {
+	return &DependencyDiscoveryWorker{
+		ctx:          ctx,
+		podCIDRs:     podCIDRs,
+		serviceCIDRs: serviceCIDRs,
+	}
 }
 
 func (w *DependencyDiscoveryWorker) Run() {
@@ -51,7 +57,7 @@ func (w *DependencyDiscoveryWorker) discover() {
 
 	log.Info().Msg("Starting dependency discovery pass...")
 
-	if err := dependency.Discover(ctx); err != nil {
+	if err := dependency.Discover(ctx, w.podCIDRs, w.serviceCIDRs); err != nil {
 		log.Warn().Err(err).Msg("Dependency discovery pass failed")
 		return
 	}

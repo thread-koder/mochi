@@ -12,6 +12,10 @@ const (
 	KindCronJob     = "CronJob"
 	KindPod         = "Pod"
 	KindExternal    = "External"
+	KindUnknown     = "Unknown"
+
+	// ownerKindNode is the Kubernetes owner kind for static pods, not a graph kind.
+	ownerKindNode = "Node"
 )
 
 // nodeRefFromPod maps a pod to a graph node from sync-time workload_kind / workload_name.
@@ -25,7 +29,7 @@ func nodeRefFromPod(pod *database.Pod) (NodeRef, bool) {
 	}
 
 	kind := *pod.WorkloadKind
-	if kind == "Node" {
+	if kind == ownerKindNode {
 		return NodeRef{}, false
 	}
 	if pod.WorkloadName == nil {

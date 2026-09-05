@@ -30,7 +30,7 @@ func queueDependencyNodeUpsert(batch *pgx.Batch, node *DependencyNode) {
 	})
 }
 
-func GetDependencyNodeByKey(ctx context.Context, kind, namespace, name string) (*DependencyNode, error) {
+func GetDependencyNode(ctx context.Context, kind, namespace, name string) (*DependencyNode, error) {
 	query := `
 		SELECT id, kind, namespace, name, metadata, 
 			   first_seen_at, last_seen_at, created_at, updated_at
@@ -52,7 +52,7 @@ func GetDependencyNodeByKey(ctx context.Context, kind, namespace, name string) (
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apperrors.NewNotFound("dependency_node", fmt.Sprintf("%s/%s/%s", kind, namespace, name))
 		}
-		return nil, fmt.Errorf("failed to query dependency node by key: %w", err)
+		return nil, fmt.Errorf("failed to query dependency node: %w", err)
 	}
 
 	return &node, nil

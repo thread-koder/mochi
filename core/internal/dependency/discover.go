@@ -3,6 +3,7 @@ package dependency
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 
 const discoveryWindow = "1h"
 
-func Discover(ctx context.Context) error {
+func Discover(ctx context.Context, podCIDRs, serviceCIDRs []string) error {
 	log := logger.WithComponent("dependency")
 	start := time.Now()
 
@@ -25,7 +26,7 @@ func Discover(ctx context.Context) error {
 	}
 
 	now := time.Now().UTC()
-	resolveOpts := DefaultResolveOptions()
+	resolveOpts := DefaultResolveOptions(podCIDRs, serviceCIDRs)
 	merged := make(map[string]*ResolvedEdge)
 
 	for _, conn := range series {
@@ -124,6 +125,6 @@ func edgeKey(edge ResolvedEdge) string {
 		nodeKey(edge.From.Kind, edge.From.Namespace, edge.From.Name),
 		nodeKey(edge.To.Kind, edge.To.Namespace, edge.To.Name),
 		edge.Protocol,
-		fmt.Sprintf("%d", edge.Port),
+		strconv.Itoa(edge.Port),
 	}, "\x00")
 }

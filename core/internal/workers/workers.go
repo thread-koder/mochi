@@ -19,9 +19,12 @@ type WorkerPool struct {
 	discovery    *DependencyDiscoveryWorker
 }
 
-func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
-	if cfg == nil {
+func NewWorkerPool(workers *config.WorkerConfig, k8s *config.KubernetesConfig) (*WorkerPool, error) {
+	if workers == nil {
 		return nil, fmt.Errorf("worker config is nil")
+	}
+	if k8s == nil {
+		return nil, fmt.Errorf("kubernetes config is nil")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -29,9 +32,9 @@ func NewWorkerPool(cfg *config.WorkerConfig) (*WorkerPool, error) {
 	return &WorkerPool{
 		ctx:          ctx,
 		cancel:       cancel,
-		resourceSync: NewResourceSyncWorker(ctx, &cfg.Sync),
-		retention:    NewRetentionWorker(ctx, &cfg.Retention),
-		discovery:    NewDependencyDiscoveryWorker(ctx),
+		resourceSync: NewResourceSyncWorker(ctx, &workers.Sync),
+		retention:    NewRetentionWorker(ctx, &workers.Retention),
+		discovery:    NewDependencyDiscoveryWorker(ctx, k8s.PodCIDRs, k8s.ServiceCIDRs),
 	}, nil
 }
 

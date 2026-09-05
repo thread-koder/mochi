@@ -80,7 +80,7 @@ func run() error {
 	}
 	defer redis.Close()
 
-	workerPool, err := workers.NewWorkerPool(&cfg.Workers)
+	workerPool, err := workers.NewWorkerPool(&cfg.Workers, &cfg.Kubernetes)
 	if err != nil {
 		return fmt.Errorf("create worker pool: %w", err)
 	}
