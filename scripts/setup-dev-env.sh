@@ -19,7 +19,7 @@ echo -e "${GREEN}Setting up development environment dependencies in minikube${NC
 # Check if minikube is running
 if ! minikube status &>/dev/null; then
     echo -e "${YELLOW}Minikube is not running. Starting minikube...${NC}"
-    minikube start
+    minikube start --container-runtime=containerd
 fi
 
 # Check if Helm is installed

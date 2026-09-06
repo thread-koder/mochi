@@ -33,8 +33,6 @@ go.work
 .env
 .env.*
 !.env.example
-.env.local
-.env.*.local
 
 # Build artifacts
 dist/
@@ -51,19 +49,11 @@ web/.cache/
 *.log
 logs/
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
 # Temporary files
 tmp/
 temp/
 
-# Configuration files with secrets
-core/configs/*.local.yaml
-core/configs/*.local.yml
-core/configs/secrets.yaml
-core/configs/secrets.yml
+# Local kernel BTF header for bpf2go (see agent/internal/collection/ebpf/generate.go)
+agent/internal/collection/ebpf/bpf/vmlinux.h
 
 mochi.md
