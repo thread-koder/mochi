@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: mochi-agent
+  namespace: mochi-system
+  labels:
+    app.kubernetes.io/name: mochi-agent
+    release: mochi-prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mochi-agent
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

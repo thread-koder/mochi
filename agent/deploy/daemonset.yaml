@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: mochi-agent
+  namespace: mochi-system
+  labels:
+    app.kubernetes.io/name: mochi-agent
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mochi-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mochi-agent
+    spec:
+      serviceAccountName: mochi-agent
+      hostPID: true
+      hostNetwork: true
+      containers:
+        - name: mochi-agent
+          image: mochi-agent:dev
+          imagePullPolicy: Never
+          ports:
+            - name: metrics
+              containerPort: 9800
+              protocol: TCP
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - BPF
+                - PERFMON
+                - NET_ADMIN
+                - SYS_RESOURCE
+          volumeMounts:
+            - name: sys
+              mountPath: /sys
+              readOnly: true
+            - name: cgroup
+              mountPath: /sys/fs/cgroup
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /health
+              port: metrics
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 150m
+              memory: 256Mi
+      volumes:
+        - name: sys
+          hostPath:
+            path: /sys
+            type: Directory
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+            type: Directory
+      tolerations:
+        - operator: Exists
