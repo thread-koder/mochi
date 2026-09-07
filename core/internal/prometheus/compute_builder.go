@@ -116,8 +116,12 @@ func BuildWorkloadMemoryOOMQuery(namespace string, pods []string, container stri
 		timeRange = "5m"
 	}
 
-	base := BuildContainerMetricQuery("container_oom_events_total", namespace, pods, container, timeRange)
-	return fmt.Sprintf("sum(increase(%s))", base), nil
+	cadvisorSel := BuildContainerMetricQuery("container_oom_events_total", namespace, pods, container, "")
+	ksmLabelSel := fmt.Sprintf(`namespace="%s",%s`, namespace, podLabelMatcher(pods))
+	if container != "" {
+		ksmLabelSel += fmt.Sprintf(`,container="%s"`, container)
+	}
+	return memoryOOMCountQuery(cadvisorSel, ksmLabelSel, timeRange), nil
 }
 
 func BuildWorkloadMemoryPressureQuery(namespace string, pods []string, container string, rangeDuration string, timeRange string, step string) (string, error) {
@@ -250,8 +254,9 @@ func BuildNamespaceMemoryOOMQuery(namespace string, timeRange string) (string, e
 		return "", fmt.Errorf("namespace is required")
 	}
 
-	base := fmt.Sprintf(`container_oom_events_total{container!="POD",container!="",namespace="%s"}`, namespace)
-	return fmt.Sprintf("sum(increase(%s[%s]))", base, timeRange), nil
+	cadvisorSel := fmt.Sprintf(`container_oom_events_total{container!="POD",container!="",namespace="%s"}`, namespace)
+	ksmLabelSel := fmt.Sprintf(`namespace="%s"`, namespace)
+	return memoryOOMCountQuery(cadvisorSel, ksmLabelSel, timeRange), nil
 }
 
 func BuildNamespaceMemoryPressureQuery(namespace string, rangeDuration string, timeRange string, step string) (string, error) {
@@ -278,4 +283,17 @@ func BuildNamespaceRestartsQuery(namespace string, timeRange string) (string, er
 
 	query := fmt.Sprintf(`kube_pod_container_status_restarts_total{namespace="%s"}`, namespace)
 	return fmt.Sprintf("sum(increase(%s[%s]))", query, timeRange), nil
+}
+
+// memoryOOMCountQuery returns max(cAdvisor OOM increase, KSM OOM-attributed restarts).
+// container_oom_events_total often stays 0 after kubelet deletes the OOM'd container.
+func memoryOOMCountQuery(cadvisorSel, ksmLabelSel, timeRange string) string {
+	cadvisor := fmt.Sprintf(`(sum(increase(%s[%s])) or vector(0))`, cadvisorSel, timeRange)
+	restarts := fmt.Sprintf(`kube_pod_container_status_restarts_total{%s}`, ksmLabelSel)
+	reason := fmt.Sprintf(`kube_pod_container_status_last_terminated_reason{reason="OOMKilled",%s}`, ksmLabelSel)
+	ksm := fmt.Sprintf(
+		`scalar(sum(sum by (namespace, pod, container) (increase(%s[%s])) and on (namespace, pod, container) (%s == 1)) or vector(0))`,
+		restarts, timeRange, reason,
+	)
+	return fmt.Sprintf("clamp_min(%s, %s)", cadvisor, ksm)
 }
