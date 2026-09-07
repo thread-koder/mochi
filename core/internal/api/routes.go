@@ -36,6 +36,7 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 			{
 				computeAnalysis.GET("/analyze/namespaces/:namespace", computeHandlers.AnalyzeNamespace)
 				computeAnalysis.GET("/analyze/workloads/:workloadType/:workloadName", computeHandlers.AnalyzeWorkload)
+				computeAnalysis.GET("/bottlenecks/namespaces/:namespace", computeHandlers.GetNamespaceBottlenecks)
 			}
 
 			computeRecommendations := compute.Group("")
