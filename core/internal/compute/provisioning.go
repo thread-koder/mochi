@@ -12,15 +12,23 @@ type ResourceSpecs struct {
 	MemoryLimit   *float64 `json:"memory_limit"`
 }
 
+type ProvisioningStatus string
+
+const (
+	ProvisioningUnspecified      ProvisioningStatus = "unspecified"
+	ProvisioningOverProvisioned  ProvisioningStatus = "over_provisioned"
+	ProvisioningUnderProvisioned ProvisioningStatus = "under_provisioned"
+	ProvisioningOptimal          ProvisioningStatus = "optimal"
+)
+
 type ResourceProvisioning struct {
-	RequestUtilization float64  `json:"request_utilization"`
-	LimitUtilization   float64  `json:"limit_utilization"`
-	CurrentRequest     *float64 `json:"current_request"`
-	CurrentLimit       *float64 `json:"current_limit"`
-	IsOverProvisioned  bool     `json:"is_over_provisioned"`
-	IsUnderProvisioned bool     `json:"is_under_provisioned"`
-	Efficiency         float64  `json:"efficiency"`
-	Confidence         float64  `json:"confidence"`
+	RequestUtilization *float64           `json:"request_utilization"`
+	LimitUtilization   *float64           `json:"limit_utilization"`
+	CurrentRequest     *float64           `json:"current_request"`
+	CurrentLimit       *float64           `json:"current_limit"`
+	Status             ProvisioningStatus `json:"status"`
+	Efficiency         float64            `json:"efficiency"`
+	Confidence         float64            `json:"confidence"`
 }
 
 type ProvisioningResult struct {
@@ -36,7 +44,7 @@ const (
 	CPUHeadroom    = 0.2
 	MemoryHeadroom = 0.2
 
-	// Used to skip "over provisioned" flags so we do not nag on minimum resources.
+	// Skip over-provisioned when the request is already at the practical floor.
 	MinCPURequestCores    = 0.01
 	MinMemoryRequestBytes = 64 * 1024 * 1024
 
@@ -46,208 +54,24 @@ const (
 	BurstEffectiveMinFloor = 0.05
 	BurstEffectiveMinCeil  = 0.4
 
-	// Confidence burst softener: partial predictability credit when usage is bursty but well observed.
+	// Partial predictability credit when usage is bursty but well observed.
 	confidenceBurstThreshold  = 1.6
 	confidenceBurstFloor      = 0.8
 	confidenceDataFactorFloor = 0.5
 )
 
-func analyzeCPUProvisioning(specs ResourceSpecs, utilization ResourceUtilization, stability StabilityResult, minSamples int) ResourceProvisioning {
-	result := ResourceProvisioning{
-		IsOverProvisioned:  false,
-		IsUnderProvisioned: false,
-		Efficiency:         1.0,
-		Confidence: computeResourceConfidence(
-			utilization.Stats,
-			utilization.SampleSize,
-			minSamples,
-		),
-	}
+type resourceProvisioningInput struct {
+	currentRequest               *float64
+	currentLimit                 *float64
+	percentileP95                float64
+	peakUsage                    float64
+	healthyRequestUtilizationMin float64
+	minimumRequest               float64
+	limitHeadroom                float64
 
-	hasRequest := specs.CPURequest != nil && *specs.CPURequest > 0
-	hasLimit := specs.CPULimit != nil && *specs.CPULimit > 0
-
-	result.CurrentRequest = specs.CPURequest
-	result.CurrentLimit = specs.CPULimit
-
-	if !hasRequest || !hasLimit {
-		result.IsUnderProvisioned = true
-	}
-
-	if !hasRequest && !hasLimit {
-		result.Efficiency = 0.0
-		return result
-	}
-
-	if stability.CPUThrottling > ThrottlingThreshold {
-		result.IsUnderProvisioned = true
-		penalty := (stability.CPUThrottling - ThrottlingThreshold) * 3.0
-		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
-	}
-	if stability.CPUPressure > PressureThreshold {
-		result.IsUnderProvisioned = true
-		penalty := (stability.CPUPressure - PressureThreshold) * 1.0
-		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
-	}
-
-	if hasRequest {
-		result.RequestUtilization = utilization.Stats.Percentile.P95 / *specs.CPURequest
-
-		minThreshold := effectiveMinFromBurstiness(
-			utilization.Stats.Mean,
-			utilization.Stats.Percentile.P95,
-			utilization.Stats.Max,
-		)
-		atFloor := *specs.CPURequest <= MinCPURequestCores
-		lowThrottling := stability.CPUThrottling > 0 && stability.CPUThrottling <= ThrottlingThreshold
-		underProvisionedDueToStability := stability.CPUThrottling > ThrottlingThreshold || stability.CPUPressure > PressureThreshold
-
-		if result.RequestUtilization < minThreshold && !atFloor && !lowThrottling && !underProvisionedDueToStability {
-			result.IsOverProvisioned = true
-		}
-
-		if result.RequestUtilization > OptimalUtilizationMax {
-			result.IsUnderProvisioned = true
-		}
-
-		var requestEfficiency float64
-		if result.RequestUtilization >= minThreshold && result.RequestUtilization <= OptimalUtilizationMax {
-			requestEfficiency = 1.0
-		} else if result.RequestUtilization < minThreshold && (atFloor || lowThrottling) {
-			requestEfficiency = 1.0
-		} else if result.RequestUtilization < minThreshold {
-			requestEfficiency = result.RequestUtilization / minThreshold
-		} else {
-			if result.RequestUtilization > 1.0 {
-				requestEfficiency = 0.0
-			} else {
-				requestEfficiency = 1.0 - ((result.RequestUtilization - OptimalUtilizationMax) / (1.0 - OptimalUtilizationMax))
-			}
-		}
-		result.Efficiency = min(result.Efficiency, requestEfficiency)
-	}
-
-	if hasLimit {
-		result.LimitUtilization = utilization.Stats.Max / *specs.CPULimit
-
-		if result.LimitUtilization > (1.0 - CPUHeadroom) {
-			result.IsUnderProvisioned = true
-			limitPenalty := 1.0
-			if result.LimitUtilization > 1.0 {
-				limitPenalty = 0.0
-			} else {
-				limitPenalty = (1.0 - result.LimitUtilization) / CPUHeadroom
-			}
-			result.Efficiency = min(result.Efficiency, limitPenalty)
-		}
-	}
-
-	if (hasRequest && !hasLimit) || (!hasRequest && hasLimit) {
-		result.Efficiency = min(result.Efficiency, 0.5)
-	}
-
-	result.Efficiency = max(0.0, min(1.0, result.Efficiency))
-
-	return result
-}
-
-func analyzeMemoryProvisioning(specs ResourceSpecs, utilization ResourceUtilization, stability StabilityResult, minSamples int) ResourceProvisioning {
-	result := ResourceProvisioning{
-		IsOverProvisioned:  false,
-		IsUnderProvisioned: false,
-		Efficiency:         1.0,
-		Confidence: computeResourceConfidence(
-			utilization.Stats,
-			utilization.SampleSize,
-			minSamples,
-		),
-	}
-
-	hasRequest := specs.MemoryRequest != nil && *specs.MemoryRequest > 0
-	hasLimit := specs.MemoryLimit != nil && *specs.MemoryLimit > 0
-
-	result.CurrentRequest = specs.MemoryRequest
-	result.CurrentLimit = specs.MemoryLimit
-
-	if !hasRequest || !hasLimit {
-		result.IsUnderProvisioned = true
-	}
-
-	if !hasRequest && !hasLimit {
-		result.Efficiency = 0.0
-		return result
-	}
-
-	if stability.MemoryOOM > 0 {
-		result.IsUnderProvisioned = true
-		penalty := eventCountPenalty(stability.MemoryOOM, maxPenaltyOOM, oomCountAtMax)
-		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
-	}
-	if stability.MemoryFailCnt > 0 {
-		result.IsUnderProvisioned = true
-		penalty := eventCountPenalty(stability.MemoryFailCnt, maxPenaltyMemoryFailCnt, memoryFailCountAtMax)
-		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
-	}
-	if stability.MemoryPressure > PressureThreshold {
-		result.IsUnderProvisioned = true
-		penalty := (stability.MemoryPressure - PressureThreshold) * 1.0
-		result.Efficiency = min(result.Efficiency, max(0.0, 1.0-penalty))
-	}
-
-	if hasRequest {
-		result.RequestUtilization = utilization.Stats.Percentile.P95 / *specs.MemoryRequest
-
-		atFloor := *specs.MemoryRequest <= MinMemoryRequestBytes
-		lowMemoryPressure := stability.MemoryPressure > 0 && stability.MemoryPressure <= PressureThreshold
-		underProvisionedDueToStability := stability.MemoryOOM > 0 || stability.MemoryFailCnt > 0 || stability.MemoryPressure > PressureThreshold
-
-		if result.RequestUtilization < OptimalUtilizationMin && !atFloor && !lowMemoryPressure && !underProvisionedDueToStability {
-			result.IsOverProvisioned = true
-		}
-
-		if result.RequestUtilization > OptimalUtilizationMax {
-			result.IsUnderProvisioned = true
-		}
-
-		var requestEfficiency float64
-		if result.RequestUtilization >= OptimalUtilizationMin && result.RequestUtilization <= OptimalUtilizationMax {
-			requestEfficiency = 1.0
-		} else if result.RequestUtilization < OptimalUtilizationMin && (atFloor || lowMemoryPressure) {
-			requestEfficiency = 1.0
-		} else if result.RequestUtilization < OptimalUtilizationMin {
-			requestEfficiency = result.RequestUtilization / OptimalUtilizationMin
-		} else {
-			if result.RequestUtilization > 1.0 {
-				requestEfficiency = 0.0
-			} else {
-				requestEfficiency = 1.0 - ((result.RequestUtilization - OptimalUtilizationMax) / (1.0 - OptimalUtilizationMax))
-			}
-		}
-		result.Efficiency = min(result.Efficiency, requestEfficiency)
-	}
-
-	if hasLimit {
-		result.LimitUtilization = utilization.Stats.Max / *specs.MemoryLimit
-
-		if result.LimitUtilization > (1.0 - MemoryHeadroom) {
-			result.IsUnderProvisioned = true
-			limitPenalty := 1.0
-			if result.LimitUtilization > 1.0 {
-				limitPenalty = 0.0
-			} else {
-				limitPenalty = (1.0 - result.LimitUtilization) / MemoryHeadroom
-			}
-			result.Efficiency = min(result.Efficiency, limitPenalty)
-		}
-	}
-
-	if (hasRequest && !hasLimit) || (!hasRequest && hasLimit) {
-		result.Efficiency = min(result.Efficiency, 0.5)
-	}
-
-	result.Efficiency = max(0.0, min(1.0, result.Efficiency))
-
-	return result
+	underProvisionedFromStability bool
+	suppressOverProvisioned       bool
+	efficiencyFromStability       float64
 }
 
 func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, stability StabilityResult, minSamples int) ProvisioningResult {
@@ -261,6 +85,161 @@ func AnalyzeProvisioning(specs ResourceSpecs, utilization UtilizationResult, sta
 	result.Efficiency = (result.CPU.Efficiency * cpuWeight) + (result.Memory.Efficiency * memoryWeight)
 
 	return result
+}
+
+func analyzeCPUProvisioning(specs ResourceSpecs, utilization ResourceUtilization, stability StabilityResult, minSamples int) ResourceProvisioning {
+	healthyRequestUtilizationMin := effectiveMinFromBurstiness(
+		utilization.Stats.Mean,
+		utilization.Stats.Percentile.P95,
+		utilization.Stats.Max,
+	)
+	suppressOverProvisioned := stability.CPUThrottling > 0 && stability.CPUThrottling <= ThrottlingThreshold
+
+	underProvisionedFromStability := false
+	efficiencyFromStability := 1.0
+	if stability.CPUThrottling > ThrottlingThreshold {
+		underProvisionedFromStability = true
+		penalty := (stability.CPUThrottling - ThrottlingThreshold) * 3.0
+		efficiencyFromStability = min(efficiencyFromStability, max(0.0, 1.0-penalty))
+	}
+	if stability.CPUPressure > PressureThreshold {
+		underProvisionedFromStability = true
+		penalty := (stability.CPUPressure - PressureThreshold) * 1.0
+		efficiencyFromStability = min(efficiencyFromStability, max(0.0, 1.0-penalty))
+	}
+
+	return analyzeResourceProvisioning(resourceProvisioningInput{
+		currentRequest:                specs.CPURequest,
+		currentLimit:                  specs.CPULimit,
+		percentileP95:                 utilization.Stats.Percentile.P95,
+		peakUsage:                     utilization.Stats.Max,
+		healthyRequestUtilizationMin:  healthyRequestUtilizationMin,
+		minimumRequest:                MinCPURequestCores,
+		limitHeadroom:                 CPUHeadroom,
+		underProvisionedFromStability: underProvisionedFromStability,
+		suppressOverProvisioned:       suppressOverProvisioned,
+		efficiencyFromStability:       efficiencyFromStability,
+	}, computeResourceConfidence(utilization.Stats, utilization.SampleSize, minSamples))
+}
+
+func analyzeMemoryProvisioning(specs ResourceSpecs, utilization ResourceUtilization, stability StabilityResult, minSamples int) ResourceProvisioning {
+	suppressOverProvisioned := stability.MemoryPressure > 0 && stability.MemoryPressure <= PressureThreshold
+
+	underProvisionedFromStability := false
+	efficiencyFromStability := 1.0
+	if stability.MemoryOOM > 0 {
+		underProvisionedFromStability = true
+		penalty := eventCountPenalty(stability.MemoryOOM, maxPenaltyOOM, oomCountAtMax)
+		efficiencyFromStability = min(efficiencyFromStability, max(0.0, 1.0-penalty))
+	}
+	if stability.MemoryFailCnt > 0 {
+		underProvisionedFromStability = true
+		penalty := eventCountPenalty(stability.MemoryFailCnt, maxPenaltyMemoryFailCnt, memoryFailCountAtMax)
+		efficiencyFromStability = min(efficiencyFromStability, max(0.0, 1.0-penalty))
+	}
+	if stability.MemoryPressure > PressureThreshold {
+		underProvisionedFromStability = true
+		penalty := (stability.MemoryPressure - PressureThreshold) * 1.0
+		efficiencyFromStability = min(efficiencyFromStability, max(0.0, 1.0-penalty))
+	}
+
+	return analyzeResourceProvisioning(resourceProvisioningInput{
+		currentRequest:                specs.MemoryRequest,
+		currentLimit:                  specs.MemoryLimit,
+		percentileP95:                 utilization.Stats.Percentile.P95,
+		peakUsage:                     utilization.Stats.Max,
+		healthyRequestUtilizationMin:  OptimalUtilizationMin,
+		minimumRequest:                MinMemoryRequestBytes,
+		limitHeadroom:                 MemoryHeadroom,
+		underProvisionedFromStability: underProvisionedFromStability,
+		suppressOverProvisioned:       suppressOverProvisioned,
+		efficiencyFromStability:       efficiencyFromStability,
+	}, computeResourceConfidence(utilization.Stats, utilization.SampleSize, minSamples))
+}
+
+func analyzeResourceProvisioning(input resourceProvisioningInput, confidence float64) ResourceProvisioning {
+	result := ResourceProvisioning{
+		CurrentRequest: input.currentRequest,
+		CurrentLimit:   input.currentLimit,
+		Efficiency:     input.efficiencyFromStability,
+		Confidence:     confidence,
+	}
+
+	hasRequest := input.currentRequest != nil && *input.currentRequest > 0
+	hasLimit := input.currentLimit != nil && *input.currentLimit > 0
+
+	if !hasRequest {
+		result.Status = ProvisioningUnspecified
+		result.Efficiency = 0.0
+		return result
+	}
+
+	underProvisioned := input.underProvisionedFromStability
+	overProvisioned := false
+
+	requestUtilization := input.percentileP95 / *input.currentRequest
+	result.RequestUtilization = &requestUtilization
+
+	requestAtMinimum := *input.currentRequest <= input.minimumRequest
+	if requestUtilization > OptimalUtilizationMax {
+		underProvisioned = true
+	}
+	if requestUtilization < input.healthyRequestUtilizationMin && !requestAtMinimum && !input.suppressOverProvisioned {
+		overProvisioned = true
+	}
+
+	result.Efficiency = min(result.Efficiency, requestFitEfficiency(
+		requestUtilization,
+		input.healthyRequestUtilizationMin,
+		requestAtMinimum,
+		input.suppressOverProvisioned,
+	))
+
+	if hasLimit {
+		limitUtilization := input.peakUsage / *input.currentLimit
+		result.LimitUtilization = &limitUtilization
+
+		if limitUtilization > (1.0 - input.limitHeadroom) {
+			underProvisioned = true
+			limitPenalty := 1.0
+			if limitUtilization > 1.0 {
+				limitPenalty = 0.0
+			} else {
+				limitPenalty = (1.0 - limitUtilization) / input.limitHeadroom
+			}
+			result.Efficiency = min(result.Efficiency, limitPenalty)
+		}
+	}
+
+	if underProvisioned {
+		result.Status = ProvisioningUnderProvisioned
+	} else if overProvisioned {
+		result.Status = ProvisioningOverProvisioned
+	} else {
+		result.Status = ProvisioningOptimal
+	}
+
+	result.Efficiency = max(0.0, min(1.0, result.Efficiency))
+	return result
+}
+
+func requestFitEfficiency(
+	requestUtilization float64,
+	healthyRequestUtilizationMin float64,
+	requestAtMinimum bool,
+	suppressOverProvisioned bool,
+) float64 {
+	if (requestUtilization >= healthyRequestUtilizationMin && requestUtilization <= OptimalUtilizationMax) ||
+		(requestUtilization < healthyRequestUtilizationMin && (requestAtMinimum || suppressOverProvisioned)) {
+		return 1.0
+	}
+	if requestUtilization < healthyRequestUtilizationMin {
+		return requestUtilization / healthyRequestUtilizationMin
+	}
+	if requestUtilization > 1.0 {
+		return 0.0
+	}
+	return 1.0 - ((requestUtilization - OptimalUtilizationMax) / (1.0 - OptimalUtilizationMax))
 }
 
 // computeResourceConfidence scores measurement trust from usage predictability and data sufficiency.
@@ -298,20 +277,20 @@ func computeResourceConfidence(stats timeseries.StatsResult, sampleSize, minSamp
 	return max(0.0, min(1.0, predictability*dataFactor))
 }
 
-func burstScore(mean, p95, peak float64) float64 {
+func burstScore(mean, percentileP95, peakUsage float64) float64 {
 	if mean <= 0 {
 		return 0
 	}
-	return (p95/mean + peak/mean) / 2.0
+	return (percentileP95/mean + peakUsage/mean) / 2.0
 }
 
-// effectiveMinFromBurstiness lowers the minimum "healthy" request utilization when mean, P95, and peak
+// effectiveMinFromBurstiness lowers the minimum healthy request utilization when mean, P95, and peak
 // show burstiness, so bursty CPU workloads are not marked over-provisioned for sitting near idle between spikes.
-func effectiveMinFromBurstiness(mean, p95, peak float64) float64 {
+func effectiveMinFromBurstiness(mean, percentileP95, peakUsage float64) float64 {
 	if mean <= 0 {
 		return BurstEffectiveMinCeil
 	}
-	score := max(burstScore(mean, p95, peak), 1.0)
+	score := max(burstScore(mean, percentileP95, peakUsage), 1.0)
 	effectiveMin := BurstEffectiveMinCeil - (score-1.0)*0.1
 	effectiveMin = max(effectiveMin, BurstEffectiveMinFloor)
 	effectiveMin = min(effectiveMin, BurstEffectiveMinCeil)

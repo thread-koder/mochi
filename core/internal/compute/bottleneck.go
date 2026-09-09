@@ -77,14 +77,18 @@ func ClassifyContainerBottlenecks(analysis ContainerAnalysis) []BottleneckFindin
 	memProv := analysis.Provisioning.Memory
 
 	base := BottleneckFinding{
-		ContainerName:          analysis.ContainerName,
-		CPUThrottling:          stability.CPUThrottling,
-		CPUPressure:            stability.CPUPressure,
-		MemoryOOM:              stability.MemoryOOM,
-		MemoryFailCnt:          stability.MemoryFailCnt,
-		MemoryPressure:         stability.MemoryPressure,
-		CPULimitUtilization:    cpuProv.LimitUtilization,
-		MemoryLimitUtilization: memProv.LimitUtilization,
+		ContainerName:  analysis.ContainerName,
+		CPUThrottling:  stability.CPUThrottling,
+		CPUPressure:    stability.CPUPressure,
+		MemoryOOM:      stability.MemoryOOM,
+		MemoryFailCnt:  stability.MemoryFailCnt,
+		MemoryPressure: stability.MemoryPressure,
+	}
+	if cpuProv.LimitUtilization != nil {
+		base.CPULimitUtilization = *cpuProv.LimitUtilization
+	}
+	if memProv.LimitUtilization != nil {
+		base.MemoryLimitUtilization = *memProv.LimitUtilization
 	}
 
 	findings := make([]BottleneckFinding, 0, 2)
@@ -117,8 +121,8 @@ func classifyCPUBottleneck(stability StabilityResult, prov ResourceProvisioning)
 		penalty := min((stability.CPUPressure-PressureThreshold)*0.5, maxPenaltyCPUPressure)
 		return BottleneckCPUPressure, penalty / maxPenaltyCPUPressure, true
 	}
-	if prov.CurrentLimit != nil && *prov.CurrentLimit > 0 && prov.LimitUtilization > (1.0-CPUHeadroom) {
-		return BottleneckCPULimitSaturated, limitSaturationScore(prov.LimitUtilization, CPUHeadroom), true
+	if prov.CurrentLimit != nil && *prov.CurrentLimit > 0 && *prov.LimitUtilization > (1.0-CPUHeadroom) {
+		return BottleneckCPULimitSaturated, limitSaturationScore(*prov.LimitUtilization, CPUHeadroom), true
 	}
 	return "", 0, false
 }
@@ -136,8 +140,8 @@ func classifyMemoryBottleneck(stability StabilityResult, prov ResourceProvisioni
 		penalty := min((stability.MemoryPressure-PressureThreshold)*1.0, maxPenaltyMemoryPressure)
 		return BottleneckMemoryPressure, penalty / maxPenaltyMemoryPressure, true
 	}
-	if prov.CurrentLimit != nil && *prov.CurrentLimit > 0 && prov.LimitUtilization > (1.0-MemoryHeadroom) {
-		return BottleneckMemoryLimitSaturated, limitSaturationScore(prov.LimitUtilization, MemoryHeadroom), true
+	if prov.CurrentLimit != nil && *prov.CurrentLimit > 0 && *prov.LimitUtilization > (1.0-MemoryHeadroom) {
+		return BottleneckMemoryLimitSaturated, limitSaturationScore(*prov.LimitUtilization, MemoryHeadroom), true
 	}
 	return "", 0, false
 }
