@@ -33,13 +33,14 @@ interface UtilizationResult {
   memory: ResourceUtilization
 }
 
+type ProvisioningStatus = 'unspecified' | 'over_provisioned' | 'under_provisioned' | 'optimal'
+
 interface ResourceProvisioning {
-  request_utilization: number
-  limit_utilization: number
+  request_utilization: number | null
+  limit_utilization: number | null
   current_request: number | null
   current_limit: number | null
-  is_over_provisioned: boolean
-  is_under_provisioned: boolean
+  status: ProvisioningStatus
   efficiency: number
   confidence: number
 }

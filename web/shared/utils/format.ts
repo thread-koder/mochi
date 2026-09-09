@@ -23,8 +23,8 @@ export const formatBytes = (value?: number | null): string => {
   return `${display} ${units[unitIndex]}`
 }
 
-export const formatPercentage = (value: number): string => {
-  if (isNaN(value)) {
+export const formatPercentage = (value: number | null | undefined): string => {
+  if (value === undefined || value === null || isNaN(value)) {
     return 'N/A'
   }
   return `${(value * 100).toFixed(1)}%`

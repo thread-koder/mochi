@@ -462,15 +462,29 @@ const toggleExpand = (key: string) => {
 }
 
 const provisioningStatus = (provisioning: ResourceProvisioning): string => {
-  if (provisioning.is_over_provisioned) return 'Over-provisioned'
-  if (provisioning.is_under_provisioned) return 'Under-provisioned'
-  return 'Optimal'
+  switch (provisioning.status) {
+    case 'over_provisioned':
+      return 'Over-provisioned'
+    case 'under_provisioned':
+      return 'Under-provisioned'
+    case 'unspecified':
+      return 'Unspecified'
+    default:
+      return 'Optimal'
+  }
 }
 
 const provisioningStatusClass = (provisioning: ResourceProvisioning): string => {
-  if (provisioning.is_over_provisioned) return 'text-warning-light'
-  if (provisioning.is_under_provisioned) return 'text-error-light'
-  return 'text-on-surface-secondary'
+  switch (provisioning.status) {
+    case 'over_provisioned':
+      return 'text-warning-light'
+    case 'under_provisioned':
+      return 'text-error-light'
+    case 'unspecified':
+      return 'text-on-surface-muted'
+    default:
+      return 'text-on-surface-secondary'
+  }
 }
 
 const progressBarWidth = (value: number): string => {
