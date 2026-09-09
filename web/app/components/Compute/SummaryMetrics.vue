@@ -91,7 +91,7 @@
           </span>
           <span
             v-else
-            class="text-sm text-on-surface-secondary"
+            class="text-sm text-on-surface"
           >
             None
           </span>
@@ -199,7 +199,7 @@
           </span>
           <span
             v-else
-            class="text-sm text-on-surface-secondary"
+            class="text-sm text-on-surface"
           >
             None
           </span>

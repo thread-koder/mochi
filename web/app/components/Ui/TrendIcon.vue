@@ -18,7 +18,7 @@
   </template>
   <span
     v-else
-    class="text-xs text-on-surface-muted"
+    class="text-sm text-on-surface-muted"
   >N/A</span>
 </template>
 
@@ -36,11 +36,11 @@ const props = withDefaults(
 
 const iconClass = computed(() => {
   if (props.direction === 'increasing') {
-    return 'text-xs text-error-light'
+    return 'text-sm text-error-light'
   }
   if (props.direction === 'decreasing') {
-    return 'text-xs text-success-light'
+    return 'text-sm text-success-light'
   }
-  return 'text-xs text-on-surface-secondary'
+  return 'text-sm text-on-surface-secondary'
 })
 </script>

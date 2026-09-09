@@ -203,25 +203,37 @@
                           </div>
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Current Request</span>
-                            <span class="text-xs font-medium text-on-surface">
+                            <span
+                              class="text-xs font-medium"
+                              :class="provisioningValueClass(container.provisioning.cpu.current_request)"
+                            >
                               {{ formatCPU(container.provisioning.cpu.current_request) }}
                             </span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Request Utilization</span>
-                            <span class="text-xs font-medium text-on-surface">
+                            <span
+                              class="text-xs font-medium"
+                              :class="provisioningValueClass(container.provisioning.cpu.request_utilization)"
+                            >
                               {{ formatPercentage(container.provisioning.cpu.request_utilization) }}
                             </span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Current Limit</span>
-                            <span class="text-xs font-medium text-on-surface">
+                            <span
+                              class="text-xs font-medium"
+                              :class="provisioningValueClass(container.provisioning.cpu.current_limit)"
+                            >
                               {{ formatCPU(container.provisioning.cpu.current_limit) }}
                             </span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Limit Utilization</span>
-                            <span class="text-xs font-medium text-on-surface">
+                            <span
+                              class="text-xs font-medium"
+                              :class="provisioningValueClass(container.provisioning.cpu.limit_utilization)"
+                            >
                               {{ formatPercentage(container.provisioning.cpu.limit_utilization) }}
                             </span>
                           </div>
@@ -267,25 +279,37 @@
                           </div>
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Current Request</span>
-                            <span class="text-xs font-medium text-on-surface">
+                            <span
+                              class="text-xs font-medium"
+                              :class="provisioningValueClass(container.provisioning.memory.current_request)"
+                            >
                               {{ formatBytes(container.provisioning.memory.current_request) }}
                             </span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Request Utilization</span>
-                            <span class="text-xs font-medium text-on-surface">
+                            <span
+                              class="text-xs font-medium"
+                              :class="provisioningValueClass(container.provisioning.memory.request_utilization)"
+                            >
                               {{ formatPercentage(container.provisioning.memory.request_utilization) }}
                             </span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Current Limit</span>
-                            <span class="text-xs font-medium text-on-surface">
+                            <span
+                              class="text-xs font-medium"
+                              :class="provisioningValueClass(container.provisioning.memory.current_limit)"
+                            >
                               {{ formatBytes(container.provisioning.memory.current_limit) }}
                             </span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span class="text-xs text-on-surface-secondary">Limit Utilization</span>
-                            <span class="text-xs font-medium text-on-surface">
+                            <span
+                              class="text-xs font-medium"
+                              :class="provisioningValueClass(container.provisioning.memory.limit_utilization)"
+                            >
                               {{ formatPercentage(container.provisioning.memory.limit_utilization) }}
                             </span>
                           </div>
@@ -485,6 +509,10 @@ const provisioningStatusClass = (provisioning: ResourceProvisioning): string => 
     default:
       return 'text-on-surface-secondary'
   }
+}
+
+const provisioningValueClass = (value: number | null | undefined): string => {
+  return value == null ? 'text-on-surface-muted' : 'text-on-surface'
 }
 
 const progressBarWidth = (value: number): string => {
