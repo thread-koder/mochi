@@ -31,6 +31,11 @@ type PodInfo struct {
 	ips         []string
 }
 
+// HostNetwork is true when the pod shares the host network namespace.
+func (p PodInfo) HostNetwork() bool {
+	return p.hostNetwork
+}
+
 // Resolver maps host pid/cgroup to pod identity (this node) and dest IPs to
 // unique non-hostNetwork pods (cluster-wide informer for podsByIP).
 type Resolver struct {

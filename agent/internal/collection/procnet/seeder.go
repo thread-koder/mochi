@@ -45,7 +45,8 @@ var procTables = []tableSpec{
 	{name: "udp6", v6: true, kind: tableUDP},
 }
 
-// Seeder walks host PIDs / netns and reconciles active L4 sockets into the store.
+// Seeder walks host PIDs, resolves pod identity, and reconciles active L4
+// sockets from each pod netns into the store.
 type Seeder struct {
 	store           *aggregate.Store
 	resolver        *identity.Resolver
@@ -103,12 +104,8 @@ func (s *Seeder) collectActive() ([]aggregate.SeedSocket, map[string]map[uint16]
 		return nil, nil, fmt.Errorf("read /proc: %w", err)
 	}
 
-	hostNetNS, err := os.Readlink("/proc/self/ns/net")
-	if err != nil {
-		return nil, nil, fmt.Errorf("read host netns: %w", err)
-	}
-
-	seenNetNS := make(map[string]struct{})
+	// One snapshot per pod UID (pause + app share the netns).
+	seenUID := make(map[string]struct{})
 	var sockets []aggregate.SeedSocket
 	boundUDP := make(map[string]map[uint16]struct{})
 
@@ -120,36 +117,45 @@ func (s *Seeder) collectActive() ([]aggregate.SeedSocket, map[string]map[uint16]
 		if err != nil {
 			continue
 		}
-		nsPath := filepath.Join("/proc", entry.Name(), "ns", "net")
-		nsID, err := os.Readlink(nsPath)
-		if err != nil {
-			continue
-		}
-		if nsID == hostNetNS {
-			continue
-		}
-		if _, seen := seenNetNS[nsID]; seen {
-			continue
-		}
 
 		pod, ok := s.resolver.ResolvePID(uint32(pid))
-		if !ok {
+		if !ok || pod.HostNetwork() {
 			continue
 		}
-		seenNetNS[nsID] = struct{}{}
+		if _, seen := seenUID[pod.UID]; seen {
+			continue
+		}
 
+		var (
+			parsedAny  bool
+			pidSockets []aggregate.SeedSocket
+			pidUDP     map[uint16]struct{}
+		)
 		for _, spec := range procTables {
 			path := filepath.Join("/proc", entry.Name(), "net", spec.name)
-			parsed, listenPorts, _ := s.parseTable(path, spec.v6, spec.kind, pod)
-			sockets = append(sockets, parsed...)
+			parsed, listenPorts, err := s.parseTable(path, spec.v6, spec.kind, pod)
+			if err != nil {
+				// Pid exited mid-walk, or table missing: try another pid of this pod.
+				continue
+			}
+			parsedAny = true
+			pidSockets = append(pidSockets, parsed...)
 			if spec.kind == tableUDP && len(listenPorts) > 0 {
-				if boundUDP[pod.UID] == nil {
-					boundUDP[pod.UID] = make(map[uint16]struct{})
+				if pidUDP == nil {
+					pidUDP = make(map[uint16]struct{})
 				}
 				for port := range listenPorts {
-					boundUDP[pod.UID][port] = struct{}{}
+					pidUDP[port] = struct{}{}
 				}
 			}
+		}
+		if !parsedAny {
+			continue
+		}
+		seenUID[pod.UID] = struct{}{}
+		sockets = append(sockets, pidSockets...)
+		if len(pidUDP) > 0 {
+			boundUDP[pod.UID] = pidUDP
 		}
 	}
 	return sockets, boundUDP, nil
