@@ -17,10 +17,7 @@ import (
 	"github.com/thread_koder/mochi/agent/internal/metrics"
 )
 
-const (
-	conntrackRefreshInterval = 5 * time.Second
-	procnetSeedInterval      = 30 * time.Second
-)
+const procnetSeedInterval = 30 * time.Second
 
 // Runtime owns collection lifecycle (identity, conntrack, eBPF, procnet seed).
 type Runtime struct {
@@ -57,6 +54,10 @@ func Start(cfg config.Config, registry *metrics.Registry) *Runtime {
 	ctClient, err := conntrack.NewClient()
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to open conntrack. Continuing without NAT enrichment")
+	} else if err := ctClient.Start(ctx); err != nil {
+		err = errors.Join(err, ctClient.Close())
+		log.Error().Err(err).Msg("Failed to start conntrack. Continuing without NAT enrichment")
+		ctClient = nil
 	}
 	runtime.ctClient = ctClient
 
@@ -68,9 +69,6 @@ func Start(cfg config.Config, registry *metrics.Registry) *Runtime {
 	}
 	runtime.collector = collector
 
-	if ctClient != nil {
-		go ctClient.StartRefresh(ctx, conntrackRefreshInterval)
-	}
 	go collector.Start(ctx)
 	go procnet.NewSeeder(store, resolver, ctClient, listen, dnsCache).Start(ctx, procnetSeedInterval)
 	log.Info().Msg("Collection started")
