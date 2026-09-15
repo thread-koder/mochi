@@ -120,10 +120,6 @@ func monotonicNowNs() (uint64, error) {
 }
 
 func (c *Collector) gcIdleUDPFlows() error {
-	if c.udpObjs.Flows == nil {
-		return nil
-	}
-
 	nowNs, err := monotonicNowNs()
 	if err != nil {
 		return err
@@ -183,7 +179,7 @@ func (c *Collector) closeUDPFlow(key udpflowFlowKey, val udpflowFlowVal) {
 		key.Sport,
 		key.Dport,
 		float64(val.TxBytes),
-		0,
+		float64(val.RxBytes),
 		flowClose,
 	)
 }

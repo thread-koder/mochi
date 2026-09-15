@@ -138,13 +138,19 @@ func (c *Collector) loadUDP() error {
 		return nil
 	}
 
-	if err := attach(c.udpObjs.MochiUdpSendmsg); err != nil {
-		closeErr := errors.Join(closeLinks(links), c.udpObjs.Close())
-		return errors.Join(fmt.Errorf("attach fexit udp_sendmsg: %w", err), closeErr)
-	}
-	if err := attach(c.udpObjs.MochiUdpv6Sendmsg); err != nil {
-		closeErr := errors.Join(closeLinks(links), c.udpObjs.Close())
-		return errors.Join(fmt.Errorf("attach fexit udpv6_sendmsg: %w", err), closeErr)
+	for _, step := range []struct {
+		prog *ebpf.Program
+		name string
+	}{
+		{c.udpObjs.MochiUdpSendmsg, "fexit udp_sendmsg"},
+		{c.udpObjs.MochiUdpv6Sendmsg, "fexit udpv6_sendmsg"},
+		{c.udpObjs.MochiUdpRecvmsg, "fexit udp_recvmsg"},
+		{c.udpObjs.MochiUdpv6Recvmsg, "fexit udpv6_recvmsg"},
+	} {
+		if err := attach(step.prog); err != nil {
+			closeErr := errors.Join(closeLinks(links), c.udpObjs.Close())
+			return errors.Join(fmt.Errorf("attach %s: %w", step.name, err), closeErr)
+		}
 	}
 
 	events, err := ringbuf.NewReader(c.udpObjs.OpenEvents)

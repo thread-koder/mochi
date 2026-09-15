@@ -29,6 +29,7 @@ type udpflowFlowVal struct {
 	Pad      uint32
 	CgroupId uint64
 	TxBytes  uint64
+	RxBytes  uint64
 	LastNs   uint64
 }
 
@@ -38,7 +39,9 @@ type udpflowFlowVal struct {
 const (
 	udpflowMapFlows              = "flows"
 	udpflowMapOpenEvents         = "open_events"
+	udpflowProgMochiUdpRecvmsg   = "mochi_udp_recvmsg"
 	udpflowProgMochiUdpSendmsg   = "mochi_udp_sendmsg"
+	udpflowProgMochiUdpv6Recvmsg = "mochi_udpv6_recvmsg"
 	udpflowProgMochiUdpv6Sendmsg = "mochi_udpv6_sendmsg"
 )
 
@@ -84,7 +87,9 @@ type udpflowSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type udpflowProgramSpecs struct {
+	MochiUdpRecvmsg   *ebpf.ProgramSpec `ebpf:"mochi_udp_recvmsg"`
 	MochiUdpSendmsg   *ebpf.ProgramSpec `ebpf:"mochi_udp_sendmsg"`
+	MochiUdpv6Recvmsg *ebpf.ProgramSpec `ebpf:"mochi_udpv6_recvmsg"`
 	MochiUdpv6Sendmsg *ebpf.ProgramSpec `ebpf:"mochi_udpv6_sendmsg"`
 }
 
@@ -143,13 +148,17 @@ type udpflowVariables struct {
 //
 // It can be passed to loadUdpflowObjects or ebpf.CollectionSpec.LoadAndAssign.
 type udpflowPrograms struct {
+	MochiUdpRecvmsg   *ebpf.Program `ebpf:"mochi_udp_recvmsg"`
 	MochiUdpSendmsg   *ebpf.Program `ebpf:"mochi_udp_sendmsg"`
+	MochiUdpv6Recvmsg *ebpf.Program `ebpf:"mochi_udpv6_recvmsg"`
 	MochiUdpv6Sendmsg *ebpf.Program `ebpf:"mochi_udpv6_sendmsg"`
 }
 
 func (p *udpflowPrograms) Close() error {
 	return _UdpflowClose(
+		p.MochiUdpRecvmsg,
 		p.MochiUdpSendmsg,
+		p.MochiUdpv6Recvmsg,
 		p.MochiUdpv6Sendmsg,
 	)
 }

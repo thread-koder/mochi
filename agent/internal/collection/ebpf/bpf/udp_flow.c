@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
-// CO-RE program: client-outbound UDP flows via successful udp_sendmsg.
-// First datagram of a 4-tuple emits an OPEN event. Later sends accumulate tx in-map.
-// Flow end and lifetime bytes are handled in userspace idle GC.
+// CO-RE program: client-outbound UDP flows via successful udp_sendmsg / udp_recvmsg.
+// First datagram of a 4-tuple emits an OPEN event. Later sends/recvs accumulate
+// tx/rx in-map. Flow end and lifetime bytes are handled in userspace idle GC.
 // Regenerate Go bindings with: go generate ./internal/collection/ebpf (requires clang).
 
 #include "vmlinux.h"
@@ -14,6 +14,8 @@ char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
 #define AF_INET 2
 #define AF_INET6 10
+#define MSG_PEEK 2
+#define MSG_ERRQUEUE 0x2000
 
 struct flow_key {
 	__u8 family;
@@ -29,6 +31,7 @@ struct flow_val {
 	__u32 pad;
 	__u64 cgroup_id;
 	__u64 tx_bytes;
+	__u64 rx_bytes;
 	__u64 last_ns;
 } __attribute__((packed));
 
@@ -149,13 +152,15 @@ static __always_inline int fill_dst_v6_sock(struct sock *sk, struct flow_key *ke
 	return 0;
 }
 
+/* msg_name is a kernel sockaddr on fexit of sendmsg/recvmsg (syscall already
+ * copied the user msghdr into a kernel msghdr). */
 static __always_inline int fill_dst_v4_msg(void *msg_name, struct flow_key *key)
 {
 	struct sockaddr_in sin = {};
 
 	if (!msg_name)
 		return -1;
-	if (bpf_probe_read_user(&sin, sizeof(sin), msg_name) < 0)
+	if (bpf_probe_read_kernel(&sin, sizeof(sin), msg_name) < 0)
 		return -1;
 	if (sin.sin_port == 0)
 		return -1;
@@ -173,7 +178,7 @@ static __always_inline int fill_dst_v6_msg(void *msg_name, struct flow_key *key)
 
 	if (!msg_name)
 		return -1;
-	if (bpf_probe_read_user(&sin6, sizeof(sin6), msg_name) < 0)
+	if (bpf_probe_read_kernel(&sin6, sizeof(sin6), msg_name) < 0)
 		return -1;
 	if (sin6.sin6_port == 0)
 		return -1;
@@ -185,38 +190,67 @@ static __always_inline int fill_dst_v6_msg(void *msg_name, struct flow_key *key)
 	return 0;
 }
 
+static __always_inline int fill_dst_v4(struct sock *sk, struct msghdr *msg, struct flow_key *key, int prefer_sock)
+{
+	void *msg_name = BPF_CORE_READ(msg, msg_name);
+
+	if (prefer_sock) {
+		if (fill_dst_v4_sock(sk, key) == 0)
+			return 0;
+		return fill_dst_v4_msg(msg_name, key);
+	}
+	if (fill_dst_v4_msg(msg_name, key) == 0)
+		return 0;
+	return fill_dst_v4_sock(sk, key);
+}
+
+static __always_inline int fill_dst_v6(struct sock *sk, struct msghdr *msg, struct flow_key *key, int prefer_sock)
+{
+	void *msg_name = BPF_CORE_READ(msg, msg_name);
+
+	if (prefer_sock) {
+		if (fill_dst_v6_sock(sk, key) == 0)
+			return 0;
+		return fill_dst_v6_msg(msg_name, key);
+	}
+	if (fill_dst_v6_msg(msg_name, key) == 0)
+		return 0;
+	return fill_dst_v6_sock(sk, key);
+}
+
+static __always_inline int fill_flow_key(struct sock *sk, struct msghdr *msg, struct flow_key *key, int prefer_sock)
+{
+	__u16 family = BPF_CORE_READ(sk, __sk_common.skc_family);
+
+	if (family == AF_INET) {
+		fill_src_v4(sk, key);
+		if (fill_dst_v4(sk, msg, key, prefer_sock) < 0)
+			return -1;
+	} else if (family == AF_INET6) {
+		fill_src_v6(sk, key);
+		if (fill_dst_v6(sk, msg, key, prefer_sock) < 0)
+			return -1;
+	} else {
+		return -1;
+	}
+
+	if (key->sport == 0 || key->dport == 0)
+		return -1;
+	return 0;
+}
+
 static __always_inline int handle_udp_send(struct sock *sk, struct msghdr *msg, size_t len, int ret)
 {
 	struct flow_key key = {};
 	struct flow_val *val;
 	struct flow_val new_val = {};
 	struct open_event *e;
-	void *msg_name;
 	__u64 now;
 	int is_new = 0;
 
 	if (ret < 0)
 		return 0;
-
-	if (BPF_CORE_READ(sk, __sk_common.skc_family) == AF_INET) {
-		fill_src_v4(sk, &key);
-		msg_name = BPF_CORE_READ(msg, msg_name);
-		if (fill_dst_v4_msg(msg_name, &key) < 0) {
-			if (fill_dst_v4_sock(sk, &key) < 0)
-				return 0;
-		}
-	} else if (BPF_CORE_READ(sk, __sk_common.skc_family) == AF_INET6) {
-		fill_src_v6(sk, &key);
-		msg_name = BPF_CORE_READ(msg, msg_name);
-		if (fill_dst_v6_msg(msg_name, &key) < 0) {
-			if (fill_dst_v6_sock(sk, &key) < 0)
-				return 0;
-		}
-	} else {
-		return 0;
-	}
-
-	if (key.sport == 0 || key.dport == 0)
+	if (fill_flow_key(sk, msg, &key, 0) < 0)
 		return 0;
 
 	now = bpf_ktime_get_ns();
@@ -254,6 +288,31 @@ static __always_inline int handle_udp_send(struct sock *sk, struct msghdr *msg, 
 	return 0;
 }
 
+/* Lookup-only: RX never creates a flow. Client-outbound entries come from send.
+ * prefer_sock: connected peer first so ClusterIP send keys match post-NAT replies. */
+static __always_inline int handle_udp_recv(struct sock *sk, struct msghdr *msg, int flags, int ret)
+{
+	struct flow_key key = {};
+	struct flow_val *val;
+	__u64 now;
+
+	if (ret <= 0)
+		return 0;
+	if (flags & (MSG_PEEK | MSG_ERRQUEUE))
+		return 0;
+	if (fill_flow_key(sk, msg, &key, 1) < 0)
+		return 0;
+
+	val = bpf_map_lookup_elem(&flows, &key);
+	if (!val)
+		return 0;
+
+	now = bpf_ktime_get_ns();
+	val->rx_bytes = val->rx_bytes + ret;
+	val->last_ns = now;
+	return 0;
+}
+
 SEC("fexit/udp_sendmsg")
 int BPF_PROG(mochi_udp_sendmsg, struct sock *sk, struct msghdr *msg, size_t len, int ret)
 {
@@ -264,4 +323,16 @@ SEC("fexit/udpv6_sendmsg")
 int BPF_PROG(mochi_udpv6_sendmsg, struct sock *sk, struct msghdr *msg, size_t len, int ret)
 {
 	return handle_udp_send(sk, msg, len, ret);
+}
+
+SEC("fexit/udp_recvmsg")
+int BPF_PROG(mochi_udp_recvmsg, struct sock *sk, struct msghdr *msg, size_t len, int flags, int ret)
+{
+	return handle_udp_recv(sk, msg, flags, ret);
+}
+
+SEC("fexit/udpv6_recvmsg")
+int BPF_PROG(mochi_udpv6_recvmsg, struct sock *sk, struct msghdr *msg, size_t len, int flags, int ret)
+{
+	return handle_udp_recv(sk, msg, flags, ret);
 }
