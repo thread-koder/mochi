@@ -79,16 +79,26 @@ func (s *Store) ObserveConnect(flow Flow, key metrics.SeriesKey, txDelta, rxDelt
 	s.registry.AddRxBytes(key, rxDelta)
 }
 
-func (s *Store) ObserveClose(flow Flow, fallback metrics.SeriesKey, txDelta, rxDelta float64) {
+func (s *Store) Close(flow Flow, txDelta, rxDelta float64) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := fallback
-	if bound, ok := s.flows[flow]; ok {
-		key = bound
-		delete(s.flows, flow)
+	key, ok := s.flows[flow]
+	if !ok {
+		return false
 	}
+	delete(s.flows, flow)
+	s.creditCloseLocked(key, txDelta, rxDelta)
+	return true
+}
 
+func (s *Store) ObserveClose(fallback metrics.SeriesKey, txDelta, rxDelta float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.creditCloseLocked(fallback, txDelta, rxDelta)
+}
+
+func (s *Store) creditCloseLocked(key metrics.SeriesKey, txDelta, rxDelta float64) {
 	now := time.Now()
 	stats := s.getOrCreateLocked(key)
 	if stats.eventActive > 0 {

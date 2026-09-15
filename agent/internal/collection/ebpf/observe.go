@@ -26,17 +26,24 @@ func (c *Collector) observeFlow(
 	tx, rx float64,
 	kind flowEventKind,
 ) {
+	if !src.IsValid() || src.IsUnspecified() || !dst.IsValid() || dst.IsUnspecified() {
+		return
+	}
+	if dst.Unmap().IsLoopback() {
+		return
+	}
+
+	flow := aggregate.NewFlow(src, dst, sport, dport, protocol)
+	// Credit the series frozen at OPEN first: Resolve often fails after the pod is gone.
+	if kind == flowClose && c.store.Close(flow, tx, rx) {
+		return
+	}
+
 	if pid == 0 && cgroupID == 0 {
 		return
 	}
 	pod, ok := c.resolver.Resolve(pid, cgroupID)
 	if !ok {
-		return
-	}
-	if !src.IsValid() || src.IsUnspecified() || !dst.IsValid() || dst.IsUnspecified() {
-		return
-	}
-	if dst.Unmap().IsLoopback() {
 		return
 	}
 	if protocol == metrics.ProtocolUDP && c.serverPorts.IsBound(pod.UID, sport) {
@@ -62,11 +69,10 @@ func (c *Collector) observeFlow(
 	)
 	dns.StampDest(&key, c.resolver, c.dnsCache, actualAddr)
 
-	flow := aggregate.NewFlow(src, dst, sport, dport, protocol)
 	switch kind {
 	case flowOpen:
 		c.store.ObserveConnect(flow, key, tx, rx)
 	case flowClose:
-		c.store.ObserveClose(flow, key, tx, rx)
+		c.store.ObserveClose(key, tx, rx)
 	}
 }
