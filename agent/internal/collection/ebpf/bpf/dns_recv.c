@@ -8,6 +8,7 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_tracing.h>
+#include "iov.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
@@ -39,21 +40,6 @@ struct {
 	__uint(max_entries, 1 << 22);
 } events SEC(".maps");
 
-/* Kernel 6.4+ renamed iov_iter.iov → __iov. Flavor structs for CO-RE. */
-struct iov_iter___old {
-	const struct iovec *iov;
-} __attribute__((preserve_access_index));
-
-struct iov_iter___new {
-	const struct iovec *__iov;
-} __attribute__((preserve_access_index));
-
-/* Kernel 6.0+ ITER_UBUF: single-buffer path uses ubuf instead of iov. */
-struct iov_iter___ubuf {
-	void *ubuf;
-	u8 iter_type;
-} __attribute__((preserve_access_index));
-
 static __always_inline int dns_ports_ok(struct sock *sk)
 {
 	__u16 dport;
@@ -66,32 +52,6 @@ static __always_inline int dns_ports_ok(struct sock *sk)
 	if (sport == DNS_PORT)
 		return 0;
 	return 1;
-}
-
-static __always_inline void *msg_user_buf(struct msghdr *msg)
-{
-	struct iov_iter *iter = &msg->msg_iter;
-	struct iov_iter___ubuf *ubuf_iter = (void *)iter;
-	struct iov_iter___new *new_iter = (void *)iter;
-	struct iov_iter___old *old_iter = (void *)iter;
-	const struct iovec *iov = NULL;
-	void *buf = NULL;
-
-	if (bpf_core_field_exists(ubuf_iter->ubuf) &&
-	    bpf_core_enum_value_exists(enum iter_type, ITER_UBUF)) {
-		u8 type = BPF_CORE_READ(ubuf_iter, iter_type);
-		if (type == bpf_core_enum_value(enum iter_type, ITER_UBUF))
-			return BPF_CORE_READ(ubuf_iter, ubuf);
-	}
-
-	if (bpf_core_field_exists(new_iter->__iov))
-		iov = BPF_CORE_READ(new_iter, __iov);
-	else if (bpf_core_field_exists(old_iter->iov))
-		iov = BPF_CORE_READ(old_iter, iov);
-	if (!iov)
-		return NULL;
-	buf = BPF_CORE_READ(iov, iov_base);
-	return buf;
 }
 
 static __always_inline int stash_recv(struct sock *sk, struct msghdr *msg)
@@ -175,43 +135,37 @@ static __always_inline int emit_recv(int ret, __u8 is_tcp)
 }
 
 SEC("fentry/udp_recvmsg")
-int BPF_PROG(mochi_udp_recvmsg_enter, struct sock *sk, struct msghdr *msg,
-	     size_t len, int flags)
+int BPF_PROG(mochi_udp_recvmsg_enter, struct sock *sk, struct msghdr *msg, size_t len, int flags)
 {
 	return stash_recv(sk, msg);
 }
 
 SEC("fexit/udp_recvmsg")
-int BPF_PROG(mochi_udp_recvmsg_exit, struct sock *sk, struct msghdr *msg,
-	     size_t len, int flags, int ret)
+int BPF_PROG(mochi_udp_recvmsg_exit, struct sock *sk, struct msghdr *msg, size_t len, int flags, int ret)
 {
 	return emit_recv(ret, 0);
 }
 
 SEC("fentry/udpv6_recvmsg")
-int BPF_PROG(mochi_udpv6_recvmsg_enter, struct sock *sk, struct msghdr *msg,
-	     size_t len, int flags)
+int BPF_PROG(mochi_udpv6_recvmsg_enter, struct sock *sk, struct msghdr *msg, size_t len, int flags)
 {
 	return stash_recv(sk, msg);
 }
 
 SEC("fexit/udpv6_recvmsg")
-int BPF_PROG(mochi_udpv6_recvmsg_exit, struct sock *sk, struct msghdr *msg,
-	     size_t len, int flags, int ret)
+int BPF_PROG(mochi_udpv6_recvmsg_exit, struct sock *sk, struct msghdr *msg, size_t len, int flags, int ret)
 {
 	return emit_recv(ret, 0);
 }
 
 SEC("fentry/tcp_recvmsg")
-int BPF_PROG(mochi_tcp_recvmsg_enter, struct sock *sk, struct msghdr *msg,
-	     size_t len, int flags)
+int BPF_PROG(mochi_tcp_recvmsg_enter, struct sock *sk, struct msghdr *msg, size_t len, int flags)
 {
 	return stash_recv(sk, msg);
 }
 
 SEC("fexit/tcp_recvmsg")
-int BPF_PROG(mochi_tcp_recvmsg_exit, struct sock *sk, struct msghdr *msg,
-	     size_t len, int flags, int ret)
+int BPF_PROG(mochi_tcp_recvmsg_exit, struct sock *sk, struct msghdr *msg, size_t len, int flags, int ret)
 {
 	return emit_recv(ret, 1);
 }

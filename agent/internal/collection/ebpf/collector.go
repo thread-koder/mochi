@@ -24,7 +24,8 @@ type ServerPorts interface {
 	IsBound(podUID string, port uint16) bool
 }
 
-// Collector owns loaded eBPF programs and event loops for TCP, UDP, and DNS.
+// Collector owns loaded eBPF programs and event loops for TCP, UDP, DNS, and
+// the plaintext TCP byte stream.
 type Collector struct {
 	tcpObjs    tcpstateObjects
 	tcpLink    link.Link
@@ -40,6 +41,11 @@ type Collector struct {
 	dnsLinks   []io.Closer
 	dnsEvents  *ringbuf.Reader
 	dnsEnabled bool
+
+	streamObjs    tcpstreamObjects
+	streamLinks   []io.Closer
+	streamEvents  *ringbuf.Reader
+	streamEnabled bool
 
 	store           *aggregate.Store
 	resolver        *identity.Resolver
@@ -81,6 +87,9 @@ func Load(
 	}
 	if err := collector.loadDNS(); err != nil {
 		log.Error().Err(err).Msg("DNS eBPF load failed. Continuing without DNS correlation")
+	}
+	if err := collector.loadStream(); err != nil {
+		log.Error().Err(err).Msg("TCP stream eBPF load failed. Continuing without plaintext stream")
 	}
 	if !collector.tcpEnabled && !collector.udpEnabled {
 		err := errors.Join(
@@ -127,17 +136,6 @@ func (c *Collector) loadUDP() error {
 	}
 
 	var links []io.Closer
-	attach := func(prog *ebpf.Program) error {
-		lnk, err := link.AttachTracing(link.TracingOptions{
-			Program: prog,
-		})
-		if err != nil {
-			return err
-		}
-		links = append(links, lnk)
-		return nil
-	}
-
 	for _, step := range []struct {
 		prog *ebpf.Program
 		name string
@@ -147,9 +145,9 @@ func (c *Collector) loadUDP() error {
 		{c.udpObjs.MochiUdpRecvmsg, "fexit udp_recvmsg"},
 		{c.udpObjs.MochiUdpv6Recvmsg, "fexit udpv6_recvmsg"},
 	} {
-		if err := attach(step.prog); err != nil {
+		if err := attachTracing(&links, step.prog, step.name); err != nil {
 			closeErr := errors.Join(closeLinks(links), c.udpObjs.Close())
-			return errors.Join(fmt.Errorf("attach %s: %w", step.name, err), closeErr)
+			return errors.Join(err, closeErr)
 		}
 	}
 
@@ -174,17 +172,6 @@ func (c *Collector) loadDNS() error {
 	}
 
 	var links []io.Closer
-	attach := func(prog *ebpf.Program, name string) error {
-		lnk, err := link.AttachTracing(link.TracingOptions{
-			Program: prog,
-		})
-		if err != nil {
-			return fmt.Errorf("attach %s: %w", name, err)
-		}
-		links = append(links, lnk)
-		return nil
-	}
-
 	for _, step := range []struct {
 		prog *ebpf.Program
 		name string
@@ -196,7 +183,7 @@ func (c *Collector) loadDNS() error {
 		{c.dnsObjs.MochiTcpRecvmsgEnter, "fentry tcp_recvmsg"},
 		{c.dnsObjs.MochiTcpRecvmsgExit, "fexit tcp_recvmsg"},
 	} {
-		if err := attach(step.prog, step.name); err != nil {
+		if err := attachTracing(&links, step.prog, step.name); err != nil {
 			closeErr := errors.Join(closeLinks(links), c.dnsObjs.Close())
 			return errors.Join(err, closeErr)
 		}
@@ -215,6 +202,42 @@ func (c *Collector) loadDNS() error {
 	return nil
 }
 
+func (c *Collector) loadStream() error {
+	log := logger.WithComponent("ebpf-stream")
+
+	if err := loadTcpstreamObjects(&c.streamObjs, nil); err != nil {
+		return fmt.Errorf("load TCP stream eBPF objects: %w", err)
+	}
+
+	var links []io.Closer
+	for _, step := range []struct {
+		prog *ebpf.Program
+		name string
+	}{
+		{c.streamObjs.MochiStreamSendEnter, "fentry tcp_sendmsg"},
+		{c.streamObjs.MochiStreamSendExit, "fexit tcp_sendmsg"},
+		{c.streamObjs.MochiStreamRecvEnter, "fentry tcp_recvmsg"},
+		{c.streamObjs.MochiStreamRecvExit, "fexit tcp_recvmsg"},
+	} {
+		if err := attachTracing(&links, step.prog, step.name); err != nil {
+			closeErr := errors.Join(closeLinks(links), c.streamObjs.Close())
+			return errors.Join(err, closeErr)
+		}
+	}
+
+	events, err := ringbuf.NewReader(c.streamObjs.Events)
+	if err != nil {
+		closeErr := errors.Join(closeLinks(links), c.streamObjs.Close())
+		return errors.Join(fmt.Errorf("open TCP stream ringbuf: %w", err), closeErr)
+	}
+
+	c.streamLinks = links
+	c.streamEvents = events
+	c.streamEnabled = true
+	log.Info().Msg("eBPF TCP stream collector loaded")
+	return nil
+}
+
 func (c *Collector) Start(ctx context.Context) {
 	if c.tcpEnabled {
 		go c.runTCP(ctx)
@@ -225,6 +248,9 @@ func (c *Collector) Start(ctx context.Context) {
 	}
 	if c.dnsEnabled {
 		go c.runDNS(ctx)
+	}
+	if c.streamEnabled {
+		go c.runStream(ctx)
 	}
 }
 
@@ -253,7 +279,23 @@ func (c *Collector) Close() error {
 		err = errors.Join(err, closeLinks(c.dnsLinks))
 		err = errors.Join(err, c.dnsObjs.Close())
 	}
+	if c.streamEnabled {
+		if c.streamEvents != nil {
+			err = errors.Join(err, c.streamEvents.Close())
+		}
+		err = errors.Join(err, closeLinks(c.streamLinks))
+		err = errors.Join(err, c.streamObjs.Close())
+	}
 	return err
+}
+
+func attachTracing(links *[]io.Closer, prog *ebpf.Program, name string) error {
+	lnk, err := link.AttachTracing(link.TracingOptions{Program: prog})
+	if err != nil {
+		return fmt.Errorf("attach %s: %w", name, err)
+	}
+	*links = append(*links, lnk)
+	return nil
 }
 
 func closeLinks(links []io.Closer) error {
