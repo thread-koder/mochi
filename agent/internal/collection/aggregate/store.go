@@ -112,9 +112,11 @@ func (s *Store) creditCloseLocked(key metrics.SeriesKey, txDelta, rxDelta float6
 }
 
 // ReconcileSeedActives applies a /proc snapshot: set seedActive for unbound
-// sockets, zero seedActive when those sockets disappear, and GC eBPF binds
-// whose Src appeared in this snapshot but whose flow did not. Host netns is
-// not walked, so those binds wait for close or connect-reuse.
+// sockets, zero seedActive when those sockets disappear. Seed does not unbind
+// flows — Close owns that freeze (connect-reuse and eviction too). TCP may
+// drop eventActive once when the 4-tuple left /proc but Src is still present,
+// so a missed leave-ESTABLISHED does not pin the gauge. The bind stays for a
+// late close. UDP /proc absence is not close. Host netns is not walked.
 func (s *Store) ReconcileSeedActives(sockets []SeedSocket) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -158,19 +160,19 @@ func (s *Store) ReconcileSeedActives(sockets []SeedSocket) {
 		if _, ok := seenSrc[flow.Src]; !ok {
 			continue
 		}
-		delete(s.flows, flow)
+		if flow.Protocol != metrics.ProtocolTCP {
+			continue
+		}
 		s.dropEventActiveLocked(key, now)
 	}
 }
 
 func (s *Store) dropEventActiveLocked(key metrics.SeriesKey, now time.Time) {
 	stats, ok := s.series[key]
-	if !ok {
+	if !ok || stats.eventActive == 0 {
 		return
 	}
-	if stats.eventActive > 0 {
-		stats.eventActive--
-	}
+	stats.eventActive--
 	stats.lastTouch = now
 	s.registry.SetActive(key, stats.gauge())
 }
