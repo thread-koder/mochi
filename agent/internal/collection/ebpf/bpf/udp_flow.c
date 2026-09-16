@@ -9,6 +9,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
+#include "dest.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
@@ -58,51 +59,6 @@ struct {
 	__uint(max_entries, 65536);
 } flows SEC(".maps");
 
-static __always_inline int is_loopback_v4(__u8 *addr)
-{
-	return addr[0] == 127;
-}
-
-static __always_inline int is_unspecified_v4(__u8 *addr)
-{
-	return addr[0] == 0 && addr[1] == 0 && addr[2] == 0 && addr[3] == 0;
-}
-
-static __always_inline int is_unspecified_v6(__u8 *addr)
-{
-	for (int i = 0; i < 16; i++)
-		if (addr[i] != 0)
-			return 0;
-	return 1;
-}
-
-static __always_inline int is_loopback_v6(__u8 *addr)
-{
-	if (addr[15] != 1)
-		return 0;
-	for (int i = 0; i < 15; i++)
-		if (addr[i] != 0)
-			return 0;
-	return 1;
-}
-
-static __always_inline int is_v4mapped_v6(__u8 *addr)
-{
-	for (int i = 0; i < 10; i++)
-		if (addr[i] != 0)
-			return 0;
-	return addr[10] == 0xff && addr[11] == 0xff;
-}
-
-static __always_inline int v6_dst_ok(__u8 *addr)
-{
-	if (is_unspecified_v6(addr) || is_loopback_v6(addr))
-		return 0;
-	if (is_v4mapped_v6(addr))
-		return !is_unspecified_v4(addr + 12) && !is_loopback_v4(addr + 12);
-	return 1;
-}
-
 static __always_inline void fill_src_v4(struct sock *sk, struct flow_key *key)
 {
 	__u32 saddr;
@@ -133,7 +89,7 @@ static __always_inline int fill_dst_v4_sock(struct sock *sk, struct flow_key *ke
 	key->dport = bpf_ntohs(dport);
 	__builtin_memset(key->daddr, 0, sizeof(key->daddr));
 	__builtin_memcpy(key->daddr, &daddr, 4);
-	if (is_unspecified_v4(key->daddr) || is_loopback_v4(key->daddr))
+	if (!v4_dst_ok(key->daddr))
 		return -1;
 	return 0;
 }
@@ -167,7 +123,7 @@ static __always_inline int fill_dst_v4_msg(void *msg_name, struct flow_key *key)
 	key->dport = bpf_ntohs(sin.sin_port);
 	__builtin_memset(key->daddr, 0, sizeof(key->daddr));
 	__builtin_memcpy(key->daddr, &sin.sin_addr.s_addr, 4);
-	if (is_unspecified_v4(key->daddr) || is_loopback_v4(key->daddr))
+	if (!v4_dst_ok(key->daddr))
 		return -1;
 	return 0;
 }

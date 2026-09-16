@@ -7,6 +7,7 @@
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
+#include "dest.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
@@ -61,6 +62,25 @@ static __always_inline void stash_sk(__u64 sk_key)
 	bpf_map_update_elem(&sk_owners, &sk_key, &info, BPF_ANY);
 }
 
+static __always_inline int tcp_dest_ok(struct trace_event_raw_inet_sock_set_state *args)
+{
+	__u16 family = BPF_CORE_READ(args, family);
+
+	if (family == AF_INET) {
+		__u8 d4[4];
+
+		bpf_core_read(&d4, sizeof(d4), &args->daddr);
+		return v4_dst_ok(d4);
+	}
+	if (family == AF_INET6) {
+		__u8 d6[16];
+
+		BPF_CORE_READ_INTO(&d6, args, daddr_v6);
+		return v6_dst_ok(d6);
+	}
+	return 0;
+}
+
 SEC("tracepoint/sock/inet_sock_set_state")
 int mochi_inet_sock_set_state(struct trace_event_raw_inet_sock_set_state *args)
 {
@@ -81,6 +101,8 @@ int mochi_inet_sock_set_state(struct trace_event_raw_inet_sock_set_state *args)
 	// SYN_SENT is TCP-only. Skip sk_protocol: it is a bitfield and may be unset
 	// on CLOSE→SYN_SENT when read via CO-RE.
 	if (oldstate == TCP_CLOSE && newstate == TCP_SYN_SENT) {
+		if (!tcp_dest_ok(args))
+			return 0;
 		stash_sk(sk_key);
 		return 0;
 	}
