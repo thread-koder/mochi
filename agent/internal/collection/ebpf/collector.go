@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -24,8 +25,8 @@ type ServerPorts interface {
 	IsBound(podUID string, port uint16) bool
 }
 
-// Collector owns loaded eBPF programs and event loops for TCP, UDP, DNS, and
-// the plaintext TCP byte stream.
+// Collector owns loaded eBPF programs and event loops for TCP, UDP, DNS, the
+// plaintext TCP byte stream, and TLS plaintext uprobes.
 type Collector struct {
 	tcpObjs    tcpstateObjects
 	tcpLink    link.Link
@@ -46,6 +47,20 @@ type Collector struct {
 	streamLinks   []io.Closer
 	streamEvents  *ringbuf.Reader
 	streamEnabled bool
+
+	tlsObjs    tlsplainObjects
+	tlsLinks   []io.Closer
+	tlsEvents  *ringbuf.Reader
+	tlsEnabled bool
+
+	tlsMu     sync.Mutex
+	tlsStop   bool
+	tlsDenied bool
+	tlsInodes map[fileID][]io.Closer
+	tlsSkip   map[fileID]struct{}
+	tlsSeen   map[pidKey]struct{}
+	tlsRetry  map[pidKey]struct{}
+	agentFile *fileID
 
 	store           *aggregate.Store
 	resolver        *identity.Resolver
@@ -90,6 +105,9 @@ func Load(
 	}
 	if err := collector.loadStream(); err != nil {
 		log.Error().Err(err).Msg("TCP stream eBPF load failed. Continuing without plaintext stream")
+	}
+	if err := collector.loadTLS(); err != nil {
+		log.Error().Err(err).Msg("TLS eBPF load failed. Continuing without TLS plaintext")
 	}
 	if !collector.tcpEnabled && !collector.udpEnabled {
 		err := errors.Join(
@@ -238,6 +256,50 @@ func (c *Collector) loadStream() error {
 	return nil
 }
 
+func (c *Collector) loadTLS() error {
+	log := logger.WithComponent("ebpf-tls")
+
+	if err := loadTlsplainObjects(&c.tlsObjs, nil); err != nil {
+		return fmt.Errorf("load TLS eBPF objects: %w", err)
+	}
+
+	var links []io.Closer
+	for _, step := range []struct {
+		prog *ebpf.Program
+		name string
+	}{
+		{c.tlsObjs.MochiTlsSendEnter, "fentry tcp_sendmsg"},
+		{c.tlsObjs.MochiTlsRecvEnter, "fentry tcp_recvmsg"},
+	} {
+		if err := attachTracing(&links, step.prog, step.name); err != nil {
+			closeErr := errors.Join(closeLinks(links), c.tlsObjs.Close())
+			return errors.Join(err, closeErr)
+		}
+	}
+
+	events, err := ringbuf.NewReader(c.tlsObjs.Events)
+	if err != nil {
+		closeErr := errors.Join(closeLinks(links), c.tlsObjs.Close())
+		return errors.Join(fmt.Errorf("open TLS ringbuf: %w", err), closeErr)
+	}
+
+	if id, err := fileIDOf("/proc/self/exe"); err == nil {
+		c.agentFile = &id
+	} else {
+		log.Error().Err(err).Msg("Failed to stat agent executable. Go TLS probes may include the agent")
+	}
+
+	c.tlsInodes = make(map[fileID][]io.Closer)
+	c.tlsSkip = make(map[fileID]struct{})
+	c.tlsSeen = make(map[pidKey]struct{})
+	c.tlsRetry = make(map[pidKey]struct{})
+	c.tlsLinks = links
+	c.tlsEvents = events
+	c.tlsEnabled = true
+	log.Info().Msg("eBPF TLS plaintext collector loaded")
+	return nil
+}
+
 func (c *Collector) Start(ctx context.Context) {
 	if c.tcpEnabled {
 		go c.runTCP(ctx)
@@ -251,6 +313,10 @@ func (c *Collector) Start(ctx context.Context) {
 	}
 	if c.streamEnabled {
 		go c.runStream(ctx)
+	}
+	if c.tlsEnabled {
+		go c.runTLS(ctx)
+		go c.watchTLS(ctx)
 	}
 }
 
@@ -285,6 +351,9 @@ func (c *Collector) Close() error {
 		}
 		err = errors.Join(err, closeLinks(c.streamLinks))
 		err = errors.Join(err, c.streamObjs.Close())
+	}
+	if c.tlsEnabled {
+		err = errors.Join(err, c.closeTLS())
 	}
 	return err
 }

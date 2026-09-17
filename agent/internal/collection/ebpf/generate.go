@@ -9,3 +9,4 @@ package ebpf
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -target bpfel,bpfeb udpflow bpf/udp_flow.c -- -I./bpf -I/usr/include -O2 -g -Wno-missing-declarations
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -target bpfel,bpfeb dnsrecv bpf/dns_recv.c -- -I./bpf -I/usr/include -O2 -g -Wno-missing-declarations
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -target bpfel,bpfeb tcpstream bpf/tcp_stream.c -- -I./bpf -I/usr/include -O2 -g -Wno-missing-declarations
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang -target bpfel,bpfeb tlsplain bpf/tls_plain.c -- -I./bpf -I/usr/include -O2 -g -Wno-missing-declarations

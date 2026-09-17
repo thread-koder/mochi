@@ -12,42 +12,17 @@
 #include <bpf/bpf_tracing.h>
 #include "dest.h"
 #include "iov.h"
+#include "stream_hdr.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
-#define AF_INET 2
-#define AF_INET6 10
 #define MSG_PEEK 2
-#define STREAM_CAP 1024
-#define STREAM_DIR_RECV 0
-#define STREAM_DIR_SEND 1
 
 struct stream_stash {
 	struct iov_seg segs[IOV_STASH_SEGS];
 	__u8 nsegs;
 	__u8 pad[7];
 };
-
-struct stream_hdr {
-	__u32 pid;
-	__u32 len;
-	__u64 cgroup_id;
-	__u16 family;
-	__u16 sport;
-	__u16 dport;
-	__u8 dir;
-	__u8 pad;
-	__u8 saddr[16];
-	__u8 daddr[16];
-} __attribute__((packed));
-
-struct event {
-	struct stream_hdr hdr;
-	__u8 data[STREAM_CAP];
-} __attribute__((packed));
-
-_Static_assert(sizeof(struct stream_hdr) == 56, "stream header drifted");
-_Static_assert(sizeof(struct event) == 56 + STREAM_CAP, "stream event drifted");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
@@ -60,49 +35,6 @@ struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
 	__uint(max_entries, 1 << 22);
 } events SEC(".maps");
-
-static __always_inline int remote_ok(struct sock *sk)
-{
-	__u16 family = BPF_CORE_READ(sk, __sk_common.skc_family);
-	__u16 dport = BPF_CORE_READ(sk, __sk_common.skc_dport);
-	__u8 daddr[16] = {};
-
-	if (dport == 0)
-		return 0;
-	if (family == AF_INET) {
-		__u32 d = BPF_CORE_READ(sk, __sk_common.skc_daddr);
-		__builtin_memcpy(daddr, &d, 4);
-		return v4_dst_ok(daddr);
-	}
-	if (family == AF_INET6) {
-		BPF_CORE_READ_INTO(&daddr, sk, __sk_common.skc_v6_daddr);
-		return v6_dst_ok(daddr);
-	}
-	return 0;
-}
-
-static __always_inline void fill_tuple(struct sock *sk, struct stream_hdr *hdr)
-{
-	__u16 family = BPF_CORE_READ(sk, __sk_common.skc_family);
-	__u16 dport = BPF_CORE_READ(sk, __sk_common.skc_dport);
-
-	hdr->family = family;
-	hdr->sport = BPF_CORE_READ(sk, __sk_common.skc_num);
-	hdr->dport = bpf_ntohs(dport);
-	__builtin_memset(hdr->saddr, 0, sizeof(hdr->saddr));
-	__builtin_memset(hdr->daddr, 0, sizeof(hdr->daddr));
-	if (family == AF_INET) {
-		__u32 s = BPF_CORE_READ(sk, __sk_common.skc_rcv_saddr);
-		__u32 d = BPF_CORE_READ(sk, __sk_common.skc_daddr);
-		__builtin_memcpy(hdr->saddr, &s, 4);
-		__builtin_memcpy(hdr->daddr, &d, 4);
-		return;
-	}
-	if (family == AF_INET6) {
-		BPF_CORE_READ_INTO(&hdr->saddr, sk, __sk_common.skc_v6_rcv_saddr);
-		BPF_CORE_READ_INTO(&hdr->daddr, sk, __sk_common.skc_v6_daddr);
-	}
-}
 
 static __always_inline int tls_bytes(__u8 hdr[3])
 {
@@ -283,7 +215,7 @@ static __always_inline int emit_chunk(struct sock *sk, int flags, int ret, __u8 
 		return 0;
 
 	/* The verifier treats the dynptr as acquired even when reserve fails. */
-	if (bpf_ringbuf_reserve_dynptr(&events, sizeof(struct event), 0, &ptr)) {
+	if (bpf_ringbuf_reserve_dynptr(&events, sizeof(struct stream_event), 0, &ptr)) {
 		bpf_ringbuf_discard_dynptr(&ptr, 0);
 		return 0;
 	}

@@ -10,6 +10,7 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/ti-mo/conntrack v0.6.0
 	github.com/ti-mo/netfilter v0.5.3
+	golang.org/x/arch v0.31.0
 	golang.org/x/sys v0.47.0
 	k8s.io/api v0.36.2
 	k8s.io/apimachinery v0.36.2

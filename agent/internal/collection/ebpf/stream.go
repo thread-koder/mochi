@@ -20,9 +20,15 @@ const streamPayloadMax = 1024
 const (
 	streamDirRecv = 0
 	streamDirSend = 1
+
+	// Must match STREAM_KIND_* in bpf/stream_hdr.h.
+	streamKindSocket  = 0
+	streamKindOpenSSL = 1
+	streamKindGoTLS   = 2
 )
 
-// streamWireEvent matches struct event in bpf/tcp_stream.c.
+// streamWireEvent matches struct stream_event in bpf/stream_hdr.h.
+// Kind is 0 on the socket path. TLS sets openssl or gotls.
 type streamWireEvent struct {
 	Pid      uint32
 	Len      uint32
@@ -31,7 +37,7 @@ type streamWireEvent struct {
 	Sport    uint16
 	Dport    uint16
 	Dir      uint8
-	_        uint8
+	Kind     uint8
 	Saddr    [16]byte
 	Daddr    [16]byte
 	Data     [streamPayloadMax]byte
@@ -80,6 +86,10 @@ func (c *Collector) handleStreamRecord(log zerolog.Logger, raw []byte) {
 	if err != nil {
 		return
 	}
+	c.dumpHTTP1(log, "TCP stream", "", event)
+}
+
+func (c *Collector) dumpHTTP1(log zerolog.Logger, msg, via string, event streamWireEvent) {
 	if int(event.Len) > len(event.Data) {
 		return
 	}
@@ -120,7 +130,7 @@ func (c *Collector) handleStreamRecord(log zerolog.Logger, raw []byte) {
 	if event.Dir == streamDirSend {
 		dir = "send"
 	}
-	log.Debug().
+	eventLog := log.Debug().
 		Str("src_pod_uid", pod.UID).
 		Str("src_namespace", pod.Namespace).
 		Str("src_pod", pod.Name).
@@ -130,9 +140,13 @@ func (c *Collector) handleStreamRecord(log zerolog.Logger, raw []byte) {
 		Uint16("dport", event.Dport).
 		Str("actual_dst", actualAddr.String()).
 		Uint16("actual_dport", actualPort).
-		Str("dir", dir).
+		Str("dir", dir)
+	if via != "" {
+		eventLog = eventLog.Str("via", via)
+	}
+	eventLog.
 		Str("payload", printablePrefix(payload, 256)).
-		Msg("TCP stream")
+		Msg(msg)
 }
 
 func parseStreamWireEvent(raw []byte) (streamWireEvent, error) {

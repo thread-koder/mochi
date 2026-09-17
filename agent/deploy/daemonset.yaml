@@ -32,6 +32,8 @@ spec:
                   fieldPath: spec.nodeName
           securityContext:
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: Unconfined
             capabilities:
               drop:
                 - ALL
@@ -40,6 +42,8 @@ spec:
                 - PERFMON
                 - NET_ADMIN
                 - SYS_RESOURCE
+                - SYS_PTRACE
+                - SYS_ADMIN
           volumeMounts:
             - name: sys
               mountPath: /sys
@@ -62,10 +66,10 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 150m
               memory: 256Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi
       volumes:
         - name: sys
           hostPath:
