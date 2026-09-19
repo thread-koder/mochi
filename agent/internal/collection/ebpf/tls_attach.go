@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"runtime"
 
 	"github.com/cilium/ebpf"
@@ -38,8 +37,8 @@ func (c *Collector) attachFile(openPath string, allowGo bool) ([]io.Closer, bool
 	} else {
 		ex, err := link.OpenExecutable(openPath)
 		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return nil, false, nil
+			if processGone(err) {
+				return nil, false, err
 			}
 			return nil, false, fmt.Errorf("open executable: %w", err)
 		}
@@ -83,8 +82,8 @@ func (c *Collector) attachGoTLS(openPath string, links *[]io.Closer) (bool, erro
 	}
 	file, err := elf.Open(openPath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
+		if processGone(err) {
+			return false, err
 		}
 		return false, fmt.Errorf("open ELF: %w", err)
 	}
@@ -92,8 +91,8 @@ func (c *Collector) attachGoTLS(openPath string, links *[]io.Closer) (bool, erro
 
 	ex, err := link.OpenExecutable(openPath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
+		if processGone(err) {
+			return false, err
 		}
 		return false, fmt.Errorf("open executable: %w", err)
 	}

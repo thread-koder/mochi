@@ -3,6 +3,7 @@ package ebpf
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -116,7 +117,12 @@ func (c *Collector) considerFile(pid uint32, key pidKey, openPath, label string,
 	log := logger.WithComponent("ebpf-tls")
 	id, err := fileIDOf(openPath)
 	if err != nil {
-		if c.procUnreadable(err) {
+		if processGone(err) {
+			c.markRetry(key)
+			return
+		}
+		if errors.Is(err, os.ErrPermission) {
+			c.noteProcDenied(err)
 			return
 		}
 		log.Error().Err(err).Str("path", label).Uint32("pid", pid).Msg("Failed to stat TLS target")
@@ -132,6 +138,14 @@ func (c *Collector) considerFile(pid uint32, key pidKey, openPath, label string,
 
 	links, hit, err := c.attachFile(openPath, allowGo)
 	if err != nil {
+		if processGone(err) {
+			c.markRetry(key)
+			return
+		}
+		if errors.Is(err, os.ErrPermission) {
+			c.noteProcDenied(err)
+			return
+		}
 		c.markRetry(key)
 		log.Error().Err(err).Str("path", label).Uint32("pid", pid).Msg("Failed to attach TLS probes")
 		return
