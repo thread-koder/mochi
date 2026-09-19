@@ -10,7 +10,7 @@ import (
 
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
-	"github.com/rs/zerolog"
+	"github.com/thread_koder/mochi/agent/internal/collection/http1"
 	"github.com/thread_koder/mochi/agent/internal/logger"
 )
 
@@ -56,35 +56,21 @@ func (c *Collector) runTLS(ctx context.Context) {
 			log.Error().Err(err).Msg("Failed to read TLS ringbuf")
 			continue
 		}
-		c.handleTLSRecord(log, record.RawSample)
+		c.handleTLSRecord(record.RawSample)
 	}
 }
 
-func (c *Collector) handleTLSRecord(log zerolog.Logger, raw []byte) {
-	if zerolog.GlobalLevel() > zerolog.DebugLevel {
-		return
-	}
-
+func (c *Collector) handleTLSRecord(raw []byte) {
 	event, err := parseStreamWireEvent(raw)
 	if err != nil {
 		return
 	}
-	via, ok := tlsVia(event.Kind)
-	if !ok {
+	switch event.Kind {
+	case http1.KindOpenSSL, http1.KindGoTLS:
+	default:
 		return
 	}
-	c.dumpHTTP1(log, "TLS plaintext", via, event)
-}
-
-func tlsVia(kind uint8) (string, bool) {
-	switch kind {
-	case streamKindOpenSSL:
-		return "openssl", true
-	case streamKindGoTLS:
-		return "gotls", true
-	default:
-		return "", false
-	}
+	c.feedHTTP1(event)
 }
 
 func (c *Collector) noteProcDenied(err error) {

@@ -10,6 +10,7 @@ import (
 	"github.com/thread_koder/mochi/agent/internal/collection/conntrack"
 	"github.com/thread_koder/mochi/agent/internal/collection/dns"
 	"github.com/thread_koder/mochi/agent/internal/collection/ebpf"
+	"github.com/thread_koder/mochi/agent/internal/collection/http1"
 	"github.com/thread_koder/mochi/agent/internal/collection/identity"
 	"github.com/thread_koder/mochi/agent/internal/collection/procnet"
 	"github.com/thread_koder/mochi/agent/internal/config"
@@ -19,7 +20,7 @@ import (
 
 const procnetSeedInterval = 30 * time.Second
 
-// Runtime owns collection lifecycle (identity, conntrack, eBPF, procnet seed).
+// Runtime owns collection lifecycle (identity, conntrack, HTTP tracker, eBPF, procnet seed).
 type Runtime struct {
 	cancel    context.CancelFunc
 	resolver  *identity.Resolver
@@ -41,8 +42,8 @@ func Start(cfg config.Config, registry *metrics.Registry) *Runtime {
 	store := aggregate.NewStore(registry, cfg.MaxSeries)
 	listen := procnet.NewListenIndex()
 	dnsCache := dns.NewCache(cfg.MaxSeries)
-	resolver := identity.NewResolver(cfg.NodeName, dnsCache.DropPod)
 
+	resolver := identity.NewResolver(cfg.NodeName, dnsCache.DropPod)
 	if err := resolver.Start(ctx); err != nil {
 		cancel()
 		log.Error().Err(err).Msg("Failed to start identity resolver. Continuing without collection")
@@ -61,7 +62,8 @@ func Start(cfg config.Config, registry *metrics.Registry) *Runtime {
 	}
 	runtime.ctClient = ctClient
 
-	collector, err := ebpf.Load(store, resolver, ctClient, listen, dnsCache)
+	http1Tracker := http1.NewTracker(registry, store, resolver, ctClient, dnsCache, cfg.MaxSeries)
+	collector, err := ebpf.Load(store, resolver, ctClient, listen, dnsCache, http1Tracker)
 	if err != nil {
 		log.Error().Err(err).Msg("eBPF load failed. Continuing without collection")
 		runtime.Close()
@@ -69,8 +71,11 @@ func Start(cfg config.Config, registry *metrics.Registry) *Runtime {
 	}
 	runtime.collector = collector
 
+	seeder := procnet.NewSeeder(store, resolver, ctClient, listen, dnsCache)
+
+	go http1Tracker.Start(ctx)
 	go collector.Start(ctx)
-	go procnet.NewSeeder(store, resolver, ctClient, listen, dnsCache).Start(ctx, procnetSeedInterval)
+	go seeder.Start(ctx, procnetSeedInterval)
 	log.Info().Msg("Collection started")
 	return runtime
 }

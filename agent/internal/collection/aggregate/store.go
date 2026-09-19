@@ -39,8 +39,8 @@ type seriesStats struct {
 
 func (st *seriesStats) gauge() float64 { return st.eventActive + st.seedActive }
 
-// Store pre-aggregates series on the node before Prometheus export.
-// flows freezes each socket's SeriesKey at open so Prom labels stay stable
+// Store freezes L4 SeriesKeys for mochi_net_* (flows + active + MAX_SERIES eviction).
+// flows binds each socket's SeriesKey at open so Prom labels stay stable
 // (counters cannot be retagged when NAT later hits or DNS fills after a race).
 type Store struct {
 	mu        sync.Mutex
@@ -57,6 +57,13 @@ func NewStore(registry *metrics.Registry, maxSeries int) *Store {
 		flows:     make(map[Flow]metrics.SeriesKey),
 		registry:  registry,
 	}
+}
+
+func (s *Store) Lookup(flow Flow) (metrics.SeriesKey, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, ok := s.flows[flow]
+	return key, ok
 }
 
 func (s *Store) ObserveConnect(flow Flow, key metrics.SeriesKey, txDelta, rxDelta float64) {

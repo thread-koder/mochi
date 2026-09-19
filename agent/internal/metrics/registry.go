@@ -26,6 +26,10 @@ var labelNames = []string{
 	"dst_hostname",
 }
 
+var httpLabelNames = append(append([]string{}, labelNames...), "method", "route")
+
+var httpCounterLabelNames = append(append([]string{}, httpLabelNames...), "status_class")
+
 // SeriesKey is the Prometheus label identifier for one aggregated edge.
 type SeriesKey struct {
 	SrcPodUID     string
@@ -79,14 +83,32 @@ func (k SeriesKey) labelValues() []string {
 	}
 }
 
+// HTTPSeriesKey is one hop RED series (identity + method + route).
+type HTTPSeriesKey struct {
+	SeriesKey
+	Method string
+	Route  string
+}
+
+func (k HTTPSeriesKey) httpLabelValues() []string {
+	return append(k.SeriesKey.labelValues(), k.Method, k.Route)
+}
+
+func (k HTTPSeriesKey) counterLabelValues(statusClass string) []string {
+	return append(k.httpLabelValues(), statusClass)
+}
+
 type Registry struct {
 	ConnectsTotal     *prometheus.CounterVec
 	ActiveConnections *prometheus.GaugeVec
 	TxBytesTotal      *prometheus.CounterVec
 	RxBytesTotal      *prometheus.CounterVec
+
+	HTTPRequestsTotal *prometheus.CounterVec
+	HTTPDuration      *prometheus.HistogramVec
 }
 
-// NewRegistry registers mochi_net_* vectors with the default Prometheus registerer.
+// NewRegistry registers mochi_net_* and mochi_http_* vectors.
 func NewRegistry() *Registry {
 	registry := &Registry{
 		ConnectsTotal: prometheus.NewCounterVec(
@@ -109,6 +131,17 @@ func NewRegistry() *Registry {
 				Name: "mochi_net_rx_bytes_total",
 				Help: "Bytes received on observed client-outbound flows",
 			}, labelNames),
+		HTTPRequestsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "mochi_http_requests_total",
+				Help: "Client-outbound HTTP/1 request count by status class",
+			}, httpCounterLabelNames),
+		HTTPDuration: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:                        "mochi_http_request_duration_seconds",
+				Help:                        "Client-outbound HTTP/1 request duration",
+				NativeHistogramBucketFactor: 1.1,
+			}, httpLabelNames),
 	}
 
 	prometheus.MustRegister(
@@ -116,6 +149,8 @@ func NewRegistry() *Registry {
 		registry.ActiveConnections,
 		registry.TxBytesTotal,
 		registry.RxBytesTotal,
+		registry.HTTPRequestsTotal,
+		registry.HTTPDuration,
 	)
 	return registry
 }
@@ -147,4 +182,10 @@ func (r *Registry) AddRxBytes(key SeriesKey, delta float64) {
 
 func (r *Registry) DeleteActive(key SeriesKey) {
 	_ = r.ActiveConnections.DeleteLabelValues(key.labelValues()...)
+}
+
+func (r *Registry) RecordHTTP(key SeriesKey, method, route, statusClass string, seconds float64) {
+	httpKey := HTTPSeriesKey{SeriesKey: key, Method: method, Route: route}
+	r.HTTPRequestsTotal.WithLabelValues(httpKey.counterLabelValues(statusClass)...).Inc()
+	r.HTTPDuration.WithLabelValues(httpKey.httpLabelValues()...).Observe(seconds)
 }

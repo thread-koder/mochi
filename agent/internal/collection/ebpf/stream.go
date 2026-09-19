@@ -1,34 +1,24 @@
 package ebpf
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/cilium/ebpf/ringbuf"
-	"github.com/rs/zerolog"
-	"github.com/thread_koder/mochi/agent/internal/collection/conntrack"
+	"github.com/thread_koder/mochi/agent/internal/collection/http1"
 	"github.com/thread_koder/mochi/agent/internal/logger"
-	"github.com/thread_koder/mochi/agent/internal/metrics"
 )
 
-// Must match STREAM_CAP in bpf/tcp_stream.c.
-const streamPayloadMax = 1024
-
+// Packed stream_hdr in bpf/stream_hdr.h is 56 bytes. STREAM_CAP is 1024.
 const (
-	streamDirRecv = 0
-	streamDirSend = 1
-
-	// Must match STREAM_KIND_* in bpf/stream_hdr.h.
-	streamKindSocket  = 0
-	streamKindOpenSSL = 1
-	streamKindGoTLS   = 2
+	streamHdrSize    = 56
+	streamPayloadMax = 1024
 )
 
 // streamWireEvent matches struct stream_event in bpf/stream_hdr.h.
-// Kind is 0 on the socket path. TLS sets openssl or gotls.
+// Data is a subslice of the ringbuf sample (valid until the next Read).
 type streamWireEvent struct {
 	Pid      uint32
 	Len      uint32
@@ -40,21 +30,7 @@ type streamWireEvent struct {
 	Kind     uint8
 	Saddr    [16]byte
 	Daddr    [16]byte
-	Data     [streamPayloadMax]byte
-}
-
-var streamWireEventSize = binary.Size(streamWireEvent{})
-
-var http1Prefixes = [][]byte{
-	[]byte("GET "),
-	[]byte("POST "),
-	[]byte("PUT "),
-	[]byte("HEAD "),
-	[]byte("DELETE "),
-	[]byte("PATCH "),
-	[]byte("OPTIONS "),
-	[]byte("CONNECT "),
-	[]byte("HTTP/1"),
+	Data     []byte
 }
 
 func (c *Collector) runStream(ctx context.Context) {
@@ -73,31 +49,19 @@ func (c *Collector) runStream(ctx context.Context) {
 			log.Error().Err(err).Msg("Failed to read TCP stream ringbuf")
 			continue
 		}
-		c.handleStreamRecord(log, record.RawSample)
+		c.handleStreamRecord(record.RawSample)
 	}
 }
 
-func (c *Collector) handleStreamRecord(log zerolog.Logger, raw []byte) {
-	if zerolog.GlobalLevel() > zerolog.DebugLevel {
-		return
-	}
-
+func (c *Collector) handleStreamRecord(raw []byte) {
 	event, err := parseStreamWireEvent(raw)
 	if err != nil {
 		return
 	}
-	c.dumpHTTP1(log, "TCP stream", "", event)
+	c.feedHTTP1(event)
 }
 
-func (c *Collector) dumpHTTP1(log zerolog.Logger, msg, via string, event streamWireEvent) {
-	if int(event.Len) > len(event.Data) {
-		return
-	}
-	payload := event.Data[:event.Len]
-	if !http1Prefix(payload) {
-		return
-	}
-
+func (c *Collector) feedHTTP1(event streamWireEvent) {
 	src, ok := addrFromEvent(event.Family, event.Saddr[:])
 	if !ok {
 		return
@@ -106,82 +70,42 @@ func (c *Collector) dumpHTTP1(log zerolog.Logger, msg, via string, event streamW
 	if !ok {
 		return
 	}
-	if !src.IsValid() || src.IsUnspecified() || !dst.IsValid() || dst.IsUnspecified() {
-		return
-	}
-	if dst.Unmap().IsLoopback() {
-		return
-	}
-	if event.Pid == 0 && event.CgroupID == 0 {
-		return
-	}
-	pod, ok := c.resolver.Resolve(event.Pid, event.CgroupID)
-	if !ok {
-		return
-	}
-
-	actualAddr, actualPort := c.conntrackClient.ActualDst(
-		conntrack.IPProtocol(metrics.ProtocolTCP),
-		conntrack.Endpoint{Addr: src, Port: event.Sport},
-		conntrack.Endpoint{Addr: dst, Port: event.Dport},
-	)
-
-	dir := "recv"
-	if event.Dir == streamDirSend {
-		dir = "send"
-	}
-	eventLog := log.Debug().
-		Str("src_pod_uid", pod.UID).
-		Str("src_namespace", pod.Namespace).
-		Str("src_pod", pod.Name).
-		Str("src", src.String()).
-		Uint16("sport", event.Sport).
-		Str("dst", dst.String()).
-		Uint16("dport", event.Dport).
-		Str("actual_dst", actualAddr.String()).
-		Uint16("actual_dport", actualPort).
-		Str("dir", dir)
-	if via != "" {
-		eventLog = eventLog.Str("via", via)
-	}
-	eventLog.
-		Str("payload", printablePrefix(payload, 256)).
-		Msg(msg)
+	c.http1.Handle(http1.Chunk{
+		Pid:      event.Pid,
+		CgroupID: event.CgroupID,
+		Family:   event.Family,
+		Sport:    event.Sport,
+		Dport:    event.Dport,
+		Dir:      event.Dir,
+		Kind:     event.Kind,
+		Src:      src,
+		Dst:      dst,
+		Data:     event.Data,
+	})
 }
 
 func parseStreamWireEvent(raw []byte) (streamWireEvent, error) {
-	if len(raw) < streamWireEventSize {
+	if len(raw) < streamHdrSize {
 		return streamWireEvent{}, fmt.Errorf("event too short: %d", len(raw))
 	}
-	var event streamWireEvent
-	if err := binary.Read(bytes.NewReader(raw), binary.LittleEndian, &event); err != nil {
-		return streamWireEvent{}, fmt.Errorf("decode event: %w", err)
+	length := binary.LittleEndian.Uint32(raw[4:8])
+	if length > streamPayloadMax || streamHdrSize+int(length) > len(raw) {
+		return streamWireEvent{}, fmt.Errorf("event payload len %d", length)
 	}
-	return event, nil
-}
-
-func http1Prefix(payload []byte) bool {
-	for _, prefix := range http1Prefixes {
-		if bytes.HasPrefix(payload, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
-func printablePrefix(payload []byte, n int) string {
-	if len(payload) > n {
-		payload = payload[:n]
-	}
-	var result bytes.Buffer
-	result.Grow(len(payload))
-	for _, b := range payload {
-		switch {
-		case b == '\r' || b == '\n' || b == '\t' || (b >= 0x20 && b <= 0x7e):
-			result.WriteByte(b)
-		default:
-			result.WriteByte('.')
-		}
-	}
-	return result.String()
+	var saddr, daddr [16]byte
+	copy(saddr[:], raw[24:40])
+	copy(daddr[:], raw[40:56])
+	return streamWireEvent{
+		Pid:      binary.LittleEndian.Uint32(raw[0:4]),
+		Len:      length,
+		CgroupID: binary.LittleEndian.Uint64(raw[8:16]),
+		Family:   binary.LittleEndian.Uint16(raw[16:18]),
+		Sport:    binary.LittleEndian.Uint16(raw[18:20]),
+		Dport:    binary.LittleEndian.Uint16(raw[20:22]),
+		Dir:      raw[22],
+		Kind:     raw[23],
+		Saddr:    saddr,
+		Daddr:    daddr,
+		Data:     raw[streamHdrSize : streamHdrSize+int(length)],
+	}, nil
 }
