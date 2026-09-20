@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/cilium/ebpf/ringbuf"
-	"github.com/thread_koder/mochi/agent/internal/collection/http1"
+	"github.com/thread_koder/mochi/agent/internal/collection/l7"
 	"github.com/thread_koder/mochi/agent/internal/logger"
 )
 
@@ -58,10 +58,10 @@ func (c *Collector) handleStreamRecord(raw []byte) {
 	if err != nil {
 		return
 	}
-	c.feedHTTP1(event)
+	c.feedL7(event)
 }
 
-func (c *Collector) feedHTTP1(event streamWireEvent) {
+func (c *Collector) feedL7(event streamWireEvent) {
 	src, ok := addrFromEvent(event.Family, event.Saddr[:])
 	if !ok {
 		return
@@ -70,10 +70,9 @@ func (c *Collector) feedHTTP1(event streamWireEvent) {
 	if !ok {
 		return
 	}
-	c.http1.Handle(http1.Chunk{
+	c.l7.Handle(l7.Chunk{
 		Pid:      event.Pid,
 		CgroupID: event.CgroupID,
-		Family:   event.Family,
 		Sport:    event.Sport,
 		Dport:    event.Dport,
 		Dir:      event.Dir,

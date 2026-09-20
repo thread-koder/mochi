@@ -10,8 +10,8 @@ import (
 	"github.com/thread_koder/mochi/agent/internal/collection/conntrack"
 	"github.com/thread_koder/mochi/agent/internal/collection/dns"
 	"github.com/thread_koder/mochi/agent/internal/collection/ebpf"
-	"github.com/thread_koder/mochi/agent/internal/collection/http1"
 	"github.com/thread_koder/mochi/agent/internal/collection/identity"
+	"github.com/thread_koder/mochi/agent/internal/collection/l7"
 	"github.com/thread_koder/mochi/agent/internal/collection/procnet"
 	"github.com/thread_koder/mochi/agent/internal/config"
 	"github.com/thread_koder/mochi/agent/internal/logger"
@@ -20,7 +20,7 @@ import (
 
 const procnetSeedInterval = 30 * time.Second
 
-// Runtime owns collection lifecycle (identity, conntrack, HTTP tracker, eBPF, procnet seed).
+// Runtime owns collection lifecycle (identity, conntrack, L7 tracker, eBPF, procnet seed).
 type Runtime struct {
 	cancel    context.CancelFunc
 	resolver  *identity.Resolver
@@ -62,8 +62,8 @@ func Start(cfg config.Config, registry *metrics.Registry) *Runtime {
 	}
 	runtime.ctClient = ctClient
 
-	http1Tracker := http1.NewTracker(registry, store, resolver, ctClient, dnsCache, cfg.MaxSeries)
-	collector, err := ebpf.Load(store, resolver, ctClient, listen, dnsCache, http1Tracker)
+	l7Tracker := l7.NewTracker(registry, store, resolver, ctClient, dnsCache, cfg.MaxSeries)
+	collector, err := ebpf.Load(store, resolver, ctClient, listen, dnsCache, l7Tracker)
 	if err != nil {
 		log.Error().Err(err).Msg("eBPF load failed. Continuing without collection")
 		runtime.Close()
@@ -73,7 +73,7 @@ func Start(cfg config.Config, registry *metrics.Registry) *Runtime {
 
 	seeder := procnet.NewSeeder(store, resolver, ctClient, listen, dnsCache)
 
-	go http1Tracker.Start(ctx)
+	go l7Tracker.Start(ctx)
 	go collector.Start(ctx)
 	go seeder.Start(ctx, procnetSeedInterval)
 	log.Info().Msg("Collection started")

@@ -134,12 +134,12 @@ func NewRegistry() *Registry {
 		HTTPRequestsTotal: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "mochi_http_requests_total",
-				Help: "Client-outbound HTTP/1 request count by status class",
+				Help: "Client-outbound HTTP hop count by status class (HTTP/1, HTTP/2, gRPC)",
 			}, httpCounterLabelNames),
 		HTTPDuration: prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Name:                        "mochi_http_request_duration_seconds",
-				Help:                        "Client-outbound HTTP/1 request duration",
+				Help:                        "Client-outbound HTTP hop duration (HTTP/1, HTTP/2, gRPC)",
 				NativeHistogramBucketFactor: 1.1,
 			}, httpLabelNames),
 	}

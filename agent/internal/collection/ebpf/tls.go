@@ -10,7 +10,7 @@ import (
 
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
-	"github.com/thread_koder/mochi/agent/internal/collection/http1"
+	"github.com/thread_koder/mochi/agent/internal/collection/l7"
 	"github.com/thread_koder/mochi/agent/internal/logger"
 )
 
@@ -66,11 +66,11 @@ func (c *Collector) handleTLSRecord(raw []byte) {
 		return
 	}
 	switch event.Kind {
-	case http1.KindOpenSSL, http1.KindGoTLS:
+	case l7.KindOpenSSL, l7.KindGoTLS:
 	default:
 		return
 	}
-	c.feedHTTP1(event)
+	c.feedL7(event)
 }
 
 func (c *Collector) noteProcDenied(err error) {

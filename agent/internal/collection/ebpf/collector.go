@@ -15,8 +15,8 @@ import (
 	"github.com/thread_koder/mochi/agent/internal/collection/aggregate"
 	"github.com/thread_koder/mochi/agent/internal/collection/conntrack"
 	"github.com/thread_koder/mochi/agent/internal/collection/dns"
-	"github.com/thread_koder/mochi/agent/internal/collection/http1"
 	"github.com/thread_koder/mochi/agent/internal/collection/identity"
+	"github.com/thread_koder/mochi/agent/internal/collection/l7"
 	"github.com/thread_koder/mochi/agent/internal/logger"
 )
 
@@ -68,7 +68,7 @@ type Collector struct {
 	conntrackClient *conntrack.Client
 	serverPorts     ServerPorts
 	dnsCache        *dns.Cache
-	http1           *http1.Tracker
+	l7              *l7.Tracker
 }
 
 func Load(
@@ -77,7 +77,7 @@ func Load(
 	conntrackClient *conntrack.Client,
 	serverPorts ServerPorts,
 	dnsCache *dns.Cache,
-	http1Tracker *http1.Tracker,
+	l7Tracker *l7.Tracker,
 ) (*Collector, error) {
 	log := logger.WithComponent("ebpf")
 
@@ -95,7 +95,7 @@ func Load(
 		conntrackClient: conntrackClient,
 		serverPorts:     serverPorts,
 		dnsCache:        dnsCache,
-		http1:           http1Tracker,
+		l7:              l7Tracker,
 	}
 
 	if err := collector.loadTCP(); err != nil {

@@ -1,9 +1,8 @@
-package http1
+package l7
 
 import (
 	"strconv"
 	"strings"
-	"unicode"
 )
 
 const (
@@ -12,7 +11,7 @@ const (
 	maxRoutesPerDest = 64
 )
 
-// Router templates paths per destination and caps cardinality with /{other}.
+// Router templates REST paths per destination and caps cardinality with /{other}.
 // Callers must serialize access (Tracker holds t.mu around Template).
 type Router struct {
 	byDest map[string]map[string]struct{}
@@ -22,16 +21,16 @@ func NewRouter() *Router {
 	return &Router{byDest: make(map[string]map[string]struct{})}
 }
 
-func (r *Router) Template(destKey, path string) string {
+func (r *Router) Template(dest, path string) string {
 	templated := templatePath(path)
 	if templated == "" {
 		templated = "/"
 	}
 
-	routes := r.byDest[destKey]
+	routes := r.byDest[dest]
 	if routes == nil {
 		routes = make(map[string]struct{})
-		r.byDest[destKey] = routes
+		r.byDest[dest] = routes
 	}
 	if _, ok := routes[templated]; ok {
 		return templated
@@ -43,11 +42,21 @@ func (r *Router) Template(destKey, path string) string {
 	return templated
 }
 
-func destKey(dstPodUID, actualIP string, actualPort int) string {
+func DestKey(dstPodUID, actualIP string, actualPort int) string {
 	if dstPodUID != "" {
 		return "uid:" + dstPodUID
 	}
 	return "ip:" + actualIP + ":" + strconv.Itoa(actualPort)
+}
+
+func CapRoute(path string) string {
+	if path == "" {
+		return "/"
+	}
+	if len(path) > maxRouteLen {
+		return path[:maxRouteLen]
+	}
+	return path
 }
 
 func templatePath(path string) string {
@@ -159,5 +168,5 @@ func isAllHex(seg string) bool {
 }
 
 func isHexRune(c rune) bool {
-	return unicode.Is(unicode.ASCII_Hex_Digit, c)
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
 }

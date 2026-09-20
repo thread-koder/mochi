@@ -7,43 +7,19 @@ import (
 	"strings"
 )
 
-const (
-	DirRecv = 0
-	DirSend = 1
+const incompleteCap = 8 << 10
 
-	KindSocket  = 0
-	KindOpenSSL = 1
-	KindGoTLS   = 2
-
-	incompleteCap = 8 << 10 // 8KiB
-)
-
-// Message is one HTTP/1 request-line or status-line extracted from a prefix.
 type Message struct {
 	Request bool
 	Method  string
 	Path    string
 	Status  int
-	Connect bool
-	HTTP2   bool
 	Opaque  bool
 }
 
-var emitMethods = map[string]struct{}{
-	"GET":     {},
-	"POST":    {},
-	"PUT":     {},
-	"HEAD":    {},
-	"DELETE":  {},
-	"PATCH":   {},
-	"OPTIONS": {},
-}
-
-var http2Preface = []byte("PRI * HTTP/2.0")
-
-// httpStartTokens are full first-line prefixes. Short buffers that are a
-// prefix of one of these are also treated as HTTP so a split request-line
-// is leftover-buffered instead of dropped.
+// httpStartTokens are full first line prefixes. Short buffers that are a
+// prefix of one of these are also treated as HTTP so a split request line
+// is leftover buffered instead of dropped.
 var httpStartTokens = [][]byte{
 	[]byte("GET "),
 	[]byte("POST "),
@@ -53,25 +29,22 @@ var httpStartTokens = [][]byte{
 	[]byte("PATCH "),
 	[]byte("OPTIONS "),
 	[]byte("CONNECT "),
-	[]byte("PRI "),
 	[]byte("HTTP/1"),
 }
 
-// ParsePrefix extracts complete first-lines from a syscall/uprobe prefix.
-// leftover is an incomplete first line (no \n yet). opaque means stop HTTP/1.
+// ParsePrefix extracts complete first lines from a syscall/uprobe prefix.
+// leftover is an incomplete first line (no \n yet). opaque means stop HTTP/1
+// (CONNECT or 101).
 func ParsePrefix(data []byte) (msgs []Message, leftover []byte, opaque bool) {
 	if len(data) == 0 {
 		return nil, nil, false
-	}
-	if bytes.HasPrefix(data, http2Preface) {
-		return nil, nil, true
 	}
 
 	rest := data
 	for len(rest) > 0 {
 		line, after, ok := cutLine(rest)
 		if !ok {
-			if looksLikeHTTPStart(rest) {
+			if LooksLikeStart(rest) {
 				return msgs, rest, false
 			}
 			return msgs, nil, false
@@ -81,15 +54,12 @@ func ParsePrefix(data []byte) (msgs []Message, leftover []byte, opaque bool) {
 			rest = after
 			continue
 		}
-		if msg.HTTP2 || msg.Opaque {
+		if msg.Opaque {
+			msgs = append(msgs, msg)
 			return msgs, nil, true
 		}
 		msgs = append(msgs, msg)
-		if msg.Connect {
-			return msgs, nil, true
-		}
 
-		// Pipeline next message only when headers ends in this prefix.
 		_, after0, ok := bytes.Cut(after, []byte("\r\n\r\n"))
 		if !ok {
 			return msgs, nil, false
@@ -98,7 +68,7 @@ func ParsePrefix(data []byte) (msgs []Message, leftover []byte, opaque bool) {
 		if len(rest) == 0 {
 			return msgs, nil, false
 		}
-		if !looksLikeHTTPStart(rest) {
+		if !LooksLikeStart(rest) {
 			return msgs, nil, false
 		}
 	}
@@ -117,7 +87,7 @@ func cutLine(data []byte) (line, after []byte, ok bool) {
 	return line, after, true
 }
 
-func looksLikeHTTPStart(data []byte) bool {
+func LooksLikeStart(data []byte) bool {
 	if len(data) == 0 {
 		return false
 	}
@@ -141,9 +111,6 @@ func parseFirstLine(line []byte) (Message, bool) {
 	if len(line) == 0 {
 		return Message{}, true
 	}
-	if bytes.HasPrefix(line, http2Preface) || bytes.Equal(line, []byte("PRI * HTTP/2.0")) {
-		return Message{HTTP2: true, Opaque: true}, false
-	}
 	if bytes.HasPrefix(line, []byte("HTTP/1.")) {
 		return parseStatusLine(line)
 	}
@@ -159,9 +126,9 @@ func parseRequestLine(line []byte) (Message, bool) {
 	methodStr := string(method)
 	targetStr := string(target)
 	if methodStr == "CONNECT" {
-		return Message{Request: true, Method: methodStr, Path: targetStr, Connect: true, Opaque: true}, false
+		return Message{Request: true, Method: methodStr, Path: targetStr, Opaque: true}, false
 	}
-	if _, ok := emitMethods[methodStr]; !ok {
+	if !EmitMethod(methodStr) {
 		return Message{}, true
 	}
 	path := requestPath(targetStr)
@@ -215,7 +182,16 @@ func stripQuery(path string) string {
 	return path
 }
 
-func statusClass(status int) string {
+func EmitMethod(method string) bool {
+	switch method {
+	case "GET", "POST", "PUT", "HEAD", "DELETE", "PATCH", "OPTIONS":
+		return true
+	default:
+		return false
+	}
+}
+
+func StatusClass(status int) string {
 	switch {
 	case status >= 200 && status < 300:
 		return "2xx"
