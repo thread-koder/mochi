@@ -17,6 +17,8 @@ type ConnectionSeries struct {
 	SrcNamespace      string
 	SrcPod            string
 	DstPodUID         string
+	DstNamespace      string
+	DstPod            string
 	DstIP             string
 	DstPort           int
 	ActualDstIP       string
@@ -92,9 +94,9 @@ func FetchConnectionSeries(ctx context.Context, opts prometheus.QueryOptions) ([
 }
 
 func joinConnectionSeries(connects, txBytes, rxBytes, active model.Vector) []ConnectionSeries {
-	txByKey := vectorValuesByKey(txBytes)
-	rxByKey := vectorValuesByKey(rxBytes)
-	activeByKey := vectorValuesByKey(active)
+	txByKey := connectionValuesByKey(txBytes)
+	rxByKey := connectionValuesByKey(rxBytes)
+	activeByKey := connectionValuesByKey(active)
 
 	seen := make(map[string]struct{}, len(connects))
 	series := make([]ConnectionSeries, 0, len(connects)+len(active))
@@ -125,7 +127,7 @@ func joinConnectionSeries(connects, txBytes, rxBytes, active model.Vector) []Con
 	return series
 }
 
-func vectorValuesByKey(vector model.Vector) map[string]float64 {
+func connectionValuesByKey(vector model.Vector) map[string]float64 {
 	byKey := make(map[string]float64, len(vector))
 	for _, sample := range vector {
 		metric := sample.Metric
@@ -134,6 +136,8 @@ func vectorValuesByKey(vector model.Vector) map[string]float64 {
 			string(metric["src_namespace"]),
 			string(metric["src_pod"]),
 			string(metric["dst_pod_uid"]),
+			string(metric["dst_namespace"]),
+			string(metric["dst_pod"]),
 			string(metric["dst_ip"]),
 			string(metric["dst_port"]),
 			string(metric["actual_dst_ip"]),
@@ -174,6 +178,8 @@ func connectionFromMetric(
 	srcNamespace := string(metric["src_namespace"])
 	srcPod := string(metric["src_pod"])
 	dstPodUID := string(metric["dst_pod_uid"])
+	dstNamespace := string(metric["dst_namespace"])
+	dstPod := string(metric["dst_pod"])
 	dstIP := string(metric["dst_ip"])
 	actualDstIP := string(metric["actual_dst_ip"])
 	protocol := string(metric["protocol"])
@@ -187,6 +193,8 @@ func connectionFromMetric(
 		srcNamespace,
 		srcPod,
 		dstPodUID,
+		dstNamespace,
+		dstPod,
 		dstIP,
 		dstPortLabel,
 		actualDstIP,
@@ -200,6 +208,8 @@ func connectionFromMetric(
 		SrcNamespace:      srcNamespace,
 		SrcPod:            srcPod,
 		DstPodUID:         dstPodUID,
+		DstNamespace:      dstNamespace,
+		DstPod:            dstPod,
 		DstIP:             dstIP,
 		DstPort:           dstPort,
 		ActualDstIP:       actualDstIP,
