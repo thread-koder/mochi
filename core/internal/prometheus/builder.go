@@ -38,3 +38,13 @@ func podLabelMatcher(pods []string) string {
 	}
 	return fmt.Sprintf(`pod=~"%s"`, strings.Join(escaped, "|"))
 }
+
+// increaseOrNew is window growth, or the current counter when the series did not exist one window ago.
+// increase() misses the first increment of a new counter (first scrape is already N).
+func increaseOrNew(selector, rangeDuration string) (string, error) {
+	if rangeDuration == "" {
+		return "", fmt.Errorf("rangeDuration is required")
+	}
+	inc := fmt.Sprintf("increase(%s[%s])", selector, rangeDuration)
+	return fmt.Sprintf("(%s > 0) or (%s unless %s offset %s)", inc, selector, selector, rangeDuration), nil
+}
