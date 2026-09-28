@@ -8,10 +8,6 @@ CREATE TABLE IF NOT EXISTS dependency_edges (
     via_service_name VARCHAR(255),
     via_service_port INT,
     source VARCHAR(50) NOT NULL DEFAULT 'mochi-ebpf',
-    connects DOUBLE PRECISION NOT NULL DEFAULT 0,
-    tx_bytes DOUBLE PRECISION NOT NULL DEFAULT 0,
-    rx_bytes DOUBLE PRECISION NOT NULL DEFAULT 0,
-    active_connections DOUBLE PRECISION NOT NULL DEFAULT 0,
     first_seen_at TIMESTAMP WITH TIME ZONE NOT NULL,
     last_seen_at TIMESTAMP WITH TIME ZONE NOT NULL,
     evidence JSONB,
@@ -35,5 +31,25 @@ CREATE INDEX IF NOT EXISTS idx_dependency_edges_via_service
 
 CREATE TRIGGER update_dependency_edges_updated_at
     BEFORE UPDATE ON dependency_edges
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TABLE IF NOT EXISTS dependency_edge_hours (
+    edge_id UUID NOT NULL REFERENCES dependency_edges(id) ON DELETE CASCADE,
+    hour_start TIMESTAMP WITH TIME ZONE NOT NULL,
+    connects DOUBLE PRECISION NOT NULL DEFAULT 0,
+    tx_bytes DOUBLE PRECISION NOT NULL DEFAULT 0,
+    rx_bytes DOUBLE PRECISION NOT NULL DEFAULT 0,
+    active_connections DOUBLE PRECISION NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (edge_id, hour_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dependency_edge_hours_hour_start
+    ON dependency_edge_hours (hour_start);
+
+CREATE TRIGGER update_dependency_edge_hours_updated_at
+    BEFORE UPDATE ON dependency_edge_hours
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
