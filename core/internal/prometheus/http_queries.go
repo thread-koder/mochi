@@ -2,7 +2,6 @@ package prometheus
 
 import (
 	"context"
-	"time"
 
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
@@ -13,7 +12,7 @@ func QueryMochiHTTPRequests(ctx context.Context, opts QueryOptions) (model.Vecto
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeVectorQuery(ctx, query, time.Now())
+	return executeVectorQuery(ctx, query, opts.evalAt())
 }
 
 func QueryMochiHTTPErrors(ctx context.Context, opts QueryOptions) (model.Vector, v1.Warnings, error) {
@@ -21,7 +20,7 @@ func QueryMochiHTTPErrors(ctx context.Context, opts QueryOptions) (model.Vector,
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeVectorQuery(ctx, query, time.Now())
+	return executeVectorQuery(ctx, query, opts.evalAt())
 }
 
 func QueryMochiHTTPDurationP50(ctx context.Context, opts QueryOptions) (model.Vector, v1.Warnings, error) {
@@ -29,7 +28,7 @@ func QueryMochiHTTPDurationP50(ctx context.Context, opts QueryOptions) (model.Ve
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeVectorQuery(ctx, query, time.Now())
+	return executeVectorQuery(ctx, query, opts.evalAt())
 }
 
 func QueryMochiHTTPDurationP95(ctx context.Context, opts QueryOptions) (model.Vector, v1.Warnings, error) {
@@ -37,5 +36,5 @@ func QueryMochiHTTPDurationP95(ctx context.Context, opts QueryOptions) (model.Ve
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeVectorQuery(ctx, query, time.Now())
+	return executeVectorQuery(ctx, query, opts.evalAt())
 }

@@ -2,7 +2,6 @@ package prometheus
 
 import (
 	"context"
-	"time"
 
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
@@ -13,7 +12,7 @@ func QueryMochiNetConnects(ctx context.Context, opts QueryOptions) (model.Vector
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeVectorQuery(ctx, query, time.Now())
+	return executeVectorQuery(ctx, query, opts.evalAt())
 }
 
 func QueryMochiNetTxBytes(ctx context.Context, opts QueryOptions) (model.Vector, v1.Warnings, error) {
@@ -21,7 +20,7 @@ func QueryMochiNetTxBytes(ctx context.Context, opts QueryOptions) (model.Vector,
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeVectorQuery(ctx, query, time.Now())
+	return executeVectorQuery(ctx, query, opts.evalAt())
 }
 
 func QueryMochiNetRxBytes(ctx context.Context, opts QueryOptions) (model.Vector, v1.Warnings, error) {
@@ -29,7 +28,7 @@ func QueryMochiNetRxBytes(ctx context.Context, opts QueryOptions) (model.Vector,
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeVectorQuery(ctx, query, time.Now())
+	return executeVectorQuery(ctx, query, opts.evalAt())
 }
 
 func QueryMochiNetActiveConnections(ctx context.Context, opts QueryOptions) (model.Vector, v1.Warnings, error) {
@@ -37,5 +36,5 @@ func QueryMochiNetActiveConnections(ctx context.Context, opts QueryOptions) (mod
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeVectorQuery(ctx, query, time.Now())
+	return executeVectorQuery(ctx, query, opts.evalAt())
 }

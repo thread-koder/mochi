@@ -21,9 +21,18 @@ type QueryOptions struct {
 	Node string
 	// RangeDuration is the rate/increase lookback window (for example "5m").
 	RangeDuration string
+	// At is the instant-query evaluation time. Zero means time.Now().
+	At time.Time
 }
 
-func QueryRange(ctx context.Context, query string, r v1.Range, opts QueryOptions) (model.Value, v1.Warnings, error) {
+func (opts QueryOptions) evalAt() time.Time {
+	if opts.At.IsZero() {
+		return time.Now()
+	}
+	return opts.At
+}
+
+func QueryRange(ctx context.Context, query string, r v1.Range) (model.Value, v1.Warnings, error) {
 	result, warnings, err := API.QueryRange(ctx, query, r)
 	if err != nil {
 		return nil, warnings, fmt.Errorf("failed to execute PromQL range query: %w", err)
@@ -41,8 +50,8 @@ func Query(ctx context.Context, query string, ts time.Time) (model.Value, v1.War
 	return result, warnings, nil
 }
 
-func executeMatrixQuery(ctx context.Context, query string, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
-	result, warnings, err := QueryRange(ctx, query, r, opts)
+func executeMatrixQuery(ctx context.Context, query string, r v1.Range) (model.Matrix, v1.Warnings, error) {
+	result, warnings, err := QueryRange(ctx, query, r)
 	if err != nil {
 		return nil, warnings, err
 	}

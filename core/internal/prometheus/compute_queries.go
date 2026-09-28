@@ -13,7 +13,7 @@ func QueryWorkloadCPUUsage(ctx context.Context, r v1.Range, opts QueryOptions) (
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryWorkloadMemoryUsage(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
@@ -21,7 +21,7 @@ func QueryWorkloadMemoryUsage(ctx context.Context, r v1.Range, opts QueryOptions
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryWorkloadCPUThrottling(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -29,7 +29,7 @@ func QueryWorkloadCPUThrottling(ctx context.Context, timeRange time.Duration, st
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryWorkloadCPUPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -37,7 +37,7 @@ func QueryWorkloadCPUPressure(ctx context.Context, timeRange time.Duration, step
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryWorkloadMemoryFailCount(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -45,7 +45,7 @@ func QueryWorkloadMemoryFailCount(ctx context.Context, timeRange time.Duration, 
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryWorkloadMemoryOOM(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -53,7 +53,7 @@ func QueryWorkloadMemoryOOM(ctx context.Context, timeRange time.Duration, opts Q
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryWorkloadMemoryPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -61,7 +61,7 @@ func QueryWorkloadMemoryPressure(ctx context.Context, timeRange time.Duration, s
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryWorkloadRestarts(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -69,7 +69,7 @@ func QueryWorkloadRestarts(ctx context.Context, timeRange time.Duration, opts Qu
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryNamespaceCPUUsage(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
@@ -77,7 +77,7 @@ func QueryNamespaceCPUUsage(ctx context.Context, r v1.Range, opts QueryOptions) 
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryNamespaceMemoryUsage(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
@@ -85,7 +85,7 @@ func QueryNamespaceMemoryUsage(ctx context.Context, r v1.Range, opts QueryOption
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryNamespaceCPUThrottling(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -93,7 +93,7 @@ func QueryNamespaceCPUThrottling(ctx context.Context, timeRange time.Duration, s
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryNamespaceCPUPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -101,7 +101,7 @@ func QueryNamespaceCPUPressure(ctx context.Context, timeRange time.Duration, ste
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryNamespaceMemoryFailCount(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -109,7 +109,7 @@ func QueryNamespaceMemoryFailCount(ctx context.Context, timeRange time.Duration,
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryNamespaceMemoryOOM(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -117,7 +117,7 @@ func QueryNamespaceMemoryOOM(ctx context.Context, timeRange time.Duration, opts 
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryNamespaceMemoryPressure(ctx context.Context, timeRange time.Duration, step time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -125,7 +125,7 @@ func QueryNamespaceMemoryPressure(ctx context.Context, timeRange time.Duration, 
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }
 
 func QueryNamespaceRestarts(ctx context.Context, timeRange time.Duration, opts QueryOptions) (float64, v1.Warnings, error) {
@@ -133,5 +133,5 @@ func QueryNamespaceRestarts(ctx context.Context, timeRange time.Duration, opts Q
 	if err != nil {
 		return 0, nil, err
 	}
-	return executeScalarQuery(ctx, query, time.Now())
+	return executeScalarQuery(ctx, query, opts.evalAt())
 }

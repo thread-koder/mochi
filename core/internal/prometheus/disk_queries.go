@@ -12,7 +12,7 @@ func QueryWorkloadDiskReadBytes(ctx context.Context, r v1.Range, opts QueryOptio
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryWorkloadDiskWriteBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
@@ -20,7 +20,7 @@ func QueryWorkloadDiskWriteBytes(ctx context.Context, r v1.Range, opts QueryOpti
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryWorkloadDiskReadOps(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
@@ -28,7 +28,7 @@ func QueryWorkloadDiskReadOps(ctx context.Context, r v1.Range, opts QueryOptions
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryWorkloadDiskWriteOps(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
@@ -36,7 +36,7 @@ func QueryWorkloadDiskWriteOps(ctx context.Context, r v1.Range, opts QueryOption
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryNamespaceDiskReadBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
@@ -44,7 +44,7 @@ func QueryNamespaceDiskReadBytes(ctx context.Context, r v1.Range, opts QueryOpti
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryNamespaceDiskWriteBytes(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
@@ -52,7 +52,7 @@ func QueryNamespaceDiskWriteBytes(ctx context.Context, r v1.Range, opts QueryOpt
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryNamespaceDiskReadOps(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
@@ -60,7 +60,7 @@ func QueryNamespaceDiskReadOps(ctx context.Context, r v1.Range, opts QueryOption
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
 
 func QueryNamespaceDiskWriteOps(ctx context.Context, r v1.Range, opts QueryOptions) (model.Matrix, v1.Warnings, error) {
@@ -68,5 +68,5 @@ func QueryNamespaceDiskWriteOps(ctx context.Context, r v1.Range, opts QueryOptio
 	if err != nil {
 		return nil, nil, err
 	}
-	return executeMatrixQuery(ctx, query, r, opts)
+	return executeMatrixQuery(ctx, query, r)
 }
