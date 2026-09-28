@@ -11,7 +11,7 @@ import (
 
 const discoveryInterval = 300 * time.Second
 
-// DependencyDiscoveryWorker periodically builds the dependency graph snapshot from Prometheus.
+// DependencyDiscoveryWorker periodically resolves Prometheus series into the dependency graph and hour buckets.
 type DependencyDiscoveryWorker struct {
 	ctx          context.Context
 	podCIDRs     []string

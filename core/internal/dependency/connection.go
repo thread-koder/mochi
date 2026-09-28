@@ -93,6 +93,14 @@ func FetchConnectionSeries(ctx context.Context, opts prometheus.QueryOptions) ([
 	return joinConnectionSeries(connects, txBytes, rxBytes, active), nil
 }
 
+func FetchActiveConnectionSeries(ctx context.Context, opts prometheus.QueryOptions) ([]ConnectionSeries, error) {
+	active, _, err := prometheus.QueryMochiNetActiveConnections(ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query mochi_net active connections: %w", err)
+	}
+	return joinConnectionSeries(nil, nil, nil, active), nil
+}
+
 func joinConnectionSeries(connects, txBytes, rxBytes, active model.Vector) []ConnectionSeries {
 	txByKey := connectionValuesByKey(txBytes)
 	rxByKey := connectionValuesByKey(rxBytes)

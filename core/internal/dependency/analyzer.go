@@ -13,10 +13,11 @@ import (
 )
 
 type AnalysisOptions struct {
-	TimeRange       time.Duration // Soft active window on last_seen_at (default: 7d).
-	IncludeExternal bool          // Whether to include external nodes (default: true).
-	IncludeDNS      bool          // Whether to include CoreDNS / kube-dns nodes (default: false).
-	IncludeUnknown  bool          // Whether to include unresolved cluster leftovers (default: true).
+	// TimeRange is the membership + stats window (last_seen_at filter and hour SUM).
+	TimeRange       time.Duration
+	IncludeExternal bool // Whether to include external nodes (default: true).
+	IncludeDNS      bool // Whether to include CoreDNS / kube-dns nodes (default: false).
+	IncludeUnknown  bool // Whether to include unresolved cluster leftovers (default: true).
 }
 
 func DefaultAnalysisOptions() AnalysisOptions {
@@ -137,7 +138,7 @@ func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOption
 	}, nil
 }
 
-func loadGraphNodes(ctx context.Context, edges []*database.DependencyEdge) (map[uuid.UUID]*database.DependencyNode, error) {
+func loadGraphNodes(ctx context.Context, edges []*database.DependencyEdgeWindow) (map[uuid.UUID]*database.DependencyNode, error) {
 	if len(edges) == 0 {
 		return map[uuid.UUID]*database.DependencyNode{}, nil
 	}
@@ -165,7 +166,7 @@ func loadGraphNodes(ctx context.Context, edges []*database.DependencyEdge) (map[
 	return nodesByID, nil
 }
 
-func assembleGraph(edges []*database.DependencyEdge, allNodes map[uuid.UUID]*database.DependencyNode, opts AnalysisOptions, center *database.DependencyNode) Graph {
+func assembleGraph(edges []*database.DependencyEdgeWindow, allNodes map[uuid.UUID]*database.DependencyNode, opts AnalysisOptions, center *database.DependencyNode) Graph {
 	if len(edges) == 0 {
 		nodes := []NodeDTO{}
 		if center != nil {
@@ -239,7 +240,7 @@ func toNodeDTO(n *database.DependencyNode) NodeDTO {
 	}
 }
 
-func toEdgeDTO(e *database.DependencyEdge) EdgeDTO {
+func toEdgeDTO(e *database.DependencyEdgeWindow) EdgeDTO {
 	return EdgeDTO{
 		ID:                  e.ID.String(),
 		FromNodeID:          e.FromNodeID.String(),
