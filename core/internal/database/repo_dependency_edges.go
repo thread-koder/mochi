@@ -28,21 +28,69 @@ type DependencyEdgeUpsert struct {
 	ViaServiceName      *string
 	ViaServicePort      *int
 	Source              string
+	FirstSeenAt         time.Time
+	LastSeenAt          time.Time
+	Evidence            json.RawMessage
+}
+
+// DependencyEdgeWindow is an identity edge plus hour-window volume for analyze.
+type DependencyEdgeWindow struct {
+	ID                  uuid.UUID
+	FromNodeID          uuid.UUID
+	ToNodeID            uuid.UUID
+	Protocol            string
+	Port                int
+	ViaServiceNamespace *string
+	ViaServiceName      *string
+	ViaServicePort      *int
+	Source              string
 	Connects            float64
 	TxBytes             float64
 	RxBytes             float64
 	ActiveConnections   float64
 	FirstSeenAt         time.Time
 	LastSeenAt          time.Time
-	Evidence            json.RawMessage
-	Attrs               json.RawMessage
 }
 
-func UpsertDependencyGraph(ctx context.Context, edges []*DependencyEdgeUpsert) error {
+func UpsertDependencyEdgesWithHours(ctx context.Context, edges []*DependencyEdgeUpsert, hours []*DependencyEdgeHour) error {
 	if len(edges) == 0 {
 		return nil
 	}
 
+	tx, err := Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	edgeIDs, err := upsertDependencyEdgesTx(ctx, tx, edges)
+	if err != nil {
+		return err
+	}
+
+	hourBatch := &pgx.Batch{}
+	for i, hour := range hours {
+		hour.EdgeID = edgeIDs[i]
+		queueDependencyEdgeHourReplace(hourBatch, hour)
+	}
+	hourResults := tx.SendBatch(ctx, hourBatch)
+	for range hours {
+		if _, err := hourResults.Exec(); err != nil {
+			hourResults.Close()
+			return fmt.Errorf("failed to replace dependency edge hour: %w", err)
+		}
+	}
+	if err := hourResults.Close(); err != nil {
+		return fmt.Errorf("failed to close batch results: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+func upsertDependencyEdgesTx(ctx context.Context, tx pgx.Tx, edges []*DependencyEdgeUpsert) ([]uuid.UUID, error) {
 	nodesByKey := make(map[DependencyNodeKey]*DependencyNode)
 	for _, edge := range edges {
 		for _, key := range []DependencyNodeKey{edge.From, edge.To} {
@@ -64,52 +112,42 @@ func UpsertDependencyGraph(ctx context.Context, edges []*DependencyEdgeUpsert) e
 		nodes = append(nodes, node)
 	}
 
-	tx, err := Pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	batch := &pgx.Batch{}
+	nodeBatch := &pgx.Batch{}
 	for _, node := range nodes {
-		queueDependencyNodeUpsert(batch, node)
+		queueDependencyNodeUpsert(nodeBatch, node)
 	}
-	for _, edge := range edges {
-		queueDependencyEdgeUpsert(batch, edge)
+	nodeResults := tx.SendBatch(ctx, nodeBatch)
+	for range nodes {
+		if _, err := nodeResults.Exec(); err != nil {
+			nodeResults.Close()
+			return nil, fmt.Errorf("failed to execute batch upsert for dependency graph: %w", err)
+		}
+	}
+	if err := nodeResults.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close batch results: %w", err)
 	}
 
-	results := tx.SendBatch(ctx, batch)
-	for range nodes {
-		if _, err := results.Exec(); err != nil {
-			results.Close()
-			return fmt.Errorf("failed to execute batch upsert for dependency graph: %w", err)
-		}
-	}
+	edgeBatch := &pgx.Batch{}
 	for _, edge := range edges {
-		tag, err := results.Exec()
-		if err != nil {
-			results.Close()
-			return fmt.Errorf("failed to execute batch upsert for dependency graph: %w", err)
-		}
-		if tag.RowsAffected() != 1 {
-			results.Close()
-			return fmt.Errorf(
-				"failed to upsert dependency edge: missing node %s/%s/%s or %s/%s/%s",
+		queueDependencyEdgeUpsert(edgeBatch, edge)
+	}
+	edgeResults := tx.SendBatch(ctx, edgeBatch)
+	edgeIDs := make([]uuid.UUID, len(edges))
+	for i, edge := range edges {
+		if err := edgeResults.QueryRow().Scan(&edgeIDs[i]); err != nil {
+			edgeResults.Close()
+			return nil, fmt.Errorf(
+				"failed to upsert dependency edge: missing node %s/%s/%s or %s/%s/%s: %w",
 				edge.From.Kind, edge.From.Namespace, edge.From.Name,
 				edge.To.Kind, edge.To.Namespace, edge.To.Name,
+				err,
 			)
 		}
 	}
-
-	if err := results.Close(); err != nil {
-		return fmt.Errorf("failed to close batch results: %w", err)
+	if err := edgeResults.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close batch results: %w", err)
 	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+	return edgeIDs, nil
 }
 
 func queueDependencyEdgeUpsert(batch *pgx.Batch, edge *DependencyEdgeUpsert) {
@@ -117,13 +155,11 @@ func queueDependencyEdgeUpsert(batch *pgx.Batch, edge *DependencyEdgeUpsert) {
 		INSERT INTO dependency_edges (
 			from_node_id, to_node_id, protocol, port,
 			via_service_namespace, via_service_name, via_service_port, source,
-			connects, tx_bytes, rx_bytes, active_connections,
-			first_seen_at, last_seen_at, evidence, attrs
+			first_seen_at, last_seen_at, evidence
 		)
 		SELECT f.id, t.id, @protocol, @port,
 			@via_service_namespace, @via_service_name, @via_service_port, @source,
-			@connects, @tx_bytes, @rx_bytes, @active_connections,
-			@first_seen_at, @last_seen_at, @evidence, @attrs
+			@first_seen_at, @last_seen_at, @evidence
 		FROM dependency_nodes f
 		JOIN dependency_nodes t
 			ON t.kind = @to_kind AND t.namespace = @to_namespace AND t.name = @to_name
@@ -133,13 +169,9 @@ func queueDependencyEdgeUpsert(batch *pgx.Batch, edge *DependencyEdgeUpsert) {
 			via_service_name = EXCLUDED.via_service_name,
 			via_service_port = EXCLUDED.via_service_port,
 			source = EXCLUDED.source,
-			connects = EXCLUDED.connects,
-			tx_bytes = EXCLUDED.tx_bytes,
-			rx_bytes = EXCLUDED.rx_bytes,
-			active_connections = EXCLUDED.active_connections,
 			last_seen_at = EXCLUDED.last_seen_at,
-			evidence = EXCLUDED.evidence,
-			attrs = EXCLUDED.attrs
+			evidence = EXCLUDED.evidence
+		RETURNING id
 	`, pgx.StrictNamedArgs{
 		"from_kind":             edge.From.Kind,
 		"from_namespace":        edge.From.Namespace,
@@ -153,103 +185,120 @@ func queueDependencyEdgeUpsert(batch *pgx.Batch, edge *DependencyEdgeUpsert) {
 		"via_service_name":      edge.ViaServiceName,
 		"via_service_port":      edge.ViaServicePort,
 		"source":                edge.Source,
-		"connects":              edge.Connects,
-		"tx_bytes":              edge.TxBytes,
-		"rx_bytes":              edge.RxBytes,
-		"active_connections":    edge.ActiveConnections,
 		"first_seen_at":         edge.FirstSeenAt,
 		"last_seen_at":          edge.LastSeenAt,
 		"evidence":              edge.Evidence,
-		"attrs":                 edge.Attrs,
 	})
 }
 
 const dependencyEdgeSelectColumns = `
 	e.id, e.from_node_id, e.to_node_id, e.protocol, e.port,
 	e.via_service_namespace, e.via_service_name, e.via_service_port, e.source,
-	e.connects, e.tx_bytes, e.rx_bytes, e.active_connections,
-	e.first_seen_at, e.last_seen_at, e.evidence, e.attrs, e.created_at, e.updated_at
+	COALESCE(hour_totals.connects, 0), COALESCE(hour_totals.tx_bytes, 0), COALESCE(hour_totals.rx_bytes, 0),
+	COALESCE(latest_active.active_connections, 0),
+	e.first_seen_at, e.last_seen_at
 `
 
-func GetDependencyEdgesForNamespace(ctx context.Context, namespace string, since time.Time) ([]*DependencyEdge, error) {
+const dependencyEdgeHourJoins = `
+	LEFT JOIN (
+		SELECT edge_id,
+			SUM(connects) AS connects,
+			SUM(tx_bytes) AS tx_bytes,
+			SUM(rx_bytes) AS rx_bytes
+		FROM dependency_edge_hours
+		WHERE hour_start >= @hour_since
+		GROUP BY edge_id
+	) hour_totals ON hour_totals.edge_id = e.id
+	LEFT JOIN LATERAL (
+		SELECT active_connections
+		FROM dependency_edge_hours
+		WHERE edge_id = e.id
+		  AND hour_start >= @hour_since
+		ORDER BY hour_start DESC
+		LIMIT 1
+	) latest_active ON true
+`
+
+func GetDependencyEdgesForNamespace(ctx context.Context, namespace string, since time.Time) ([]*DependencyEdgeWindow, error) {
+	hourSince := since.UTC().Truncate(time.Hour)
 	query := `
 		SELECT ` + dependencyEdgeSelectColumns + `
 		FROM dependency_edges e
 		JOIN dependency_nodes f ON f.id = e.from_node_id
 		JOIN dependency_nodes t ON t.id = e.to_node_id
-		WHERE f.namespace = @namespace
-		  AND e.last_seen_at >= @since
-		UNION
-		SELECT ` + dependencyEdgeSelectColumns + `
-		FROM dependency_edges e
-		JOIN dependency_nodes f ON f.id = e.from_node_id
-		JOIN dependency_nodes t ON t.id = e.to_node_id
-		WHERE t.namespace = @namespace
-		  AND e.last_seen_at >= @since
+		` + dependencyEdgeHourJoins + `
+		WHERE e.last_seen_at >= @since
+		  AND (f.namespace = @namespace OR t.namespace = @namespace)
 	`
 
 	rows, err := Pool.Query(ctx, query, pgx.StrictNamedArgs{
-		"namespace": namespace,
-		"since":     since,
+		"namespace":  namespace,
+		"since":      since,
+		"hour_since": hourSince,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dependency edges for namespace: %w", err)
 	}
 	defer rows.Close()
 
-	return collectDependencyEdges(rows)
+	return collectDependencyEdgeWindows(rows)
 }
 
-func GetDependencyEdgesByFromNode(ctx context.Context, nodeID uuid.UUID, since time.Time) ([]*DependencyEdge, error) {
+func GetDependencyEdgesByFromNode(ctx context.Context, nodeID uuid.UUID, since time.Time) ([]*DependencyEdgeWindow, error) {
+	hourSince := since.UTC().Truncate(time.Hour)
 	query := `
 		SELECT ` + dependencyEdgeSelectColumns + `
 		FROM dependency_edges e
+		` + dependencyEdgeHourJoins + `
 		WHERE e.from_node_id = @node_id
 		  AND e.last_seen_at >= @since
 	`
 
 	rows, err := Pool.Query(ctx, query, pgx.StrictNamedArgs{
-		"node_id": nodeID,
-		"since":   since,
+		"node_id":    nodeID,
+		"since":      since,
+		"hour_since": hourSince,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dependency edges by from node: %w", err)
 	}
 	defer rows.Close()
 
-	return collectDependencyEdges(rows)
+	return collectDependencyEdgeWindows(rows)
 }
 
-func GetDependencyEdgesByToNode(ctx context.Context, nodeID uuid.UUID, since time.Time) ([]*DependencyEdge, error) {
+func GetDependencyEdgesByToNode(ctx context.Context, nodeID uuid.UUID, since time.Time) ([]*DependencyEdgeWindow, error) {
+	hourSince := since.UTC().Truncate(time.Hour)
 	query := `
 		SELECT ` + dependencyEdgeSelectColumns + `
 		FROM dependency_edges e
+		` + dependencyEdgeHourJoins + `
 		WHERE e.to_node_id = @node_id
 		  AND e.last_seen_at >= @since
 	`
 
 	rows, err := Pool.Query(ctx, query, pgx.StrictNamedArgs{
-		"node_id": nodeID,
-		"since":   since,
+		"node_id":    nodeID,
+		"since":      since,
+		"hour_since": hourSince,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dependency edges by to node: %w", err)
 	}
 	defer rows.Close()
 
-	return collectDependencyEdges(rows)
+	return collectDependencyEdgeWindows(rows)
 }
 
-func collectDependencyEdges(rows pgx.Rows) ([]*DependencyEdge, error) {
-	edges := make([]*DependencyEdge, 0)
+func collectDependencyEdgeWindows(rows pgx.Rows) ([]*DependencyEdgeWindow, error) {
+	edges := make([]*DependencyEdgeWindow, 0)
 	for rows.Next() {
-		var edge DependencyEdge
+		var edge DependencyEdgeWindow
 		if err := rows.Scan(
 			&edge.ID, &edge.FromNodeID, &edge.ToNodeID, &edge.Protocol, &edge.Port,
 			&edge.ViaServiceNamespace, &edge.ViaServiceName, &edge.ViaServicePort, &edge.Source,
 			&edge.Connects, &edge.TxBytes, &edge.RxBytes, &edge.ActiveConnections,
-			&edge.FirstSeenAt, &edge.LastSeenAt, &edge.Evidence, &edge.Attrs,
-			&edge.CreatedAt, &edge.UpdatedAt,
+			&edge.FirstSeenAt, &edge.LastSeenAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan dependency edge: %w", err)
 		}
@@ -272,9 +321,11 @@ func pruneExpiredDependencyEdges(ctx context.Context, since time.Time) error {
 	return nil
 }
 
-// PruneExpiredDependencyGraph deletes aged edges then removes nodes with no edges.
 func PruneExpiredDependencyGraph(ctx context.Context, since time.Time) error {
 	var errs []error
+	if err := pruneExpiredDependencyEdgeHours(ctx, since); err != nil {
+		errs = append(errs, err)
+	}
 	if err := pruneExpiredDependencyEdges(ctx, since); err != nil {
 		errs = append(errs, err)
 	}
