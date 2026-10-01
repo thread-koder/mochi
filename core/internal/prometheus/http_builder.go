@@ -25,47 +25,89 @@ var httpSumByLabels = []string{
 
 var httpSumByClause = strings.Join(httpSumByLabels, ",")
 
-func buildMochiHTTPMetricQuery(metric, namespace string, extraMatchers ...string) string {
-	parts := make([]string, 0, 1+len(extraMatchers))
-	if namespace != "" {
-		parts = append(parts, fmt.Sprintf(`src_namespace="%s"`, namespace))
-	}
-	parts = append(parts, extraMatchers...)
-	if len(parts) == 0 {
+func buildMochiHTTPMetricQuery(metric string, matchers ...string) string {
+	if len(matchers) == 0 {
 		return metric + `{}`
 	}
-	return metric + `{` + strings.Join(parts, ",") + `}`
+	return metric + `{` + strings.Join(matchers, ",") + `}`
+}
+
+// buildMochiHTTPNamespaceScopedExpr builds a PromQL instant vector for one metric.
+// A single selector cannot express src_namespace=X OR dst_namespace=X. Use binary or,
+// then the caller sum-by so identical label sets (both ends in ns) dedupe.
+func buildMochiHTTPNamespaceScopedExpr(
+	metric, namespace string,
+	extraMatchers []string,
+	wrap func(selector string) (string, error),
+) (string, error) {
+	if namespace == "" {
+		return wrap(buildMochiHTTPMetricQuery(metric, extraMatchers...))
+	}
+
+	srcMatchers := append([]string{fmt.Sprintf(`src_namespace="%s"`, namespace)}, extraMatchers...)
+	dstMatchers := append([]string{fmt.Sprintf(`dst_namespace="%s"`, namespace)}, extraMatchers...)
+
+	srcExpr, err := wrap(buildMochiHTTPMetricQuery(metric, srcMatchers...))
+	if err != nil {
+		return "", err
+	}
+	dstExpr, err := wrap(buildMochiHTTPMetricQuery(metric, dstMatchers...))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("(%s) or (%s)", srcExpr, dstExpr), nil
 }
 
 func BuildMochiHTTPRequestsQuery(namespace, rangeDuration string) (string, error) {
-	selector := buildMochiHTTPMetricQuery("mochi_http_requests_total", namespace)
-	base, err := increaseOrNew(selector, rangeDuration)
+	scoped, err := buildMochiHTTPNamespaceScopedExpr(
+		"mochi_http_requests_total",
+		namespace,
+		nil,
+		func(selector string) (string, error) {
+			return increaseOrNew(selector, rangeDuration)
+		},
+	)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("sum by (%s) (%s)", httpSumByClause, base), nil
+	return fmt.Sprintf("sum by (%s) (%s)", httpSumByClause, scoped), nil
 }
 
 func BuildMochiHTTPErrorsQuery(namespace, rangeDuration string) (string, error) {
-	selector := buildMochiHTTPMetricQuery("mochi_http_requests_total", namespace, `status_class="5xx"`)
-	base, err := increaseOrNew(selector, rangeDuration)
+	scoped, err := buildMochiHTTPNamespaceScopedExpr(
+		"mochi_http_requests_total",
+		namespace,
+		[]string{`status_class="5xx"`},
+		func(selector string) (string, error) {
+			return increaseOrNew(selector, rangeDuration)
+		},
+	)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("sum by (%s) (%s)", httpSumByClause, base), nil
+	return fmt.Sprintf("sum by (%s) (%s)", httpSumByClause, scoped), nil
 }
 
 func BuildMochiHTTPDurationQuantileQuery(quantile float64, namespace, rangeDuration string) (string, error) {
 	if rangeDuration == "" {
 		return "", fmt.Errorf("rangeDuration is required")
 	}
-	selector := buildMochiHTTPMetricQuery("mochi_http_request_duration_seconds", namespace)
+	scoped, err := buildMochiHTTPNamespaceScopedExpr(
+		"mochi_http_request_duration_seconds",
+		namespace,
+		nil,
+		func(selector string) (string, error) {
+			return fmt.Sprintf("rate(%s[%s])", selector, rangeDuration), nil
+		},
+	)
+	if err != nil {
+		return "", err
+	}
 	return fmt.Sprintf(
-		"histogram_quantile(%g, sum by (%s) (rate(%s[%s])))",
+		"histogram_quantile(%g, sum by (%s) (%s))",
 		quantile,
 		httpSumByClause,
-		selector,
-		rangeDuration,
+		scoped,
 	), nil
 }
 
