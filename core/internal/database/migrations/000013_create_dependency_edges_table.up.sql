@@ -10,8 +10,6 @@ CREATE TABLE IF NOT EXISTS dependency_edges (
     source VARCHAR(50) NOT NULL DEFAULT 'mochi-ebpf',
     first_seen_at TIMESTAMP WITH TIME ZONE NOT NULL,
     last_seen_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    evidence JSONB,
-    attrs JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     UNIQUE (from_node_id, to_node_id, protocol, port)

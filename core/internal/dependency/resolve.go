@@ -38,7 +38,6 @@ type ResolvedEdge struct {
 	TxBytes             float64
 	RxBytes             float64
 	ActiveConnections   float64
-	Evidence            json.RawMessage
 }
 
 type ResolveOptions struct {
@@ -121,38 +120,11 @@ func DefaultResolveOptions(podCIDRs, serviceCIDRs []string) ResolveOptions {
 
 // Resolve turns one connection series into a workload edge, or drops it as noise/unresolvable src.
 func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (ResolvedEdge, bool, error) {
-	if series.Connects <= 0 && series.ActiveConnections <= 0 {
-		return ResolvedEdge{}, false, nil
-	}
-	if !isKnownProtocol(series.Protocol) {
-		return ResolvedEdge{}, false, nil
-	}
-
-	dstIP := net.ParseIP(series.ActualDstIP)
-	if dstIP == nil {
-		return ResolvedEdge{}, false, nil
-	}
-	if isLinkLocal(dstIP) {
-		return ResolvedEdge{}, false, nil
-	}
-
-	from, hit, err := lookupNodeRefByUID(ctx, opts, series.SrcPodUID, "src")
-	if err != nil {
-		return ResolvedEdge{}, false, err
-	}
-	if hit != uidModeled {
-		return ResolvedEdge{}, false, nil
-	}
-
-	to, kept, err := resolveDestination(ctx, series, opts)
+	from, to, kept, err := resolveEdgeEnds(ctx, series, opts)
 	if err != nil {
 		return ResolvedEdge{}, false, err
 	}
 	if !kept {
-		return ResolvedEdge{}, false, nil
-	}
-
-	if sameNode(from, to) {
 		return ResolvedEdge{}, false, nil
 	}
 
@@ -169,20 +141,7 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 		viaPort = via.port
 	}
 
-	evidence, err := json.Marshal(map[string]string{
-		"src_pod_uid":     series.SrcPodUID,
-		"dst_pod_uid":     series.DstPodUID,
-		"dst_ip":          series.DstIP,
-		"actual_dst_ip":   series.ActualDstIP,
-		"dst_port":        strconv.Itoa(series.DstPort),
-		"actual_dst_port": strconv.Itoa(series.ActualDstPort),
-		"dst_hostname":    series.DstHostname,
-	})
-	if err != nil {
-		return ResolvedEdge{}, false, fmt.Errorf("marshal evidence: %w", err)
-	}
-
-	edge := ResolvedEdge{
+	return ResolvedEdge{
 		From:                from,
 		To:                  to,
 		Protocol:            series.Protocol,
@@ -195,9 +154,46 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 		TxBytes:             series.TxBytes,
 		RxBytes:             series.RxBytes,
 		ActiveConnections:   series.ActiveConnections,
-		Evidence:            evidence,
+	}, true, nil
+}
+
+// resolveEdgeEnds maps a series to from/to workloads without via Service attribution.
+func resolveEdgeEnds(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (from, to NodeRef, kept bool, err error) {
+	if series.Connects <= 0 && series.ActiveConnections <= 0 {
+		return NodeRef{}, NodeRef{}, false, nil
 	}
-	return edge, true, nil
+	if !isKnownProtocol(series.Protocol) {
+		return NodeRef{}, NodeRef{}, false, nil
+	}
+
+	dstIP := net.ParseIP(series.ActualDstIP)
+	if dstIP == nil {
+		return NodeRef{}, NodeRef{}, false, nil
+	}
+	if isLinkLocal(dstIP) {
+		return NodeRef{}, NodeRef{}, false, nil
+	}
+
+	from, hit, err := lookupNodeRefByUID(ctx, opts, series.SrcPodUID, "src")
+	if err != nil {
+		return NodeRef{}, NodeRef{}, false, err
+	}
+	if hit != uidModeled {
+		return NodeRef{}, NodeRef{}, false, nil
+	}
+
+	to, kept, err = resolveDestination(ctx, series, opts)
+	if err != nil {
+		return NodeRef{}, NodeRef{}, false, err
+	}
+	if !kept {
+		return NodeRef{}, NodeRef{}, false, nil
+	}
+
+	if sameNode(from, to) {
+		return NodeRef{}, NodeRef{}, false, nil
+	}
+	return from, to, true, nil
 }
 
 // resolveDestination returns a NodeRef when kept. kept=false drops the series (skip-kind dest).

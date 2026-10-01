@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -30,7 +29,6 @@ type DependencyEdgeUpsert struct {
 	Source              string
 	FirstSeenAt         time.Time
 	LastSeenAt          time.Time
-	Evidence            json.RawMessage
 }
 
 // DependencyEdgeWindow is an identity edge plus hour-window volume for analyze.
@@ -155,11 +153,11 @@ func queueDependencyEdgeUpsert(batch *pgx.Batch, edge *DependencyEdgeUpsert) {
 		INSERT INTO dependency_edges (
 			from_node_id, to_node_id, protocol, port,
 			via_service_namespace, via_service_name, via_service_port, source,
-			first_seen_at, last_seen_at, evidence
+			first_seen_at, last_seen_at
 		)
 		SELECT f.id, t.id, @protocol, @port,
 			@via_service_namespace, @via_service_name, @via_service_port, @source,
-			@first_seen_at, @last_seen_at, @evidence
+			@first_seen_at, @last_seen_at
 		FROM dependency_nodes f
 		JOIN dependency_nodes t
 			ON t.kind = @to_kind AND t.namespace = @to_namespace AND t.name = @to_name
@@ -169,8 +167,7 @@ func queueDependencyEdgeUpsert(batch *pgx.Batch, edge *DependencyEdgeUpsert) {
 			via_service_name = EXCLUDED.via_service_name,
 			via_service_port = EXCLUDED.via_service_port,
 			source = EXCLUDED.source,
-			last_seen_at = EXCLUDED.last_seen_at,
-			evidence = EXCLUDED.evidence
+			last_seen_at = EXCLUDED.last_seen_at
 		RETURNING id
 	`, pgx.StrictNamedArgs{
 		"from_kind":             edge.From.Kind,
@@ -187,7 +184,6 @@ func queueDependencyEdgeUpsert(batch *pgx.Batch, edge *DependencyEdgeUpsert) {
 		"source":                edge.Source,
 		"first_seen_at":         edge.FirstSeenAt,
 		"last_seen_at":          edge.LastSeenAt,
-		"evidence":              edge.Evidence,
 	})
 }
 
