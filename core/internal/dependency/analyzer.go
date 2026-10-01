@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/thread_koder/mochi/core/internal/apperrors"
 	"github.com/thread_koder/mochi/core/internal/database"
+	"github.com/thread_koder/mochi/core/internal/prometheus"
+	"golang.org/x/sync/errgroup"
 )
 
 type AnalysisOptions struct {
@@ -38,22 +41,36 @@ type NodeDTO struct {
 	LastSeenAt  time.Time `json:"last_seen_at"`
 }
 
+type OperationDTO struct {
+	Method   string   `json:"method"`
+	Route    string   `json:"route"`
+	Requests float64  `json:"requests"`
+	Errors   float64  `json:"errors"`
+	P50      *float64 `json:"p50"`
+	P95      *float64 `json:"p95"`
+}
+
 type EdgeDTO struct {
-	ID                  string    `json:"id"`
-	FromNodeID          string    `json:"from_node_id"`
-	ToNodeID            string    `json:"to_node_id"`
-	Protocol            string    `json:"protocol"`
-	Port                int       `json:"port"`
-	ViaServiceNamespace *string   `json:"via_service_namespace"`
-	ViaServiceName      *string   `json:"via_service_name"`
-	ViaServicePort      *int      `json:"via_service_port"`
-	Source              string    `json:"source"`
-	Connects            float64   `json:"connects"`
-	TxBytes             float64   `json:"tx_bytes"`
-	RxBytes             float64   `json:"rx_bytes"`
-	ActiveConnections   float64   `json:"active_connections"`
-	FirstSeenAt         time.Time `json:"first_seen_at"`
-	LastSeenAt          time.Time `json:"last_seen_at"`
+	ID                  string         `json:"id"`
+	FromNodeID          string         `json:"from_node_id"`
+	ToNodeID            string         `json:"to_node_id"`
+	Protocol            string         `json:"protocol"`
+	Port                int            `json:"port"`
+	ViaServiceNamespace *string        `json:"via_service_namespace"`
+	ViaServiceName      *string        `json:"via_service_name"`
+	ViaServicePort      *int           `json:"via_service_port"`
+	Source              string         `json:"source"`
+	Connects            float64        `json:"connects"`
+	TxBytes             float64        `json:"tx_bytes"`
+	RxBytes             float64        `json:"rx_bytes"`
+	ActiveConnections   float64        `json:"active_connections"`
+	Requests            float64        `json:"requests"`
+	Errors              float64        `json:"errors"`
+	P50                 *float64       `json:"p50"`
+	P95                 *float64       `json:"p95"`
+	Operations          []OperationDTO `json:"operations"`
+	FirstSeenAt         time.Time      `json:"first_seen_at"`
+	LastSeenAt          time.Time      `json:"last_seen_at"`
 }
 
 type Graph struct {
@@ -96,41 +113,102 @@ func AnalyzeWorkload(ctx context.Context, workloadType, name, namespace string, 
 		return WorkloadAnalysis{}, fmt.Errorf("get dependency node for workload %s/%s/%s: %w", workloadType, namespace, name, err)
 	}
 
-	downstreamEdges, err := database.GetDependencyEdgesByFromNode(ctx, center.ID, since)
-	if err != nil {
-		return WorkloadAnalysis{}, fmt.Errorf("get downstream dependency edges: %w", err)
-	}
-	upstreamEdges, err := database.GetDependencyEdgesByToNode(ctx, center.ID, since)
-	if err != nil {
-		return WorkloadAnalysis{}, fmt.Errorf("get upstream dependency edges: %w", err)
-	}
+	var (
+		downstreamEdges []*database.DependencyEdgeWindow
+		upstreamEdges   []*database.DependencyEdgeWindow
+		nodesByID       map[uuid.UUID]*database.DependencyNode
+		httpByEdge      map[string]*httpEdge
+	)
 
-	nodesByID, err := loadGraphNodes(ctx, append(downstreamEdges, upstreamEdges...))
-	if err != nil {
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		eg, egctx := errgroup.WithContext(gctx)
+		eg.Go(func() error {
+			var err error
+			downstreamEdges, err = database.GetDependencyEdgesByFromNode(egctx, center.ID, since)
+			if err != nil {
+				return fmt.Errorf("get downstream dependency edges: %w", err)
+			}
+			return nil
+		})
+		eg.Go(func() error {
+			var err error
+			upstreamEdges, err = database.GetDependencyEdgesByToNode(egctx, center.ID, since)
+			if err != nil {
+				return fmt.Errorf("get upstream dependency edges: %w", err)
+			}
+			return nil
+		})
+		if err := eg.Wait(); err != nil {
+			return err
+		}
+		var err error
+		nodesByID, err = loadGraphNodes(gctx, slices.Concat(downstreamEdges, upstreamEdges))
+		return err
+	})
+	g.Go(func() error {
+		series, err := FetchHTTPSeries(gctx, prometheus.QueryOptions{
+			Namespace:     namespace,
+			RangeDuration: opts.TimeRange.String(),
+		})
+		if err != nil {
+			return fmt.Errorf("fetch http series for namespace %s: %w", namespace, err)
+		}
+		httpByEdge, err = mergeHTTPByEdge(gctx, series, DefaultResolveOptions(nil, nil))
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err := g.Wait(); err != nil {
 		return WorkloadAnalysis{}, err
 	}
 
 	return WorkloadAnalysis{
 		Workload:   workload,
-		Upstream:   assembleGraph(upstreamEdges, nodesByID, opts, center),
-		Downstream: assembleGraph(downstreamEdges, nodesByID, opts, center),
+		Upstream:   assembleGraph(upstreamEdges, nodesByID, opts, center, httpByEdge),
+		Downstream: assembleGraph(downstreamEdges, nodesByID, opts, center, httpByEdge),
 	}, nil
 }
 
 func AnalyzeNamespace(ctx context.Context, namespace string, opts AnalysisOptions) (NamespaceAnalysis, error) {
 	since := time.Now().UTC().Add(-opts.TimeRange)
 
-	edges, err := database.GetDependencyEdgesForNamespace(ctx, namespace, since)
-	if err != nil {
-		return NamespaceAnalysis{}, fmt.Errorf("get dependency edges for namespace %s: %w", namespace, err)
-	}
+	var (
+		edges      []*database.DependencyEdgeWindow
+		nodesByID  map[uuid.UUID]*database.DependencyNode
+		httpByEdge map[string]*httpEdge
+	)
 
-	nodesByID, err := loadGraphNodes(ctx, edges)
-	if err != nil {
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		var err error
+		edges, err = database.GetDependencyEdgesForNamespace(gctx, namespace, since)
+		if err != nil {
+			return fmt.Errorf("get dependency edges for namespace %s: %w", namespace, err)
+		}
+		nodesByID, err = loadGraphNodes(gctx, edges)
+		return err
+	})
+	g.Go(func() error {
+		series, err := FetchHTTPSeries(gctx, prometheus.QueryOptions{
+			Namespace:     namespace,
+			RangeDuration: opts.TimeRange.String(),
+		})
+		if err != nil {
+			return fmt.Errorf("fetch http series for namespace %s: %w", namespace, err)
+		}
+		httpByEdge, err = mergeHTTPByEdge(gctx, series, DefaultResolveOptions(nil, nil))
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err := g.Wait(); err != nil {
 		return NamespaceAnalysis{}, err
 	}
-	graph := assembleGraph(edges, nodesByID, opts, nil)
 
+	graph := assembleGraph(edges, nodesByID, opts, nil, httpByEdge)
 	return NamespaceAnalysis{
 		Namespace: namespace,
 		Nodes:     graph.Nodes,
@@ -166,7 +244,13 @@ func loadGraphNodes(ctx context.Context, edges []*database.DependencyEdgeWindow)
 	return nodesByID, nil
 }
 
-func assembleGraph(edges []*database.DependencyEdgeWindow, allNodes map[uuid.UUID]*database.DependencyNode, opts AnalysisOptions, center *database.DependencyNode) Graph {
+func assembleGraph(
+	edges []*database.DependencyEdgeWindow,
+	allNodes map[uuid.UUID]*database.DependencyNode,
+	opts AnalysisOptions,
+	center *database.DependencyNode,
+	httpByEdge map[string]*httpEdge,
+) Graph {
 	if len(edges) == 0 {
 		nodes := []NodeDTO{}
 		if center != nil {
@@ -192,13 +276,15 @@ func assembleGraph(edges []*database.DependencyEdgeWindow, allNodes map[uuid.UUI
 	filteredEdges := make([]EdgeDTO, 0, len(edges))
 	usedNodes := make(map[uuid.UUID]struct{})
 	for _, edge := range edges {
-		if _, ok := nodesByID[edge.FromNodeID]; !ok {
+		from, ok := nodesByID[edge.FromNodeID]
+		if !ok {
 			continue
 		}
-		if _, ok := nodesByID[edge.ToNodeID]; !ok {
+		to, ok := nodesByID[edge.ToNodeID]
+		if !ok {
 			continue
 		}
-		filteredEdges = append(filteredEdges, toEdgeDTO(edge))
+		filteredEdges = append(filteredEdges, toEdgeDTO(edge, from, to, httpByEdge))
 		usedNodes[edge.FromNodeID] = struct{}{}
 		usedNodes[edge.ToNodeID] = struct{}{}
 	}
@@ -240,8 +326,12 @@ func toNodeDTO(n *database.DependencyNode) NodeDTO {
 	}
 }
 
-func toEdgeDTO(e *database.DependencyEdgeWindow) EdgeDTO {
-	return EdgeDTO{
+func toEdgeDTO(
+	e *database.DependencyEdgeWindow,
+	from, to *database.DependencyNode,
+	httpByEdge map[string]*httpEdge,
+) EdgeDTO {
+	dto := EdgeDTO{
 		ID:                  e.ID.String(),
 		FromNodeID:          e.FromNodeID.String(),
 		ToNodeID:            e.ToNodeID.String(),
@@ -255,7 +345,26 @@ func toEdgeDTO(e *database.DependencyEdgeWindow) EdgeDTO {
 		TxBytes:             e.TxBytes,
 		RxBytes:             e.RxBytes,
 		ActiveConnections:   e.ActiveConnections,
+		Operations:          []OperationDTO{},
 		FirstSeenAt:         e.FirstSeenAt,
 		LastSeenAt:          e.LastSeenAt,
 	}
+	if len(httpByEdge) == 0 {
+		return dto
+	}
+	key := edgeKey(ResolvedEdge{
+		From:     NodeRef{Kind: from.Kind, Namespace: from.Namespace, Name: from.Name},
+		To:       NodeRef{Kind: to.Kind, Namespace: to.Namespace, Name: to.Name},
+		Protocol: e.Protocol,
+		Port:     e.Port,
+	})
+	http, ok := httpByEdge[key]
+	if !ok {
+		return dto
+	}
+	dto.Requests = http.Requests
+	dto.Errors = http.Errors
+	dto.P50, dto.P95 = http.dominantOpQuantiles()
+	dto.Operations = http.toOperations()
+	return dto
 }

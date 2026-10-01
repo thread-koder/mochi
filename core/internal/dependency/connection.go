@@ -11,20 +11,25 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// seriesIdentity is the shared L4 label set on mochi_net_* and mochi_http_*.
+type seriesIdentity struct {
+	SrcPodUID     string
+	SrcNamespace  string
+	SrcPod        string
+	DstPodUID     string
+	DstNamespace  string
+	DstPod        string
+	DstIP         string
+	DstPort       int
+	ActualDstIP   string
+	ActualDstPort int
+	Protocol      string
+	DstHostname   string
+}
+
 // ConnectionSeries is one client-outbound connection aggregate matching the mochi_net_* label set.
 type ConnectionSeries struct {
-	SrcPodUID         string
-	SrcNamespace      string
-	SrcPod            string
-	DstPodUID         string
-	DstNamespace      string
-	DstPod            string
-	DstIP             string
-	DstPort           int
-	ActualDstIP       string
-	ActualDstPort     int
-	Protocol          string
-	DstHostname       string
+	seriesIdentity
 	Connects          float64
 	TxBytes           float64
 	RxBytes           float64
@@ -138,21 +143,11 @@ func joinConnectionSeries(connects, txBytes, rxBytes, active model.Vector) []Con
 func connectionValuesByKey(vector model.Vector) map[string]float64 {
 	byKey := make(map[string]float64, len(vector))
 	for _, sample := range vector {
-		metric := sample.Metric
-		byKey[identityKey(
-			string(metric["src_pod_uid"]),
-			string(metric["src_namespace"]),
-			string(metric["src_pod"]),
-			string(metric["dst_pod_uid"]),
-			string(metric["dst_namespace"]),
-			string(metric["dst_pod"]),
-			string(metric["dst_ip"]),
-			string(metric["dst_port"]),
-			string(metric["actual_dst_ip"]),
-			string(metric["actual_dst_port"]),
-			string(metric["protocol"]),
-			string(metric["dst_hostname"]),
-		)] = float64(sample.Value)
+		id, ok := parseSeriesIdentity(sample.Metric)
+		if !ok {
+			continue
+		}
+		byKey[id.l4Key()] = float64(sample.Value)
 	}
 	return byKey
 }
@@ -161,69 +156,91 @@ func identityKey(parts ...string) string {
 	return strings.Join(parts, "\x00")
 }
 
+func (id seriesIdentity) l4Key() string {
+	return identityKey(
+		id.SrcPodUID,
+		id.SrcNamespace,
+		id.SrcPod,
+		id.DstPodUID,
+		id.DstNamespace,
+		id.DstPod,
+		id.DstIP,
+		strconv.Itoa(id.DstPort),
+		id.ActualDstIP,
+		strconv.Itoa(id.ActualDstPort),
+		id.Protocol,
+		id.DstHostname,
+	)
+}
+
+func (id seriesIdentity) httpKey(method, route string) string {
+	return identityKey(
+		id.SrcPodUID,
+		id.SrcNamespace,
+		id.SrcPod,
+		id.DstPodUID,
+		id.DstNamespace,
+		id.DstPod,
+		id.DstIP,
+		strconv.Itoa(id.DstPort),
+		id.ActualDstIP,
+		strconv.Itoa(id.ActualDstPort),
+		id.Protocol,
+		id.DstHostname,
+		method,
+		route,
+	)
+}
+
+func parseSeriesIdentity(metric model.Metric) (seriesIdentity, bool) {
+	srcPodUID := string(metric["src_pod_uid"])
+	if srcPodUID == "" {
+		return seriesIdentity{}, false
+	}
+
+	dstPort, err := strconv.Atoi(string(metric["dst_port"]))
+	if err != nil {
+		return seriesIdentity{}, false
+	}
+
+	actualDstPort, err := strconv.Atoi(string(metric["actual_dst_port"]))
+	if err != nil {
+		return seriesIdentity{}, false
+	}
+
+	protocol := string(metric["protocol"])
+	if !isKnownProtocol(protocol) {
+		return seriesIdentity{}, false
+	}
+
+	return seriesIdentity{
+		SrcPodUID:     srcPodUID,
+		SrcNamespace:  string(metric["src_namespace"]),
+		SrcPod:        string(metric["src_pod"]),
+		DstPodUID:     string(metric["dst_pod_uid"]),
+		DstNamespace:  string(metric["dst_namespace"]),
+		DstPod:        string(metric["dst_pod"]),
+		DstIP:         string(metric["dst_ip"]),
+		DstPort:       dstPort,
+		ActualDstIP:   string(metric["actual_dst_ip"]),
+		ActualDstPort: actualDstPort,
+		Protocol:      protocol,
+		DstHostname:   string(metric["dst_hostname"]),
+	}, true
+}
+
 func connectionFromMetric(
 	metric model.Metric,
 	connects float64,
 	txByKey, rxByKey, activeByKey map[string]float64,
 ) (ConnectionSeries, string, bool) {
-	srcPodUID := string(metric["src_pod_uid"])
-	if srcPodUID == "" {
+	id, ok := parseSeriesIdentity(metric)
+	if !ok {
 		return ConnectionSeries{}, "", false
 	}
-
-	dstPortLabel := string(metric["dst_port"])
-	dstPort, err := strconv.Atoi(dstPortLabel)
-	if err != nil {
-		return ConnectionSeries{}, "", false
-	}
-
-	actualDstPortLabel := string(metric["actual_dst_port"])
-	actualDstPort, err := strconv.Atoi(actualDstPortLabel)
-	if err != nil {
-		return ConnectionSeries{}, "", false
-	}
-
-	srcNamespace := string(metric["src_namespace"])
-	srcPod := string(metric["src_pod"])
-	dstPodUID := string(metric["dst_pod_uid"])
-	dstNamespace := string(metric["dst_namespace"])
-	dstPod := string(metric["dst_pod"])
-	dstIP := string(metric["dst_ip"])
-	actualDstIP := string(metric["actual_dst_ip"])
-	protocol := string(metric["protocol"])
-	dstHostname := string(metric["dst_hostname"])
-	if !isKnownProtocol(protocol) {
-		return ConnectionSeries{}, "", false
-	}
-
-	key := identityKey(
-		srcPodUID,
-		srcNamespace,
-		srcPod,
-		dstPodUID,
-		dstNamespace,
-		dstPod,
-		dstIP,
-		dstPortLabel,
-		actualDstIP,
-		actualDstPortLabel,
-		protocol,
-		dstHostname,
-	)
-
+	key := id.l4Key()
 	return ConnectionSeries{
-		SrcPodUID:         srcPodUID,
-		SrcNamespace:      srcNamespace,
-		SrcPod:            srcPod,
-		DstPodUID:         dstPodUID,
-		DstNamespace:      dstNamespace,
-		DstPod:            dstPod,
-		DstIP:             dstIP,
-		DstPort:           dstPort,
-		ActualDstIP:       actualDstIP,
-		ActualDstPort:     actualDstPort,
-		Protocol:          protocol,
-		DstHostname:       dstHostname,
+		seriesIdentity:    id,
 		Connects:          connects,
 		TxBytes:           txByKey[key],
 		RxBytes:           rxByKey[key],
