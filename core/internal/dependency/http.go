@@ -174,7 +174,7 @@ func operationKey(method, route string) string {
 func mergeHTTPByEdge(ctx context.Context, series []HTTPSeries, opts ResolveOptions) (map[string]*httpEdge, error) {
 	byEdge := make(map[string]*httpEdge)
 	for _, hop := range series {
-		from, to, kept, err := resolveEdgeEnds(ctx, hop.connectionSeries(), opts)
+		from, to, kept, err := ResolveEnds(ctx, hop.connectionSeries(), opts)
 		if err != nil {
 			return nil, fmt.Errorf("resolve http series: %w", err)
 		}

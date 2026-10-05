@@ -120,7 +120,7 @@ func DefaultResolveOptions(podCIDRs, serviceCIDRs []string) ResolveOptions {
 
 // Resolve turns one connection series into a workload edge, or drops it as noise/unresolvable src.
 func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (ResolvedEdge, bool, error) {
-	from, to, kept, err := resolveEdgeEnds(ctx, series, opts)
+	from, to, kept, err := ResolveEnds(ctx, series, opts)
 	if err != nil {
 		return ResolvedEdge{}, false, err
 	}
@@ -157,8 +157,8 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 	}, true, nil
 }
 
-// resolveEdgeEnds maps a series to from/to workloads without via Service attribution.
-func resolveEdgeEnds(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (from, to NodeRef, kept bool, err error) {
+// ResolveEnds maps a series to from/to workloads without via Service attribution.
+func ResolveEnds(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (from, to NodeRef, kept bool, err error) {
 	if series.Connects <= 0 && series.ActiveConnections <= 0 {
 		return NodeRef{}, NodeRef{}, false, nil
 	}

@@ -78,7 +78,15 @@ func setupRoutes(router *gin.Engine, cfg *config.Config) {
 				dependencyAnalysis.GET("/analyze/namespaces/:namespace", dependencyHandlers.AnalyzeNamespace)
 				dependencyAnalysis.GET("/analyze/workloads/:workloadType/:workloadName", dependencyHandlers.AnalyzeWorkload)
 			}
+
+			dependencySpans := dependency.Group("")
+			{
+				dependencySpans.GET("/spans/namespaces/:namespace", dependencyHandlers.GetNamespaceSpans)
+				dependencySpans.GET("/spans/workloads/:workloadType/:workloadName", dependencyHandlers.GetWorkloadSpans)
+			}
 		}
+
+		v1.POST("/ingest/spans", dependencyHandlers.IngestSpans)
 
 		// This group is used for analyses that are not specific
 		// to a single domain (cross-domain).
