@@ -27,6 +27,9 @@ type Request struct {
 	GRPC     bool
 	Key      metrics.SeriesKey
 	Start    time.Time
+	TraceID  [16]byte
+	SpanID   [8]byte
+	Sampled  bool
 }
 
 type Completion struct {
@@ -34,7 +37,14 @@ type Completion struct {
 	Method      string
 	Route       string
 	StatusClass string
-	Seconds     float64
+	StatusCode  int
+	GRPC        bool
+	GRPCStatus  *int
+	Start       time.Time
+	End         time.Time
+	TraceID     [16]byte
+	SpanID      [8]byte
+	Sampled     bool
 }
 
 type pendingBlock struct {
@@ -386,10 +396,11 @@ func (c *Conn) onResponseHeaders(streamID uint32, h headerSet, endStream bool, n
 			if !endStream {
 				return Completion{}, false
 			}
-			return c.finishHop(streamID, req, http1.StatusClass(grpcStatusHTTP(h.grpcStatus)), now, outstanding)
+			statusCode := grpcStatusHTTP(h.grpcStatus)
+			return c.finishHop(streamID, req, http1.StatusClass(statusCode), statusCode, &h.grpcStatus, now, outstanding)
 		}
 		if h.status >= 0 && h.status != 200 {
-			return c.finishHop(streamID, req, http1.StatusClass(h.status), now, outstanding)
+			return c.finishHop(streamID, req, http1.StatusClass(h.status), h.status, nil, now, outstanding)
 		}
 		if endStream {
 			c.dropStream(streamID, outstanding)
@@ -404,10 +415,10 @@ func (c *Conn) onResponseHeaders(streamID uint32, h headerSet, endStream bool, n
 	if h.status >= 100 && h.status < 200 {
 		return Completion{}, false
 	}
-	return c.finishHop(streamID, req, http1.StatusClass(h.status), now, outstanding)
+	return c.finishHop(streamID, req, http1.StatusClass(h.status), h.status, nil, now, outstanding)
 }
 
-func (c *Conn) finishHop(streamID uint32, req *Request, class string, now time.Time, outstanding *int) (Completion, bool) {
+func (c *Conn) finishHop(streamID uint32, req *Request, class string, statusCode int, grpcStatus *int, now time.Time, outstanding *int) (Completion, bool) {
 	if class == "" {
 		c.dropStream(streamID, outstanding)
 		return Completion{}, false
@@ -418,15 +429,25 @@ func (c *Conn) finishHop(streamID uint32, req *Request, class string, now time.T
 		Method:      req.Method,
 		Route:       req.Route,
 		StatusClass: class,
-		Seconds:     now.Sub(req.Start).Seconds(),
+		StatusCode:  statusCode,
+		GRPC:        req.GRPC,
+		GRPCStatus:  grpcStatus,
+		Start:       req.Start,
+		End:         now,
+		TraceID:     req.TraceID,
+		SpanID:      req.SpanID,
+		Sampled:     req.Sampled,
 	}, true
 }
 
 // Enqueue stores a pending stream request. replaceTLS replaces an existing
-// pending hop for the same stream ID.
+// pending hop for the same stream ID, keeping span IDs.
 func (c *Conn) Enqueue(req Request, replaceTLS bool, outstanding *int, maxOutstanding int) {
 	if existing := c.streams[req.StreamID]; existing != nil {
 		if replaceTLS {
+			req.TraceID = existing.TraceID
+			req.SpanID = existing.SpanID
+			req.Sampled = existing.Sampled
 			c.streams[req.StreamID] = &req
 		}
 		return

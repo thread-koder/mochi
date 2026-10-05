@@ -13,6 +13,7 @@ import (
 	"github.com/thread_koder/mochi/agent/internal/collection/http2"
 	"github.com/thread_koder/mochi/agent/internal/collection/identity"
 	"github.com/thread_koder/mochi/agent/internal/metrics"
+	"github.com/thread_koder/mochi/agent/internal/span"
 )
 
 const (
@@ -34,7 +35,14 @@ type completedHop struct {
 	method      string
 	route       string
 	statusClass string
-	seconds     float64
+	statusCode  int
+	grpc        bool
+	grpcStatus  *int
+	start       time.Time
+	end         time.Time
+	traceID     [16]byte
+	spanID      [8]byte
+	sampled     bool
 }
 
 // pendingRequest is a hop that missed Store.Lookup and still needs identity.
@@ -67,7 +75,7 @@ type connState struct {
 	h2        *http2.Conn
 }
 
-// Tracker demuxes HTTP/1 and HTTP/2 prefixes into hop RED.
+// Tracker demuxes HTTP/1 and HTTP/2 prefixes into hop RED and sampled spans.
 // Owns the HTTP MAX_SERIES budget (drop new label sets, never delete).
 type Tracker struct {
 	mu          sync.Mutex
@@ -78,6 +86,8 @@ type Tracker struct {
 	resolver    *identity.Resolver
 	conntrack   *conntrack.Client
 	dnsCache    *dns.Cache
+	exporter    *span.Exporter
+	sampleRate  float64
 	outstanding int
 
 	seriesMu sync.Mutex
@@ -91,18 +101,22 @@ func NewTracker(
 	resolver *identity.Resolver,
 	conntrackClient *conntrack.Client,
 	dnsCache *dns.Cache,
+	exporter *span.Exporter,
+	sampleRate float64,
 	maxSeries int,
 ) *Tracker {
 	return &Tracker{
-		conns:     make(map[aggregate.Flow]*connState),
-		router:    NewRouter(),
-		registry:  registry,
-		store:     store,
-		resolver:  resolver,
-		conntrack: conntrackClient,
-		dnsCache:  dnsCache,
-		httpMax:   maxSeries,
-		series:    make(map[metrics.HTTPSeriesKey]struct{}),
+		conns:      make(map[aggregate.Flow]*connState),
+		router:     NewRouter(),
+		registry:   registry,
+		store:      store,
+		resolver:   resolver,
+		conntrack:  conntrackClient,
+		dnsCache:   dnsCache,
+		exporter:   exporter,
+		sampleRate: sampleRate,
+		httpMax:    maxSeries,
+		series:     make(map[metrics.HTTPSeriesKey]struct{}),
 	}
 }
 
@@ -218,13 +232,13 @@ func (t *Tracker) feedHTTP1(conn *connState, flow aggregate.Flow, chunk Chunk, n
 	var pending []pendingRequest
 	for _, req := range reqs {
 		if key, ok := t.store.Lookup(flow); ok {
-			conn.h1.Enqueue(http1.Request{
+			t.enqueueHTTP1(conn, http1.Request{
 				Method: req.Method,
 				Path:   req.Path,
 				Route:  t.routeFor(key, req.Path, false),
 				Key:    key,
 				Start:  req.Start,
-			}, replaceTLS, &t.outstanding, maxOutstanding)
+			}, replaceTLS)
 			continue
 		}
 		pending = append(pending, pendingFrom(flow, chunk, req.Method, req.Path, false, 0, now))
@@ -237,7 +251,12 @@ func (t *Tracker) feedHTTP1(conn *connState, flow aggregate.Flow, chunk Chunk, n
 			method:      hop.Method,
 			route:       hop.Route,
 			statusClass: hop.StatusClass,
-			seconds:     hop.Seconds,
+			statusCode:  hop.StatusCode,
+			start:       hop.Start,
+			end:         hop.End,
+			traceID:     hop.TraceID,
+			spanID:      hop.SpanID,
+			sampled:     hop.Sampled,
 		})
 	}
 
@@ -255,7 +274,7 @@ func (t *Tracker) feedHTTP2(conn *connState, flow aggregate.Flow, chunk Chunk, n
 	var pending []pendingRequest
 	for _, req := range reqs {
 		if key, ok := t.store.Lookup(flow); ok {
-			conn.h2.Enqueue(http2.Request{
+			t.enqueueHTTP2(conn, http2.Request{
 				StreamID: req.StreamID,
 				Method:   req.Method,
 				Path:     req.Path,
@@ -263,7 +282,7 @@ func (t *Tracker) feedHTTP2(conn *connState, flow aggregate.Flow, chunk Chunk, n
 				GRPC:     req.GRPC,
 				Key:      key,
 				Start:    req.Start,
-			}, replaceTLS, &t.outstanding, maxOutstanding)
+			}, replaceTLS)
 			continue
 		}
 		pending = append(pending, pendingFrom(flow, chunk, req.Method, req.Path, req.GRPC, req.StreamID, now))
@@ -276,7 +295,14 @@ func (t *Tracker) feedHTTP2(conn *connState, flow aggregate.Flow, chunk Chunk, n
 			method:      hop.Method,
 			route:       hop.Route,
 			statusClass: hop.StatusClass,
-			seconds:     hop.Seconds,
+			statusCode:  hop.StatusCode,
+			grpc:        hop.GRPC,
+			grpcStatus:  hop.GRPCStatus,
+			start:       hop.Start,
+			end:         hop.End,
+			traceID:     hop.TraceID,
+			spanID:      hop.SpanID,
+			sampled:     hop.Sampled,
 		})
 	}
 
@@ -316,15 +342,15 @@ func (t *Tracker) enqueuePending(conn *connState, pending pendingRequest, key me
 	route := t.routeFor(key, pending.path, pending.grpc)
 	switch conn.proto {
 	case protoHTTP1:
-		conn.h1.Enqueue(http1.Request{
+		t.enqueueHTTP1(conn, http1.Request{
 			Method: pending.method,
 			Path:   pending.path,
 			Route:  route,
 			Key:    key,
 			Start:  pending.now,
-		}, replaceTLS, &t.outstanding, maxOutstanding)
+		}, replaceTLS)
 	case protoHTTP2:
-		conn.h2.Enqueue(http2.Request{
+		t.enqueueHTTP2(conn, http2.Request{
 			StreamID: pending.stream,
 			Method:   pending.method,
 			Path:     pending.path,
@@ -332,8 +358,30 @@ func (t *Tracker) enqueuePending(conn *connState, pending pendingRequest, key me
 			GRPC:     pending.grpc,
 			Key:      key,
 			Start:    pending.now,
-		}, replaceTLS, &t.outstanding, maxOutstanding)
+		}, replaceTLS)
 	}
+}
+
+func (t *Tracker) enqueueHTTP1(conn *connState, req http1.Request, replaceTLS bool) {
+	// Always mint. Enqueue replace keeps the queued hop's IDs/sampled flag.
+	t.stampIDs(&req.TraceID, &req.SpanID, &req.Sampled)
+	conn.h1.Enqueue(req, replaceTLS, &t.outstanding, maxOutstanding)
+}
+
+func (t *Tracker) enqueueHTTP2(conn *connState, req http2.Request, replaceTLS bool) {
+	// Always mint. Enqueue replace keeps the queued hop's IDs/sampled flag.
+	t.stampIDs(&req.TraceID, &req.SpanID, &req.Sampled)
+	conn.h2.Enqueue(req, replaceTLS, &t.outstanding, maxOutstanding)
+}
+
+func (t *Tracker) stampIDs(traceID *[16]byte, spanID *[8]byte, sampled *bool) {
+	tid, sid, err := span.NewIDs()
+	if err != nil {
+		return
+	}
+	*traceID = tid
+	*spanID = sid
+	*sampled = span.Sampled(tid, t.sampleRate)
 }
 
 func (t *Tracker) liveIdentity(pending pendingRequest) (metrics.SeriesKey, bool) {
@@ -364,6 +412,7 @@ func (t *Tracker) liveIdentity(pending pendingRequest) (metrics.SeriesKey, bool)
 }
 
 func (t *Tracker) recordHop(hop completedHop) {
+	t.offerSpan(hop)
 	httpKey := metrics.HTTPSeriesKey{SeriesKey: hop.key, Method: hop.method, Route: hop.route}
 	t.seriesMu.Lock()
 	_, known := t.series[httpKey]
@@ -375,7 +424,48 @@ func (t *Tracker) recordHop(hop completedHop) {
 		t.series[httpKey] = struct{}{}
 	}
 	t.seriesMu.Unlock()
-	t.registry.RecordHTTP(hop.key, hop.method, hop.route, hop.statusClass, hop.seconds)
+	t.registry.RecordHTTP(hop.key, hop.method, hop.route, hop.statusClass, hop.end.Sub(hop.start).Seconds())
+}
+
+func (t *Tracker) offerSpan(hop completedHop) {
+	if t.exporter == nil {
+		return
+	}
+	if hop.traceID == [16]byte{} || hop.spanID == [8]byte{} {
+		return
+	}
+
+	keep := hop.sampled
+	if hop.grpc {
+		if hop.grpcStatus != nil && *hop.grpcStatus != 0 {
+			keep = true
+		}
+	} else if hop.statusClass == "5xx" {
+		keep = true
+	}
+	if !keep {
+		return
+	}
+
+	sampledBy := span.SampledByHead
+	if !hop.sampled {
+		sampledBy = span.SampledByError
+	}
+
+	t.exporter.Offer(span.Hop{
+		TraceID:     hop.traceID,
+		SpanID:      hop.spanID,
+		Start:       hop.start,
+		End:         hop.end,
+		Method:      hop.method,
+		Route:       hop.route,
+		StatusClass: hop.statusClass,
+		StatusCode:  hop.statusCode,
+		GRPC:        hop.grpc,
+		GRPCStatus:  hop.grpcStatus,
+		SampledBy:   sampledBy,
+		Key:         hop.key,
+	})
 }
 
 func (t *Tracker) gc(now time.Time) {

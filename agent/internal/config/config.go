@@ -9,13 +9,15 @@ import (
 
 // Config holds agent runtime settings from environment variables.
 type Config struct {
-	MetricsHost string
-	MetricsPort int
-	LogLevel    string
-	LogFormat   string
-	EBPFEnabled bool
-	MaxSeries   int
-	NodeName    string
+	MetricsHost    string
+	MetricsPort    int
+	LogLevel       string
+	LogFormat      string
+	EBPFEnabled    bool
+	MaxSeries      int
+	NodeName       string
+	CoreURL        string
+	SpanSampleRate float64
 }
 
 func Load() (Config, error) {
@@ -37,14 +39,24 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("EBPF_ENABLED: %w", err)
 	}
 
+	spanSampleRate, err := envFloat("SPAN_SAMPLE_RATE", 0.01)
+	if err != nil {
+		return Config{}, fmt.Errorf("SPAN_SAMPLE_RATE: %w", err)
+	}
+	if spanSampleRate < 0 || spanSampleRate > 1 {
+		return Config{}, fmt.Errorf("SPAN_SAMPLE_RATE must be in [0, 1], got: %g", spanSampleRate)
+	}
+
 	cfg := Config{
-		MetricsHost: envOr("METRICS_HOST", "0.0.0.0"),
-		MetricsPort: metricsPort,
-		LogLevel:    envOr("LOG_LEVEL", "info"),
-		LogFormat:   envOr("LOG_FORMAT", "console"),
-		EBPFEnabled: ebpfEnabled,
-		MaxSeries:   maxSeries,
-		NodeName:    strings.TrimSpace(os.Getenv("NODE_NAME")),
+		MetricsHost:    envOr("METRICS_HOST", "0.0.0.0"),
+		MetricsPort:    metricsPort,
+		LogLevel:       envOr("LOG_LEVEL", "info"),
+		LogFormat:      envOr("LOG_FORMAT", "console"),
+		EBPFEnabled:    ebpfEnabled,
+		MaxSeries:      maxSeries,
+		NodeName:       strings.TrimSpace(os.Getenv("NODE_NAME")),
+		CoreURL:        strings.TrimSpace(os.Getenv("CORE_URL")),
+		SpanSampleRate: spanSampleRate,
 	}
 
 	if cfg.EBPFEnabled && cfg.NodeName == "" {
@@ -81,6 +93,18 @@ func envBool(key string, fallback bool) (bool, error) {
 	value, err := strconv.ParseBool(raw)
 	if err != nil {
 		return false, fmt.Errorf("invalid boolean %q", raw)
+	}
+	return value, nil
+}
+
+func envFloat(key string, fallback float64) (float64, error) {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback, nil
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid float %q", raw)
 	}
 	return value, nil
 }

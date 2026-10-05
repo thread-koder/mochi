@@ -12,11 +12,14 @@ const (
 )
 
 type Request struct {
-	Method string
-	Path   string
-	Route  string
-	Key    metrics.SeriesKey
-	Start  time.Time
+	Method  string
+	Path    string
+	Route   string
+	Key     metrics.SeriesKey
+	Start   time.Time
+	TraceID [16]byte
+	SpanID  [8]byte
+	Sampled bool
 }
 
 type Completion struct {
@@ -24,7 +27,12 @@ type Completion struct {
 	Method      string
 	Route       string
 	StatusClass string
-	Seconds     float64
+	StatusCode  int
+	Start       time.Time
+	End         time.Time
+	TraceID     [16]byte
+	SpanID      [8]byte
+	Sampled     bool
 }
 
 type Conn struct {
@@ -122,13 +130,17 @@ func (c *Conn) Feed(dir uint8, data []byte, now time.Time, outstanding *int) (re
 }
 
 // Enqueue appends a pending request. replaceTLS replaces the last matching
-// method+route when a TLS kind revisits a socket queued hop.
+// method+route when a TLS kind revisits a socket queued hop, keeping span IDs.
 func (c *Conn) Enqueue(req Request, replaceTLS bool, outstanding *int, maxOutstanding int) {
 	if replaceTLS {
 		if n := len(c.outstanding); n > 0 {
 			last := &c.outstanding[n-1]
 			if last.Method == req.Method && last.Route == req.Route {
+				traceID, spanID, sampled := last.TraceID, last.SpanID, last.Sampled
 				*last = req
+				last.TraceID = traceID
+				last.SpanID = spanID
+				last.Sampled = sampled
 				return
 			}
 		}
@@ -164,7 +176,12 @@ func (c *Conn) pairResponse(msg Message, now time.Time, outstanding *int) (Compl
 		Method:      req.Method,
 		Route:       req.Route,
 		StatusClass: class,
-		Seconds:     now.Sub(req.Start).Seconds(),
+		StatusCode:  msg.Status,
+		Start:       req.Start,
+		End:         now,
+		TraceID:     req.TraceID,
+		SpanID:      req.SpanID,
+		Sampled:     req.Sampled,
 	}, true
 }
 

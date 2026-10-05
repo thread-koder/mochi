@@ -16,6 +16,7 @@ import (
 	"github.com/thread_koder/mochi/agent/internal/config"
 	"github.com/thread_koder/mochi/agent/internal/logger"
 	"github.com/thread_koder/mochi/agent/internal/metrics"
+	"github.com/thread_koder/mochi/agent/internal/span"
 )
 
 const procnetSeedInterval = 30 * time.Second
@@ -62,7 +63,8 @@ func Start(cfg config.Config, registry *metrics.Registry) *Runtime {
 	}
 	runtime.ctClient = ctClient
 
-	l7Tracker := l7.NewTracker(registry, store, resolver, ctClient, dnsCache, cfg.MaxSeries)
+	exporter := span.NewExporter(cfg.CoreURL)
+	l7Tracker := l7.NewTracker(registry, store, resolver, ctClient, dnsCache, exporter, cfg.SpanSampleRate, cfg.MaxSeries)
 	collector, err := ebpf.Load(store, resolver, ctClient, listen, dnsCache, l7Tracker)
 	if err != nil {
 		log.Error().Err(err).Msg("eBPF load failed. Continuing without collection")
@@ -74,6 +76,9 @@ func Start(cfg config.Config, registry *metrics.Registry) *Runtime {
 	seeder := procnet.NewSeeder(store, resolver, ctClient, listen, dnsCache)
 
 	go l7Tracker.Start(ctx)
+	if exporter != nil {
+		go exporter.Run(ctx)
+	}
 	go collector.Start(ctx)
 	go seeder.Start(ctx, procnetSeedInterval)
 	log.Info().Msg("Collection started")

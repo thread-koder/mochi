@@ -30,6 +30,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: CORE_URL
+              value: ""
+            - name: SPAN_SAMPLE_RATE
+              value: "0.01"
           securityContext:
             allowPrivilegeEscalation: false
             seccompProfile:
