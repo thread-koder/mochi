@@ -65,6 +65,7 @@ func (w *RetentionWorker) run() {
 		{name: "compute_recommendations", run: database.PruneExpiredComputeRecommendations},
 		{name: "pod_attributions", run: database.PruneExpiredPodAttributions},
 		{name: "dependency_graph", run: database.PruneExpiredDependencyGraph},
+		{name: "spans", run: database.PruneExpiredSpans},
 	}
 
 	log.Info().Msg("Starting retention pass...")
