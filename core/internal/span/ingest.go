@@ -42,13 +42,20 @@ func Ingest(ctx context.Context, spans []IngestSpan) error {
 }
 
 func prepareSpan(ctx context.Context, s *IngestSpan, opts dependency.ResolveOptions) (*database.Span, error) {
-	traceID, err := decodeID(s.TraceID, 16)
+	traceID, err := decodeID(s.TraceID, TraceIDSize)
 	if err != nil {
 		return nil, invalid("trace_id: %v", err)
 	}
-	spanID, err := decodeID(s.SpanID, 8)
+	spanID, err := decodeID(s.SpanID, SpanIDSize)
 	if err != nil {
 		return nil, invalid("span_id: %v", err)
+	}
+	var parentSpanID []byte
+	if s.ParentSpanID != nil && *s.ParentSpanID != "" {
+		parentSpanID, err = decodeID(*s.ParentSpanID, SpanIDSize)
+		if err != nil {
+			return nil, invalid("parent_span_id: %v", err)
+		}
 	}
 	if s.StartAt.IsZero() || s.EndAt.IsZero() {
 		return nil, invalid("start_at and end_at are required")
@@ -91,6 +98,7 @@ func prepareSpan(ctx context.Context, s *IngestSpan, opts dependency.ResolveOpti
 	row := &database.Span{
 		TraceID:       traceID,
 		SpanID:        spanID,
+		ParentSpanID:  parentSpanID,
 		StartAt:       s.StartAt.UTC(),
 		EndAt:         s.EndAt.UTC(),
 		Method:        method,

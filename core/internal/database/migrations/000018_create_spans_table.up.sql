@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS spans (
     trace_id BYTEA NOT NULL,
     span_id BYTEA NOT NULL,
+    parent_span_id BYTEA,
     start_at TIMESTAMP WITH TIME ZONE NOT NULL,
     end_at TIMESTAMP WITH TIME ZONE NOT NULL,
     method VARCHAR(32) NOT NULL,
@@ -32,7 +33,8 @@ CREATE TABLE IF NOT EXISTS spans (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     PRIMARY KEY (trace_id, span_id),
     CONSTRAINT spans_trace_id_len CHECK (octet_length(trace_id) = 16),
-    CONSTRAINT spans_span_id_len CHECK (octet_length(span_id) = 8)
+    CONSTRAINT spans_span_id_len CHECK (octet_length(span_id) = 8),
+    CONSTRAINT spans_parent_span_id_len CHECK (parent_span_id IS NULL OR octet_length(parent_span_id) = 8)
 );
 
 CREATE INDEX IF NOT EXISTS idx_spans_start_at

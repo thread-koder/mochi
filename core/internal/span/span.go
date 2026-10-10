@@ -19,6 +19,9 @@ const (
 	SampledByHead  = "head"
 	SampledByError = "error"
 
+	TraceIDSize = 16
+	SpanIDSize  = 8
+
 	DefaultLimit = 100
 	MaxLimit     = 1000
 )
@@ -26,6 +29,7 @@ const (
 type IngestSpan struct {
 	TraceID       string    `json:"trace_id"`
 	SpanID        string    `json:"span_id"`
+	ParentSpanID  *string   `json:"parent_span_id"`
 	StartAt       time.Time `json:"start_at"`
 	EndAt         time.Time `json:"end_at"`
 	Method        string    `json:"method"`
@@ -63,6 +67,7 @@ type WorkloadRef struct {
 type SpanDTO struct {
 	TraceID         string       `json:"trace_id"`
 	SpanID          string       `json:"span_id"`
+	ParentSpanID    *string      `json:"parent_span_id"`
 	StartAt         time.Time    `json:"start_at"`
 	EndAt           time.Time    `json:"end_at"`
 	DurationSeconds float64      `json:"duration_seconds"`
@@ -102,9 +107,15 @@ func clampLimit(limit int) int {
 }
 
 func toDTO(s *database.Span) SpanDTO {
+	var parentHex *string
+	if len(s.ParentSpanID) > 0 {
+		encoded := hex.EncodeToString(s.ParentSpanID)
+		parentHex = &encoded
+	}
 	return SpanDTO{
 		TraceID:         hex.EncodeToString(s.TraceID),
 		SpanID:          hex.EncodeToString(s.SpanID),
+		ParentSpanID:    parentHex,
 		StartAt:         s.StartAt,
 		EndAt:           s.EndAt,
 		DurationSeconds: s.EndAt.Sub(s.StartAt).Seconds(),
@@ -151,7 +162,7 @@ func decodeID(hexID string, want int) ([]byte, error) {
 	if len(raw) != want {
 		return nil, fmt.Errorf("id length %d, want %d", len(raw), want)
 	}
-	var zero [16]byte
+	var zero [TraceIDSize]byte
 	if bytes.Equal(raw, zero[:want]) {
 		return nil, fmt.Errorf("id is all-zero")
 	}

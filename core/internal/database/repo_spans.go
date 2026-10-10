@@ -11,6 +11,7 @@ import (
 type Span struct {
 	TraceID       []byte
 	SpanID        []byte
+	ParentSpanID  []byte
 	StartAt       time.Time
 	EndAt         time.Time
 	Method        string
@@ -42,7 +43,7 @@ type Span struct {
 }
 
 const spanSelectColumns = `
-	trace_id, span_id, start_at, end_at,
+	trace_id, span_id, parent_span_id, start_at, end_at,
 	method, route, status_class, status_code, grpc_status,
 	rpc_system, source, sampled_by,
 	src_pod_uid, src_namespace, src_pod,
@@ -68,7 +69,7 @@ func InsertSpans(ctx context.Context, spans []*Span) error {
 	for _, s := range spans {
 		batch.Queue(`
 			INSERT INTO spans (
-				trace_id, span_id, start_at, end_at,
+				trace_id, span_id, parent_span_id, start_at, end_at,
 				method, route, status_class, status_code, grpc_status,
 				rpc_system, source, sampled_by,
 				src_pod_uid, src_namespace, src_pod,
@@ -78,7 +79,7 @@ func InsertSpans(ctx context.Context, spans []*Span) error {
 				from_kind, from_namespace, from_name,
 				to_kind, to_namespace, to_name
 			) VALUES (
-				@trace_id, @span_id, @start_at, @end_at,
+				@trace_id, @span_id, @parent_span_id, @start_at, @end_at,
 				@method, @route, @status_class, @status_code, @grpc_status,
 				@rpc_system, @source, @sampled_by,
 				@src_pod_uid, @src_namespace, @src_pod,
@@ -92,6 +93,7 @@ func InsertSpans(ctx context.Context, spans []*Span) error {
 		`, pgx.StrictNamedArgs{
 			"trace_id":        s.TraceID,
 			"span_id":         s.SpanID,
+			"parent_span_id":  s.ParentSpanID,
 			"start_at":        s.StartAt,
 			"end_at":          s.EndAt,
 			"method":          s.Method,
@@ -191,7 +193,7 @@ func collectSpans(rows pgx.Rows) ([]*Span, error) {
 	for rows.Next() {
 		var s Span
 		if err := rows.Scan(
-			&s.TraceID, &s.SpanID, &s.StartAt, &s.EndAt,
+			&s.TraceID, &s.SpanID, &s.ParentSpanID, &s.StartAt, &s.EndAt,
 			&s.Method, &s.Route, &s.StatusClass, &s.StatusCode, &s.GRPCStatus,
 			&s.RPCSystem, &s.Source, &s.SampledBy,
 			&s.SrcPodUID, &s.SrcNamespace, &s.SrcPod,
