@@ -31,35 +31,38 @@ const (
 )
 
 type completedHop struct {
-	key         metrics.SeriesKey
-	method      string
-	route       string
-	statusClass string
-	statusCode  int
-	grpc        bool
-	grpcStatus  *int
-	start       time.Time
-	end         time.Time
-	traceID     [16]byte
-	spanID      [8]byte
-	sampled     bool
+	key          metrics.SeriesKey
+	method       string
+	route        string
+	statusClass  string
+	statusCode   int
+	grpc         bool
+	grpcStatus   *int
+	start        time.Time
+	end          time.Time
+	traceID      [span.TraceIDSize]byte
+	spanID       [span.SpanIDSize]byte
+	parentSpanID [span.SpanIDSize]byte
+	sampled      bool
 }
 
 // pendingRequest is a hop that missed Store.Lookup and still needs identity.
 type pendingRequest struct {
-	flow     aggregate.Flow
-	pid      uint32
-	cgroupID uint64
-	src      netip.Addr
-	dst      netip.Addr
-	sport    uint16
-	dport    uint16
-	kind     uint8
-	method   string
-	path     string
-	grpc     bool
-	stream   uint32
-	now      time.Time
+	flow         aggregate.Flow
+	pid          uint32
+	cgroupID     uint64
+	src          netip.Addr
+	dst          netip.Addr
+	sport        uint16
+	dport        uint16
+	kind         uint8
+	method       string
+	path         string
+	grpc         bool
+	stream       uint32
+	traceparent  string
+	grpcTraceBin string
+	now          time.Time
 }
 
 func (p pendingRequest) fromTLS() bool {
@@ -232,31 +235,28 @@ func (t *Tracker) feedHTTP1(conn *connState, flow aggregate.Flow, chunk Chunk, n
 	var pending []pendingRequest
 	for _, req := range reqs {
 		if key, ok := t.store.Lookup(flow); ok {
-			t.enqueueHTTP1(conn, http1.Request{
-				Method: req.Method,
-				Path:   req.Path,
-				Route:  t.routeFor(key, req.Path, false),
-				Key:    key,
-				Start:  req.Start,
-			}, replaceTLS)
+			req.Route = t.routeFor(key, req.Path, false)
+			req.Key = key
+			t.enqueueHTTP1(conn, req, replaceTLS)
 			continue
 		}
-		pending = append(pending, pendingFrom(flow, chunk, req.Method, req.Path, false, 0, now))
+		pending = append(pending, pendingFrom(flow, chunk, req.Method, req.Path, false, 0, req.Traceparent, "", now))
 	}
 
 	hops := make([]completedHop, 0, len(completions))
 	for _, hop := range completions {
 		hops = append(hops, completedHop{
-			key:         hop.Key,
-			method:      hop.Method,
-			route:       hop.Route,
-			statusClass: hop.StatusClass,
-			statusCode:  hop.StatusCode,
-			start:       hop.Start,
-			end:         hop.End,
-			traceID:     hop.TraceID,
-			spanID:      hop.SpanID,
-			sampled:     hop.Sampled,
+			key:          hop.Key,
+			method:       hop.Method,
+			route:        hop.Route,
+			statusClass:  hop.StatusClass,
+			statusCode:   hop.StatusCode,
+			start:        hop.Start,
+			end:          hop.End,
+			traceID:      hop.TraceID,
+			spanID:       hop.SpanID,
+			parentSpanID: hop.ParentSpanID,
+			sampled:      hop.Sampled,
 		})
 	}
 
@@ -274,35 +274,30 @@ func (t *Tracker) feedHTTP2(conn *connState, flow aggregate.Flow, chunk Chunk, n
 	var pending []pendingRequest
 	for _, req := range reqs {
 		if key, ok := t.store.Lookup(flow); ok {
-			t.enqueueHTTP2(conn, http2.Request{
-				StreamID: req.StreamID,
-				Method:   req.Method,
-				Path:     req.Path,
-				Route:    t.routeFor(key, req.Path, req.GRPC),
-				GRPC:     req.GRPC,
-				Key:      key,
-				Start:    req.Start,
-			}, replaceTLS)
+			req.Route = t.routeFor(key, req.Path, req.GRPC)
+			req.Key = key
+			t.enqueueHTTP2(conn, req, replaceTLS)
 			continue
 		}
-		pending = append(pending, pendingFrom(flow, chunk, req.Method, req.Path, req.GRPC, req.StreamID, now))
+		pending = append(pending, pendingFrom(flow, chunk, req.Method, req.Path, req.GRPC, req.StreamID, req.Traceparent, req.GRPCTraceBin, now))
 	}
 
 	hops := make([]completedHop, 0, len(completions))
 	for _, hop := range completions {
 		hops = append(hops, completedHop{
-			key:         hop.Key,
-			method:      hop.Method,
-			route:       hop.Route,
-			statusClass: hop.StatusClass,
-			statusCode:  hop.StatusCode,
-			grpc:        hop.GRPC,
-			grpcStatus:  hop.GRPCStatus,
-			start:       hop.Start,
-			end:         hop.End,
-			traceID:     hop.TraceID,
-			spanID:      hop.SpanID,
-			sampled:     hop.Sampled,
+			key:          hop.Key,
+			method:       hop.Method,
+			route:        hop.Route,
+			statusClass:  hop.StatusClass,
+			statusCode:   hop.StatusCode,
+			grpc:         hop.GRPC,
+			grpcStatus:   hop.GRPCStatus,
+			start:        hop.Start,
+			end:          hop.End,
+			traceID:      hop.TraceID,
+			spanID:       hop.SpanID,
+			parentSpanID: hop.ParentSpanID,
+			sampled:      hop.Sampled,
 		})
 	}
 
@@ -312,21 +307,23 @@ func (t *Tracker) feedHTTP2(conn *connState, flow aggregate.Flow, chunk Chunk, n
 	return hops, pending
 }
 
-func pendingFrom(flow aggregate.Flow, chunk Chunk, method, path string, grpc bool, stream uint32, now time.Time) pendingRequest {
+func pendingFrom(flow aggregate.Flow, chunk Chunk, method, path string, grpc bool, stream uint32, traceparent, grpcTraceBin string, now time.Time) pendingRequest {
 	return pendingRequest{
-		flow:     flow,
-		pid:      chunk.Pid,
-		cgroupID: chunk.CgroupID,
-		src:      chunk.Src,
-		dst:      chunk.Dst,
-		sport:    chunk.Sport,
-		dport:    chunk.Dport,
-		kind:     chunk.Kind,
-		method:   method,
-		path:     path,
-		grpc:     grpc,
-		stream:   stream,
-		now:      now,
+		flow:         flow,
+		pid:          chunk.Pid,
+		cgroupID:     chunk.CgroupID,
+		src:          chunk.Src,
+		dst:          chunk.Dst,
+		sport:        chunk.Sport,
+		dport:        chunk.Dport,
+		kind:         chunk.Kind,
+		method:       method,
+		path:         path,
+		grpc:         grpc,
+		stream:       stream,
+		traceparent:  traceparent,
+		grpcTraceBin: grpcTraceBin,
+		now:          now,
 	}
 }
 
@@ -343,45 +340,92 @@ func (t *Tracker) enqueuePending(conn *connState, pending pendingRequest, key me
 	switch conn.proto {
 	case protoHTTP1:
 		t.enqueueHTTP1(conn, http1.Request{
-			Method: pending.method,
-			Path:   pending.path,
-			Route:  route,
-			Key:    key,
-			Start:  pending.now,
+			Method:      pending.method,
+			Path:        pending.path,
+			Route:       route,
+			Key:         key,
+			Start:       pending.now,
+			Traceparent: pending.traceparent,
 		}, replaceTLS)
 	case protoHTTP2:
 		t.enqueueHTTP2(conn, http2.Request{
-			StreamID: pending.stream,
-			Method:   pending.method,
-			Path:     pending.path,
-			Route:    route,
-			GRPC:     pending.grpc,
-			Key:      key,
-			Start:    pending.now,
+			StreamID:     pending.stream,
+			Method:       pending.method,
+			Path:         pending.path,
+			Route:        route,
+			GRPC:         pending.grpc,
+			Key:          key,
+			Start:        pending.now,
+			Traceparent:  pending.traceparent,
+			GRPCTraceBin: pending.grpcTraceBin,
 		}, replaceTLS)
 	}
 }
 
 func (t *Tracker) enqueueHTTP1(conn *connState, req http1.Request, replaceTLS bool) {
-	// Always mint. Enqueue replace keeps the queued hop's IDs/sampled flag.
-	t.stampIDs(&req.TraceID, &req.SpanID, &req.Sampled)
+	ids := t.stampIDs(req.Traceparent, "")
+	req.TraceID = ids.traceID
+	req.SpanID = ids.spanID
+	req.ParentSpanID = ids.parentSpanID
+	req.Sampled = ids.sampled
 	conn.h1.Enqueue(req, replaceTLS, &t.outstanding, maxOutstanding)
 }
 
 func (t *Tracker) enqueueHTTP2(conn *connState, req http2.Request, replaceTLS bool) {
-	// Always mint. Enqueue replace keeps the queued hop's IDs/sampled flag.
-	t.stampIDs(&req.TraceID, &req.SpanID, &req.Sampled)
+	ids := t.stampIDs(req.Traceparent, req.GRPCTraceBin)
+	req.TraceID = ids.traceID
+	req.SpanID = ids.spanID
+	req.ParentSpanID = ids.parentSpanID
+	req.Sampled = ids.sampled
 	conn.h2.Enqueue(req, replaceTLS, &t.outstanding, maxOutstanding)
 }
 
-func (t *Tracker) stampIDs(traceID *[16]byte, spanID *[8]byte, sampled *bool) {
+type hopIDs struct {
+	traceID      [span.TraceIDSize]byte
+	spanID       [span.SpanIDSize]byte
+	parentSpanID [span.SpanIDSize]byte
+	sampled      bool
+}
+
+// stampIDs prefers W3C traceparent over grpc-trace-bin. On success: adopt
+// trace_id + parent, mint a new span_id. W3C sampled is honored as-is. OC
+// deferred (or options absent) uses TraceIDRatioBased on the adopted id.
+func (t *Tracker) stampIDs(traceparent, grpcTraceBin string) hopIDs {
+	var tc span.TraceContext
+	ok := false
+	if traceparent != "" {
+		tc, ok = span.ParseTraceparent(traceparent)
+	}
+	if !ok && grpcTraceBin != "" {
+		tc, ok = span.ParseGRPCTraceBin(grpcTraceBin)
+	}
+	if ok {
+		sid, err := span.NewSpanID()
+		if err != nil {
+			return hopIDs{}
+		}
+		ids := hopIDs{
+			traceID:      tc.TraceID,
+			spanID:       sid,
+			parentSpanID: tc.ParentSpanID,
+		}
+		if tc.Deferred {
+			ids.sampled = span.Sampled(tc.TraceID, t.sampleRate)
+		} else {
+			ids.sampled = tc.Sampled
+		}
+		return ids
+	}
+
 	tid, sid, err := span.NewIDs()
 	if err != nil {
-		return
+		return hopIDs{}
 	}
-	*traceID = tid
-	*spanID = sid
-	*sampled = span.Sampled(tid, t.sampleRate)
+	return hopIDs{
+		traceID: tid,
+		spanID:  sid,
+		sampled: span.Sampled(tid, t.sampleRate),
+	}
 }
 
 func (t *Tracker) liveIdentity(pending pendingRequest) (metrics.SeriesKey, bool) {
@@ -431,7 +475,7 @@ func (t *Tracker) offerSpan(hop completedHop) {
 	if t.exporter == nil {
 		return
 	}
-	if hop.traceID == [16]byte{} || hop.spanID == [8]byte{} {
+	if span.IsZeroTraceID(hop.traceID) || span.IsZeroSpanID(hop.spanID) {
 		return
 	}
 
@@ -453,18 +497,19 @@ func (t *Tracker) offerSpan(hop completedHop) {
 	}
 
 	t.exporter.Offer(span.Hop{
-		TraceID:     hop.traceID,
-		SpanID:      hop.spanID,
-		Start:       hop.start,
-		End:         hop.end,
-		Method:      hop.method,
-		Route:       hop.route,
-		StatusClass: hop.statusClass,
-		StatusCode:  hop.statusCode,
-		GRPC:        hop.grpc,
-		GRPCStatus:  hop.grpcStatus,
-		SampledBy:   sampledBy,
-		Key:         hop.key,
+		TraceID:      hop.traceID,
+		SpanID:       hop.spanID,
+		ParentSpanID: hop.parentSpanID,
+		Start:        hop.start,
+		End:          hop.end,
+		Method:       hop.method,
+		Route:        hop.route,
+		StatusClass:  hop.statusClass,
+		StatusCode:   hop.statusCode,
+		GRPC:         hop.grpc,
+		GRPCStatus:   hop.grpcStatus,
+		SampledBy:    sampledBy,
+		Key:          hop.key,
 	})
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/thread_koder/mochi/agent/internal/collection/http1"
 	"github.com/thread_koder/mochi/agent/internal/metrics"
+	"github.com/thread_koder/mochi/agent/internal/span"
 	"golang.org/x/net/http2/hpack"
 )
 
@@ -20,31 +21,35 @@ const (
 )
 
 type Request struct {
-	StreamID uint32
-	Method   string
-	Path     string
-	Route    string
-	GRPC     bool
-	Key      metrics.SeriesKey
-	Start    time.Time
-	TraceID  [16]byte
-	SpanID   [8]byte
-	Sampled  bool
+	StreamID     uint32
+	Method       string
+	Path         string
+	Route        string
+	GRPC         bool
+	Key          metrics.SeriesKey
+	Start        time.Time
+	Traceparent  string
+	GRPCTraceBin string
+	TraceID      [span.TraceIDSize]byte
+	SpanID       [span.SpanIDSize]byte
+	ParentSpanID [span.SpanIDSize]byte
+	Sampled      bool
 }
 
 type Completion struct {
-	Key         metrics.SeriesKey
-	Method      string
-	Route       string
-	StatusClass string
-	StatusCode  int
-	GRPC        bool
-	GRPCStatus  *int
-	Start       time.Time
-	End         time.Time
-	TraceID     [16]byte
-	SpanID      [8]byte
-	Sampled     bool
+	Key          metrics.SeriesKey
+	Method       string
+	Route        string
+	StatusClass  string
+	StatusCode   int
+	GRPC         bool
+	GRPCStatus   *int
+	Start        time.Time
+	End          time.Time
+	TraceID      [span.TraceIDSize]byte
+	SpanID       [span.SpanIDSize]byte
+	ParentSpanID [span.SpanIDSize]byte
+	Sampled      bool
 }
 
 type pendingBlock struct {
@@ -104,8 +109,8 @@ func keepLeftover(buf *[]byte, leftover []byte, owned bool) {
 
 // Feed parses one direction. truncated means the syscall may have been cut at
 // 1024 bytes so incomplete frames are dropped, not leftover stitched.
-// Returned requests have Method/Path/GRPC/StreamID/Start. Caller sets Route/Key.
-// stop is true when DropAll ran (desync or truncated field block).
+// Returned requests have Method/Path/GRPC/StreamID/Traceparent/GRPCTraceBin/Start.
+// Caller sets Route/Key. stop is true when DropAll ran (desync or truncated field block).
 func (c *Conn) Feed(dir uint8, data []byte, truncated bool, now time.Time, outstanding *int) (reqs []Request, hops []Completion, stop bool) {
 	if c.emitStop {
 		return nil, nil, false
@@ -321,12 +326,14 @@ func decodeBlock(dec *hpack.Decoder, frags [][]byte) ([]hpack.HeaderField, error
 }
 
 type headerSet struct {
-	method      string
-	path        string
-	status      int
-	contentType string
-	grpcStatus  int
-	hasGRPCStat bool
+	method       string
+	path         string
+	status       int
+	contentType  string
+	grpcStatus   int
+	hasGRPCStat  bool
+	traceparent  string
+	grpcTraceBin string
 }
 
 func collectHeaders(fields []hpack.HeaderField) headerSet {
@@ -350,6 +357,14 @@ func collectHeaders(fields []hpack.HeaderField) headerSet {
 				h.grpcStatus = n
 				h.hasGRPCStat = true
 			}
+		case "traceparent":
+			if h.traceparent == "" {
+				h.traceparent = f.Value
+			}
+		case "grpc-trace-bin":
+			if h.grpcTraceBin == "" {
+				h.grpcTraceBin = f.Value
+			}
 		}
 	}
 	return h
@@ -370,11 +385,13 @@ func (c *Conn) onRequestHeaders(streamID uint32, h headerSet, now time.Time) (Re
 		return Request{}, false
 	}
 	return Request{
-		StreamID: streamID,
-		Method:   h.method,
-		Path:     h.path,
-		GRPC:     grpc,
-		Start:    now,
+		StreamID:     streamID,
+		Method:       h.method,
+		Path:         h.path,
+		GRPC:         grpc,
+		Start:        now,
+		Traceparent:  h.traceparent,
+		GRPCTraceBin: h.grpcTraceBin,
 	}, true
 }
 
@@ -425,28 +442,30 @@ func (c *Conn) finishHop(streamID uint32, req *Request, class string, statusCode
 	}
 	c.dropStream(streamID, outstanding)
 	return Completion{
-		Key:         req.Key,
-		Method:      req.Method,
-		Route:       req.Route,
-		StatusClass: class,
-		StatusCode:  statusCode,
-		GRPC:        req.GRPC,
-		GRPCStatus:  grpcStatus,
-		Start:       req.Start,
-		End:         now,
-		TraceID:     req.TraceID,
-		SpanID:      req.SpanID,
-		Sampled:     req.Sampled,
+		Key:          req.Key,
+		Method:       req.Method,
+		Route:        req.Route,
+		StatusClass:  class,
+		StatusCode:   statusCode,
+		GRPC:         req.GRPC,
+		GRPCStatus:   grpcStatus,
+		Start:        req.Start,
+		End:          now,
+		TraceID:      req.TraceID,
+		SpanID:       req.SpanID,
+		ParentSpanID: req.ParentSpanID,
+		Sampled:      req.Sampled,
 	}, true
 }
 
 // Enqueue stores a pending stream request. replaceTLS replaces an existing
-// pending hop for the same stream ID, keeping span IDs.
+// pending hop for the same stream ID, keeping stamped IDs.
 func (c *Conn) Enqueue(req Request, replaceTLS bool, outstanding *int, maxOutstanding int) {
 	if existing := c.streams[req.StreamID]; existing != nil {
 		if replaceTLS {
 			req.TraceID = existing.TraceID
 			req.SpanID = existing.SpanID
+			req.ParentSpanID = existing.ParentSpanID
 			req.Sampled = existing.Sampled
 			c.streams[req.StreamID] = &req
 		}

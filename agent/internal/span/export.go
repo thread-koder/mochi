@@ -33,23 +33,25 @@ const (
 )
 
 type Hop struct {
-	TraceID     [16]byte
-	SpanID      [8]byte
-	Start       time.Time
-	End         time.Time
-	Method      string
-	Route       string
-	StatusClass string
-	StatusCode  int
-	GRPC        bool
-	GRPCStatus  *int
-	SampledBy   string
-	Key         metrics.SeriesKey
+	TraceID      [TraceIDSize]byte
+	SpanID       [SpanIDSize]byte
+	ParentSpanID [SpanIDSize]byte
+	Start        time.Time
+	End          time.Time
+	Method       string
+	Route        string
+	StatusClass  string
+	StatusCode   int
+	GRPC         bool
+	GRPCStatus   *int
+	SampledBy    string
+	Key          metrics.SeriesKey
 }
 
 type exportSpan struct {
 	TraceID       string    `json:"trace_id"`
 	SpanID        string    `json:"span_id"`
+	ParentSpanID  *string   `json:"parent_span_id"`
 	StartAt       time.Time `json:"start_at"`
 	EndAt         time.Time `json:"end_at"`
 	Method        string    `json:"method"`
@@ -178,9 +180,15 @@ func (e *Exporter) post(ctx context.Context, batch []Hop) error {
 		if hop.GRPC {
 			rpcSystem = RPCSystemGRPC
 		}
+		var parentHex *string
+		if !IsZeroSpanID(hop.ParentSpanID) {
+			encoded := hex.EncodeToString(hop.ParentSpanID[:])
+			parentHex = &encoded
+		}
 		body.Spans = append(body.Spans, exportSpan{
 			TraceID:       hex.EncodeToString(hop.TraceID[:]),
 			SpanID:        hex.EncodeToString(hop.SpanID[:]),
+			ParentSpanID:  parentHex,
 			StartAt:       hop.Start.UTC(),
 			EndAt:         hop.End.UTC(),
 			Method:        hop.Method,

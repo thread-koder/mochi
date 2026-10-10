@@ -10,11 +10,12 @@ import (
 const incompleteCap = 8 << 10
 
 type Message struct {
-	Request bool
-	Method  string
-	Path    string
-	Status  int
-	Opaque  bool
+	Request     bool
+	Method      string
+	Path        string
+	Status      int
+	Opaque      bool
+	Traceparent string
 }
 
 // httpStartTokens are full first line prefixes. Short buffers that are a
@@ -32,9 +33,13 @@ var httpStartTokens = [][]byte{
 	[]byte("HTTP/1"),
 }
 
-// ParsePrefix extracts complete first lines from a syscall/uprobe prefix.
-// leftover is an incomplete first line (no \n yet). opaque means stop HTTP/1
-// (CONNECT or 101).
+var traceparentName = []byte("traceparent")
+
+// ParsePrefix extracts complete messages from a syscall/uprobe prefix.
+// Requests wait for the header terminator (\r\n\r\n) so traceparent can be
+// scanned. Responses stay first-line only for pairing. leftover is an
+// incomplete request line or incomplete request header block. opaque means
+// stop HTTP/1 (CONNECT or 101).
 func ParsePrefix(data []byte) (msgs []Message, leftover []byte, opaque bool) {
 	if len(data) == 0 {
 		return nil, nil, false
@@ -42,6 +47,7 @@ func ParsePrefix(data []byte) (msgs []Message, leftover []byte, opaque bool) {
 
 	rest := data
 	for len(rest) > 0 {
+		messageStart := rest
 		line, after, ok := cutLine(rest)
 		if !ok {
 			if LooksLikeStart(rest) {
@@ -58,12 +64,38 @@ func ParsePrefix(data []byte) (msgs []Message, leftover []byte, opaque bool) {
 			msgs = append(msgs, msg)
 			return msgs, nil, true
 		}
-		msgs = append(msgs, msg)
 
-		_, after0, ok := bytes.Cut(after, []byte("\r\n\r\n"))
-		if !ok {
-			return msgs, nil, false
+		if !msg.Request {
+			// Responses: first-line only. Skip a complete header block when
+			// present so pipelined status lines can continue. Otherwise drop
+			// trailing header bytes rather than stall pairing.
+			msgs = append(msgs, msg)
+			_, after0, ok := bytes.Cut(after, []byte("\r\n\r\n"))
+			if !ok {
+				return msgs, nil, false
+			}
+			rest = after0
+			if len(rest) == 0 {
+				return msgs, nil, false
+			}
+			if !LooksLikeStart(rest) {
+				return msgs, nil, false
+			}
+			continue
 		}
+
+		headers, after0, ok := bytes.Cut(after, []byte("\r\n\r\n"))
+		if !ok {
+			leftover = messageStart
+			if len(leftover) > incompleteCap {
+				// Give-up: emit without context so hop RED still exists.
+				msgs = append(msgs, msg)
+				return msgs, nil, false
+			}
+			return msgs, leftover, false
+		}
+		msg.Traceparent = scanTraceparent(headers)
+		msgs = append(msgs, msg)
 		rest = after0
 		if len(rest) == 0 {
 			return msgs, nil, false
@@ -73,6 +105,20 @@ func ParsePrefix(data []byte) (msgs []Message, leftover []byte, opaque bool) {
 		}
 	}
 	return msgs, nil, false
+}
+
+func scanTraceparent(headers []byte) string {
+	for line := range bytes.SplitSeq(headers, []byte("\r\n")) {
+		name, value, ok := bytes.Cut(line, []byte{':'})
+		if !ok {
+			continue
+		}
+		if !bytes.EqualFold(bytes.TrimSpace(name), traceparentName) {
+			continue
+		}
+		return string(bytes.TrimSpace(value))
+	}
+	return ""
 }
 
 func cutLine(data []byte) (line, after []byte, ok bool) {

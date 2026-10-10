@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/thread_koder/mochi/agent/internal/metrics"
+	"github.com/thread_koder/mochi/agent/internal/span"
 )
 
 const (
@@ -12,27 +13,30 @@ const (
 )
 
 type Request struct {
-	Method  string
-	Path    string
-	Route   string
-	Key     metrics.SeriesKey
-	Start   time.Time
-	TraceID [16]byte
-	SpanID  [8]byte
-	Sampled bool
+	Method       string
+	Path         string
+	Route        string
+	Key          metrics.SeriesKey
+	Start        time.Time
+	Traceparent  string
+	TraceID      [span.TraceIDSize]byte
+	SpanID       [span.SpanIDSize]byte
+	ParentSpanID [span.SpanIDSize]byte
+	Sampled      bool
 }
 
 type Completion struct {
-	Key         metrics.SeriesKey
-	Method      string
-	Route       string
-	StatusClass string
-	StatusCode  int
-	Start       time.Time
-	End         time.Time
-	TraceID     [16]byte
-	SpanID      [8]byte
-	Sampled     bool
+	Key          metrics.SeriesKey
+	Method       string
+	Route        string
+	StatusClass  string
+	StatusCode   int
+	Start        time.Time
+	End          time.Time
+	TraceID      [span.TraceIDSize]byte
+	SpanID       [span.SpanIDSize]byte
+	ParentSpanID [span.SpanIDSize]byte
+	Sampled      bool
 }
 
 type Conn struct {
@@ -65,7 +69,7 @@ func keepLeftover(buf *[]byte, leftover []byte, owned bool) {
 
 // Feed parses one direction of a prefix. opaque stops HTTP/1 on this flow.
 // outstanding is decremented when a queued request is consumed (including 101).
-// Returned requests have Method/Path/Start only. Caller templates Route and Enqueues.
+// Returned requests have Method/Path/Traceparent/Start. Caller templates Route and Enqueues.
 func (c *Conn) Feed(dir uint8, data []byte, now time.Time, outstanding *int) (reqs []Request, hops []Completion, opaque bool) {
 	var buf *[]byte
 	switch dir {
@@ -106,7 +110,12 @@ func (c *Conn) Feed(dir uint8, data []byte, now time.Time, outstanding *int) (re
 				}
 				continue
 			}
-			reqs = append(reqs, Request{Method: msg.Method, Path: msg.Path, Start: now})
+			reqs = append(reqs, Request{
+				Method:      msg.Method,
+				Path:        msg.Path,
+				Traceparent: msg.Traceparent,
+				Start:       now,
+			})
 		}
 	case DirRecv:
 		for _, msg := range msgs {
@@ -130,16 +139,17 @@ func (c *Conn) Feed(dir uint8, data []byte, now time.Time, outstanding *int) (re
 }
 
 // Enqueue appends a pending request. replaceTLS replaces the last matching
-// method+route when a TLS kind revisits a socket queued hop, keeping span IDs.
+// method+route when a TLS kind revisits a socket queued hop, keeping stamped IDs.
 func (c *Conn) Enqueue(req Request, replaceTLS bool, outstanding *int, maxOutstanding int) {
 	if replaceTLS {
 		if n := len(c.outstanding); n > 0 {
 			last := &c.outstanding[n-1]
 			if last.Method == req.Method && last.Route == req.Route {
-				traceID, spanID, sampled := last.TraceID, last.SpanID, last.Sampled
+				traceID, spanID, parentID, sampled := last.TraceID, last.SpanID, last.ParentSpanID, last.Sampled
 				*last = req
 				last.TraceID = traceID
 				last.SpanID = spanID
+				last.ParentSpanID = parentID
 				last.Sampled = sampled
 				return
 			}
@@ -172,16 +182,17 @@ func (c *Conn) pairResponse(msg Message, now time.Time, outstanding *int) (Compl
 		return Completion{}, false
 	}
 	return Completion{
-		Key:         req.Key,
-		Method:      req.Method,
-		Route:       req.Route,
-		StatusClass: class,
-		StatusCode:  msg.Status,
-		Start:       req.Start,
-		End:         now,
-		TraceID:     req.TraceID,
-		SpanID:      req.SpanID,
-		Sampled:     req.Sampled,
+		Key:          req.Key,
+		Method:       req.Method,
+		Route:        req.Route,
+		StatusClass:  class,
+		StatusCode:   msg.Status,
+		Start:        req.Start,
+		End:          now,
+		TraceID:      req.TraceID,
+		SpanID:       req.SpanID,
+		ParentSpanID: req.ParentSpanID,
+		Sampled:      req.Sampled,
 	}, true
 }
 
