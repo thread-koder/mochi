@@ -27,7 +27,7 @@ type ServerPorts interface {
 }
 
 // Collector owns loaded eBPF programs and event loops for TCP, UDP, DNS, the
-// plaintext TCP byte stream, and TLS plaintext uprobes.
+// plaintext TCP byte stream, TLS plaintext uprobes, and HTTP/1 inject.
 type Collector struct {
 	tcpObjs    tcpstateObjects
 	tcpLink    link.Link
@@ -54,6 +54,11 @@ type Collector struct {
 	tlsEvents  *ringbuf.Reader
 	tlsEnabled bool
 
+	injectObjs          http1injectObjects
+	injectLinks         []io.Closer
+	injectEnabled       bool
+	injectSkMsgAttached bool
+
 	tlsMu     sync.Mutex
 	tlsStop   bool
 	tlsDenied bool
@@ -78,6 +83,7 @@ func Load(
 	serverPorts ServerPorts,
 	dnsCache *dns.Cache,
 	l7Tracker *l7.Tracker,
+	spanSampleRate float64,
 ) (*Collector, error) {
 	log := logger.WithComponent("ebpf")
 
@@ -112,6 +118,9 @@ func Load(
 	}
 	if err := collector.loadTLS(); err != nil {
 		log.Error().Err(err).Msg("TLS eBPF load failed. Continuing without TLS plaintext")
+	}
+	if err := collector.loadHTTP1Inject(spanSampleRate); err != nil {
+		log.Error().Err(err).Msg("HTTP/1 inject eBPF load failed. Continuing without Traceparent inject")
 	}
 	if !collector.tcpEnabled && !collector.udpEnabled {
 		err := errors.Join(
@@ -358,6 +367,9 @@ func (c *Collector) Close() error {
 	}
 	if c.tlsEnabled {
 		err = errors.Join(err, c.closeTLS())
+	}
+	if c.injectEnabled {
+		err = errors.Join(err, c.closeHTTP1Inject())
 	}
 	return err
 }
