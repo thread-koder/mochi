@@ -65,13 +65,14 @@ func Start(cfg config.Config, registry *metrics.Registry) *Runtime {
 
 	exporter := span.NewExporter(cfg.CoreURL)
 	l7Tracker := l7.NewTracker(registry, store, resolver, ctClient, dnsCache, exporter, cfg.SpanSampleRate, cfg.MaxSeries)
-	collector, err := ebpf.Load(store, resolver, ctClient, listen, dnsCache, l7Tracker)
+	collector, err := ebpf.Load(store, resolver, ctClient, listen, dnsCache, l7Tracker, cfg.SpanSampleRate)
 	if err != nil {
 		log.Error().Err(err).Msg("eBPF load failed. Continuing without collection")
 		runtime.Close()
 		return nil
 	}
 	runtime.collector = collector
+	l7Tracker.SetInjectedHops(collector)
 
 	seeder := procnet.NewSeeder(store, resolver, ctClient, listen, dnsCache)
 
