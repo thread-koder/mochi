@@ -95,7 +95,6 @@ func (s *Seeder) resync() {
 	}
 	s.listen.Replace(boundUDP)
 	s.store.ReconcileSeedActives(sockets)
-	log.Debug().Int("sockets", len(sockets)).Msg("Reconciled active sockets from /proc")
 }
 
 func (s *Seeder) collectActive() ([]aggregate.SeedSocket, map[string]map[uint16]struct{}, error) {

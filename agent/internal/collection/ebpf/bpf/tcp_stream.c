@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 // CO-RE program: plaintext TCP byte stream on client and accepted sockets.
-// fentry stashes the iov_iter start. The iterator advances before fexit.
-// fexit copies min(ret, cap) across those segments. ret is not a length into iov[0].
+// TX: tcp_sendmsg + tcp_bpf_sendmsg (sockmap). Not tcp_sendmsg_locked — after
+// SK_PASS the locked path sees kernel ITER_BVEC and probe_read_user would miss.
+// RX: tcp_recvmsg. fentry stashes the iov_iter start. fexit copies min(ret, cap).
 // sendfile, splice, tcp_sendpage, and tcp_read_sock do not pass these hooks.
 // Regenerate: go generate ./internal/collection/ebpf
 
@@ -35,17 +36,6 @@ struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
 	__uint(max_entries, 1 << 22);
 } events SEC(".maps");
-
-static __always_inline int tls_bytes(__u8 hdr[3])
-{
-	if (hdr[0] < 0x14 || hdr[0] > 0x17)
-		return 0;
-	if (hdr[1] != 0x03)
-		return 0;
-	if (hdr[2] < 0x01 || hdr[2] > 0x04)
-		return 0;
-	return 1;
-}
 
 static __always_inline int read_user_byte(__u8 *dst, __u64 base, __u32 off)
 {
@@ -122,11 +112,11 @@ static __always_inline int is_tls_record(struct stream_stash *stash)
 			break;
 		if (bpf_probe_read_user(hdr, 3, (void *)stash->segs[i].base) < 0)
 			return 0;
-		return tls_bytes(hdr);
+		return tls_record_bytes(hdr);
 	}
 	if (read_tls_split(stash, hdr) < 0)
 		return 0;
-	return tls_bytes(hdr);
+	return tls_record_bytes(hdr);
 }
 
 static __always_inline __u32 copy_segs(struct bpf_dynptr *dst, struct stream_stash *stash, __u32 remain)
@@ -237,6 +227,7 @@ static __always_inline int emit_chunk(struct sock *sk, int flags, int ret, __u8 
 	return 0;
 }
 
+/* Non-sockmap TX. Sockhashed sockets never hit this wrapper. */
 SEC("fentry/tcp_sendmsg")
 int BPF_PROG(mochi_stream_send_enter, struct sock *sk, struct msghdr *msg, size_t size)
 {
@@ -245,6 +236,20 @@ int BPF_PROG(mochi_stream_send_enter, struct sock *sk, struct msghdr *msg, size_
 
 SEC("fexit/tcp_sendmsg")
 int BPF_PROG(mochi_stream_send_exit, struct sock *sk, struct msghdr *msg, size_t size, int ret)
+{
+	return emit_chunk(sk, 0, ret, STREAM_DIR_SEND);
+}
+
+/* Sockmap TX: userspace iov is still live here. After SK_PASS,
+ * tcp_sendmsg_locked sees kernel ITER_BVEC and probe_read_user would miss. */
+SEC("fentry/tcp_bpf_sendmsg")
+int BPF_PROG(mochi_stream_bpf_send_enter, struct sock *sk, struct msghdr *msg, size_t size)
+{
+	return stash_iov(sk, msg);
+}
+
+SEC("fexit/tcp_bpf_sendmsg")
+int BPF_PROG(mochi_stream_bpf_send_exit, struct sock *sk, struct msghdr *msg, size_t size, int ret)
 {
 	return emit_chunk(sk, 0, ret, STREAM_DIR_SEND);
 }

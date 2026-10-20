@@ -1,6 +1,7 @@
-/* Wire header shared by the socket stream and TLS plaintext programs.
+/* Wire header for stream, TLS plaintext, and inject (remote_ok, tls_record_bytes).
  * kind 0 is the socket path. TLS sets openssl or gotls.
- * Include after vmlinux.h, bpf_core_read.h, bpf_endian.h, and dest.h. */
+ * Include after vmlinux.h, bpf_core_read.h, bpf_endian.h, and dest.h.
+ */
 
 #ifndef MOCHI_BPF_STREAM_HDR_H
 #define MOCHI_BPF_STREAM_HDR_H
@@ -35,6 +36,23 @@ struct stream_event {
 
 _Static_assert(sizeof(struct stream_hdr) == 56, "stream header drifted");
 _Static_assert(sizeof(struct stream_event) == 56 + STREAM_CAP, "stream event drifted");
+
+#define TLS_CONTENT_TYPE_MIN 0x14
+#define TLS_CONTENT_TYPE_MAX 0x17
+#define TLS_VERSION_MAJOR    0x03
+#define TLS_VERSION_MINOR_MIN 0x01
+#define TLS_VERSION_MINOR_MAX 0x04
+
+static __always_inline int tls_record_bytes(const __u8 hdr[3])
+{
+	if (hdr[0] < TLS_CONTENT_TYPE_MIN || hdr[0] > TLS_CONTENT_TYPE_MAX)
+		return 0;
+	if (hdr[1] != TLS_VERSION_MAJOR)
+		return 0;
+	if (hdr[2] < TLS_VERSION_MINOR_MIN || hdr[2] > TLS_VERSION_MINOR_MAX)
+		return 0;
+	return 1;
+}
 
 static __always_inline int remote_ok(struct sock *sk)
 {

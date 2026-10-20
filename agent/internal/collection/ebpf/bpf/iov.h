@@ -77,7 +77,8 @@ static __always_inline int read_iov_seg(const struct iovec *iov, struct iov_seg 
 
 /* Snapshot the iterator start. ITER_UBUF is one buffer and count is remaining.
  * ITER_IOVEC keeps the current segment plus the next few. iov_offset applies
- * only to the first. Returns how many segments were stashed. */
+ * only to the first. ITER_BVEC / ITER_KVEC are kernel pages — skip (no user probe).
+ * Returns how many segments were stashed. */
 static __always_inline int iov_stash(struct msghdr *msg, struct iov_seg segs[IOV_STASH_SEGS])
 {
 	struct iov_iter *iter = &msg->msg_iter;
@@ -104,6 +105,12 @@ static __always_inline int iov_stash(struct msghdr *msg, struct iov_seg segs[IOV
 			segs[0].len = count > 0xffffffffUL ? 0xffffffffU : (__u32)count;
 			return 1;
 		}
+		if (bpf_core_enum_value_exists(enum iter_type, ITER_BVEC) &&
+		    type == bpf_core_enum_value(enum iter_type, ITER_BVEC))
+			return 0;
+		if (bpf_core_enum_value_exists(enum iter_type, ITER_KVEC) &&
+		    type == bpf_core_enum_value(enum iter_type, ITER_KVEC))
+			return 0;
 	}
 
 	if (bpf_core_field_exists(new_iter->__iov)) {

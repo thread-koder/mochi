@@ -12,6 +12,7 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/rs/zerolog"
 	"github.com/thread_koder/mochi/agent/internal/collection/aggregate"
 	"github.com/thread_koder/mochi/agent/internal/collection/conntrack"
 	"github.com/thread_koder/mochi/agent/internal/collection/dns"
@@ -27,7 +28,7 @@ type ServerPorts interface {
 }
 
 // Collector owns loaded eBPF programs and event loops for TCP, UDP, DNS, the
-// plaintext TCP byte stream, TLS plaintext uprobes, and HTTP/1 inject.
+// plaintext TCP byte stream, TLS plaintext uprobes, and Traceparent inject.
 type Collector struct {
 	tcpObjs    tcpstateObjects
 	tcpLink    link.Link
@@ -54,19 +55,22 @@ type Collector struct {
 	tlsEvents  *ringbuf.Reader
 	tlsEnabled bool
 
-	injectObjs          http1injectObjects
+	injectObjs          injectObjects
 	injectLinks         []io.Closer
 	injectEnabled       bool
 	injectSkMsgAttached bool
+	writeUserAllowed    bool
 
-	tlsMu     sync.Mutex
-	tlsStop   bool
-	tlsDenied bool
-	tlsInodes map[fileID][]io.Closer
-	tlsSkip   map[fileID]struct{}
-	tlsSeen   map[pidKey]struct{}
-	tlsRetry  map[pidKey]struct{}
-	agentFile *fileID
+	uprobeMu     sync.Mutex
+	uprobeStop   bool
+	uprobeDenied bool
+	uprobeSeen   map[pidKey]struct{}
+	uprobeRetry  map[pidKey]struct{}
+	agentFile    *fileID
+	tlsInodes    map[fileID][]io.Closer
+	tlsSkip      map[fileID]struct{}
+	injectInodes map[fileID][]io.Closer
+	injectSkip   map[fileID]struct{}
 
 	store           *aggregate.Store
 	resolver        *identity.Resolver
@@ -92,7 +96,7 @@ func Load(
 	}
 
 	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Debug().Err(err).Msg("RemoveMemlock failed. Continuing")
+		log.Warn().Err(err).Msg("RemoveMemlock failed. Continuing")
 	}
 
 	collector := &Collector{
@@ -119,8 +123,8 @@ func Load(
 	if err := collector.loadTLS(); err != nil {
 		log.Error().Err(err).Msg("TLS eBPF load failed. Continuing without TLS plaintext")
 	}
-	if err := collector.loadHTTP1Inject(spanSampleRate); err != nil {
-		log.Error().Err(err).Msg("HTTP/1 inject eBPF load failed. Continuing without Traceparent inject")
+	if err := collector.loadInject(spanSampleRate); err != nil {
+		log.Error().Err(err).Msg("Inject eBPF load failed. Continuing without Traceparent inject")
 	}
 	if !collector.tcpEnabled && !collector.udpEnabled {
 		err := errors.Join(
@@ -256,6 +260,26 @@ func (c *Collector) loadStream() error {
 		}
 	}
 
+	var sockmapSendLinks []io.Closer
+	sockmapSendOK := true
+	for _, step := range []struct {
+		prog *ebpf.Program
+		name string
+	}{
+		{c.streamObjs.MochiStreamBpfSendEnter, "fentry tcp_bpf_sendmsg"},
+		{c.streamObjs.MochiStreamBpfSendExit, "fexit tcp_bpf_sendmsg"},
+	} {
+		if err := attachTracing(&sockmapSendLinks, step.prog, step.name); err != nil {
+			_ = closeLinks(sockmapSendLinks)
+			sockmapSendOK = false
+			log.Error().Err(err).Msg("eBPF TCP stream: tcp_bpf_sendmsg attach failed. Continuing without sockmap TX capture")
+			break
+		}
+	}
+	if sockmapSendOK {
+		links = append(links, sockmapSendLinks...)
+	}
+
 	events, err := ringbuf.NewReader(c.streamObjs.Events)
 	if err != nil {
 		closeErr := errors.Join(closeLinks(links), c.streamObjs.Close())
@@ -265,7 +289,11 @@ func (c *Collector) loadStream() error {
 	c.streamLinks = links
 	c.streamEvents = events
 	c.streamEnabled = true
-	log.Info().Msg("eBPF TCP stream collector loaded")
+	if sockmapSendOK {
+		log.Info().Msg("eBPF TCP stream collector loaded")
+	} else {
+		log.Info().Msg("eBPF TCP stream collector loaded without sockmap TX capture")
+	}
 	return nil
 }
 
@@ -281,7 +309,7 @@ func (c *Collector) loadTLS() error {
 		prog *ebpf.Program
 		name string
 	}{
-		{c.tlsObjs.MochiTlsSendEnter, "fentry tcp_sendmsg"},
+		{c.tlsObjs.MochiTlsTxEnter, "fentry tcp_sendmsg_locked"},
 		{c.tlsObjs.MochiTlsRecvEnter, "fentry tcp_recvmsg"},
 	} {
 		if err := attachTracing(&links, step.prog, step.name); err != nil {
@@ -296,16 +324,16 @@ func (c *Collector) loadTLS() error {
 		return errors.Join(fmt.Errorf("open TLS ringbuf: %w", err), closeErr)
 	}
 
-	if id, err := fileIDOf("/proc/self/exe"); err == nil {
-		c.agentFile = &id
-	} else {
-		log.Error().Err(err).Msg("Failed to stat agent executable. Go TLS probes may include the agent")
+	c.ensureAgentFile(log, "Go TLS probes may include the agent")
+	c.ensureUprobeWatch()
+	c.uprobeMu.Lock()
+	if c.tlsInodes == nil {
+		c.tlsInodes = make(map[fileID][]io.Closer)
 	}
-
-	c.tlsInodes = make(map[fileID][]io.Closer)
-	c.tlsSkip = make(map[fileID]struct{})
-	c.tlsSeen = make(map[pidKey]struct{})
-	c.tlsRetry = make(map[pidKey]struct{})
+	if c.tlsSkip == nil {
+		c.tlsSkip = make(map[fileID]struct{})
+	}
+	c.uprobeMu.Unlock()
 	c.tlsLinks = links
 	c.tlsEvents = events
 	c.tlsEnabled = true
@@ -329,11 +357,17 @@ func (c *Collector) Start(ctx context.Context) {
 	}
 	if c.tlsEnabled {
 		go c.runTLS(ctx)
-		go c.watchTLS(ctx)
+	}
+	if c.tlsEnabled || c.injectEnabled {
+		go c.watchUprobes(ctx)
 	}
 }
 
 func (c *Collector) Close() error {
+	c.uprobeMu.Lock()
+	c.uprobeStop = true
+	c.uprobeMu.Unlock()
+
 	var err error
 	if c.tcpEnabled {
 		if c.tcpEvents != nil {
@@ -369,9 +403,21 @@ func (c *Collector) Close() error {
 		err = errors.Join(err, c.closeTLS())
 	}
 	if c.injectEnabled {
-		err = errors.Join(err, c.closeHTTP1Inject())
+		err = errors.Join(err, c.closeInject())
 	}
 	return err
+}
+
+func (c *Collector) ensureAgentFile(log zerolog.Logger, detail string) {
+	if c.agentFile != nil {
+		return
+	}
+	id, err := fileIDOf("/proc/self/exe")
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to stat agent executable. " + detail)
+		return
+	}
+	c.agentFile = &id
 }
 
 func attachTracing(links *[]io.Closer, prog *ebpf.Program, name string) error {

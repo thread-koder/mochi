@@ -3,12 +3,8 @@ package ebpf
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
-	"os"
-	"syscall"
 
-	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/thread_koder/mochi/agent/internal/collection/l7"
 	"github.com/thread_koder/mochi/agent/internal/logger"
@@ -25,19 +21,16 @@ const (
 	tlsCookieGoRet      = 7
 )
 
-type fileID struct {
-	dev uint64
-	ino uint64
+var opensslHooks = []uprobeHook{
+	{"SSL_write", tlsCookieSSLWrite, false},
+	{"SSL_read", tlsCookieSSLRead, false},
+	{"SSL_write_ex", tlsCookieSSLWriteEx, false},
+	{"SSL_read_ex", tlsCookieSSLReadEx, false},
 }
 
-type pidKey struct {
-	pid   uint32
-	start uint64
-}
-
-type tlsHook struct {
-	symbol string
-	cookie uint64
+var goTLSHooks = []uprobeHook{
+	{"crypto/tls.(*Conn).Write", tlsCookieGoWrite, true},
+	{"crypto/tls.(*Conn).Read", tlsCookieGoRead, false},
 }
 
 func (c *Collector) runTLS(ctx context.Context) {
@@ -73,46 +66,13 @@ func (c *Collector) handleTLSRecord(raw []byte) {
 	c.feedL7(event)
 }
 
-func (c *Collector) noteProcDenied(err error) {
-	log := logger.WithComponent("ebpf-tls")
-	c.tlsMu.Lock()
-	defer c.tlsMu.Unlock()
-	if c.tlsDenied {
-		return
+func (c *Collector) knownTLSFile(id fileID) bool {
+	c.uprobeMu.Lock()
+	defer c.uprobeMu.Unlock()
+	if c.uprobeStop {
+		return true
 	}
-	c.tlsDenied = true
-	log.Error().Err(err).Msg("TLS discovery cannot read process maps or exe")
-}
-
-func (c *Collector) pidSeen(key pidKey) bool {
-	c.tlsMu.Lock()
-	defer c.tlsMu.Unlock()
-	_, ok := c.tlsSeen[key]
-	return ok
-}
-
-func (c *Collector) markPID(key pidKey) {
-	c.tlsMu.Lock()
-	defer c.tlsMu.Unlock()
-	if c.tlsStop {
-		return
-	}
-	c.tlsSeen[key] = struct{}{}
-}
-
-func (c *Collector) markRetry(key pidKey) {
-	c.tlsMu.Lock()
-	defer c.tlsMu.Unlock()
-	if c.tlsStop {
-		return
-	}
-	c.tlsRetry[key] = struct{}{}
-}
-
-func (c *Collector) knownFile(id fileID) bool {
-	c.tlsMu.Lock()
-	defer c.tlsMu.Unlock()
-	if c.tlsStop {
+	if c.tlsInodes == nil {
 		return true
 	}
 	if _, ok := c.tlsInodes[id]; ok {
@@ -122,25 +82,19 @@ func (c *Collector) knownFile(id fileID) bool {
 	return ok
 }
 
-func (c *Collector) isAgent(id fileID) bool {
-	c.tlsMu.Lock()
-	defer c.tlsMu.Unlock()
-	return c.agentFile != nil && *c.agentFile == id
-}
-
-func (c *Collector) storeSkip(id fileID) {
-	c.tlsMu.Lock()
-	defer c.tlsMu.Unlock()
-	if c.tlsStop {
+func (c *Collector) storeTLSSkip(id fileID) {
+	c.uprobeMu.Lock()
+	defer c.uprobeMu.Unlock()
+	if c.uprobeStop || c.tlsSkip == nil {
 		return
 	}
 	c.tlsSkip[id] = struct{}{}
 }
 
-func (c *Collector) storeLinks(id fileID, links []io.Closer) bool {
-	c.tlsMu.Lock()
-	defer c.tlsMu.Unlock()
-	if c.tlsStop {
+func (c *Collector) storeTLSLinks(id fileID, links []io.Closer) bool {
+	c.uprobeMu.Lock()
+	defer c.uprobeMu.Unlock()
+	if c.uprobeStop || c.tlsInodes == nil {
 		return false
 	}
 	if _, ok := c.tlsInodes[id]; ok {
@@ -151,18 +105,18 @@ func (c *Collector) storeLinks(id fileID, links []io.Closer) bool {
 }
 
 func (c *Collector) closeTLS() error {
-	c.tlsMu.Lock()
-	c.tlsStop = true
+	c.uprobeMu.Lock()
 	var uprobes []io.Closer
 	for _, inodeLinks := range c.tlsInodes {
 		uprobes = append(uprobes, inodeLinks...)
 	}
 	c.tlsInodes = nil
+	c.tlsSkip = nil
 	kernel := c.tlsLinks
 	c.tlsLinks = nil
 	events := c.tlsEvents
 	c.tlsEvents = nil
-	c.tlsMu.Unlock()
+	c.uprobeMu.Unlock()
 
 	var err error
 	if events != nil {
@@ -172,38 +126,22 @@ func (c *Collector) closeTLS() error {
 	if c.tlsEnabled {
 		err = errors.Join(err, c.tlsObjs.Close())
 	}
+	c.tlsEnabled = false
 	return err
 }
 
-func missingSymbol(err error) bool {
-	return errors.Is(err, link.ErrNoSymbol) || errors.Is(err, link.ErrNotSupported)
-}
-
-func processGone(err error) bool {
-	return errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ESRCH)
-}
-
-// procUnreadable is true when the caller should stop without a per-call error
-// log. Permission denial is logged once via noteProcDenied.
-func (c *Collector) procUnreadable(err error) bool {
-	if processGone(err) {
-		return true
-	}
-	if errors.Is(err, os.ErrPermission) {
-		c.noteProcDenied(err)
-		return true
-	}
-	return false
-}
-
-func fileIDOf(path string) (fileID, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return fileID{}, err
-	}
-	st, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return fileID{}, fmt.Errorf("stat %s: no Stat_t", path)
-	}
-	return fileID{dev: st.Dev, ino: st.Ino}, nil
+func (c *Collector) attachTLSFile(openPath string, allowGo bool, goRETs map[string]goRETInfo) ([]io.Closer, bool, error) {
+	return c.attachUprobeFile(
+		openPath,
+		allowGo,
+		goRETs,
+		opensslHooks,
+		goTLSHooks,
+		c.tlsObjs.MochiTlsEnter,
+		c.tlsObjs.MochiTlsRet,
+		c.tlsObjs.MochiTlsEnter,
+		c.tlsObjs.MochiTlsRet,
+		tlsCookieGoRet,
+		true,
+	)
 }

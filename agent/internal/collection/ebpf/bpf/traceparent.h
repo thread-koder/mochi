@@ -31,6 +31,7 @@ struct egress_key {
 	__u32 pid;
 	__u16 sport;
 	__u16 dport;
+	__u32 stream;
 };
 
 static __always_inline int tp_ids_zero_trace(const __u8 *id)

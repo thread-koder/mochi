@@ -29,12 +29,14 @@ type tcpstreamStreamStash struct {
 //
 // Used for safe lookups in a Collection or CollectionSpec.
 const (
-	tcpstreamMapEvents                = "events"
-	tcpstreamMapPending               = "pending"
-	tcpstreamProgMochiStreamRecvEnter = "mochi_stream_recv_enter"
-	tcpstreamProgMochiStreamRecvExit  = "mochi_stream_recv_exit"
-	tcpstreamProgMochiStreamSendEnter = "mochi_stream_send_enter"
-	tcpstreamProgMochiStreamSendExit  = "mochi_stream_send_exit"
+	tcpstreamMapEvents                   = "events"
+	tcpstreamMapPending                  = "pending"
+	tcpstreamProgMochiStreamBpfSendEnter = "mochi_stream_bpf_send_enter"
+	tcpstreamProgMochiStreamBpfSendExit  = "mochi_stream_bpf_send_exit"
+	tcpstreamProgMochiStreamRecvEnter    = "mochi_stream_recv_enter"
+	tcpstreamProgMochiStreamRecvExit     = "mochi_stream_recv_exit"
+	tcpstreamProgMochiStreamSendEnter    = "mochi_stream_send_enter"
+	tcpstreamProgMochiStreamSendExit     = "mochi_stream_send_exit"
 )
 
 // loadTcpstream returns the embedded CollectionSpec for tcpstream.
@@ -79,10 +81,12 @@ type tcpstreamSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type tcpstreamProgramSpecs struct {
-	MochiStreamRecvEnter *ebpf.ProgramSpec `ebpf:"mochi_stream_recv_enter"`
-	MochiStreamRecvExit  *ebpf.ProgramSpec `ebpf:"mochi_stream_recv_exit"`
-	MochiStreamSendEnter *ebpf.ProgramSpec `ebpf:"mochi_stream_send_enter"`
-	MochiStreamSendExit  *ebpf.ProgramSpec `ebpf:"mochi_stream_send_exit"`
+	MochiStreamBpfSendEnter *ebpf.ProgramSpec `ebpf:"mochi_stream_bpf_send_enter"`
+	MochiStreamBpfSendExit  *ebpf.ProgramSpec `ebpf:"mochi_stream_bpf_send_exit"`
+	MochiStreamRecvEnter    *ebpf.ProgramSpec `ebpf:"mochi_stream_recv_enter"`
+	MochiStreamRecvExit     *ebpf.ProgramSpec `ebpf:"mochi_stream_recv_exit"`
+	MochiStreamSendEnter    *ebpf.ProgramSpec `ebpf:"mochi_stream_send_enter"`
+	MochiStreamSendExit     *ebpf.ProgramSpec `ebpf:"mochi_stream_send_exit"`
 }
 
 // tcpstreamMapSpecs contains maps before they are loaded into the kernel.
@@ -140,14 +144,18 @@ type tcpstreamVariables struct {
 //
 // It can be passed to loadTcpstreamObjects or ebpf.CollectionSpec.LoadAndAssign.
 type tcpstreamPrograms struct {
-	MochiStreamRecvEnter *ebpf.Program `ebpf:"mochi_stream_recv_enter"`
-	MochiStreamRecvExit  *ebpf.Program `ebpf:"mochi_stream_recv_exit"`
-	MochiStreamSendEnter *ebpf.Program `ebpf:"mochi_stream_send_enter"`
-	MochiStreamSendExit  *ebpf.Program `ebpf:"mochi_stream_send_exit"`
+	MochiStreamBpfSendEnter *ebpf.Program `ebpf:"mochi_stream_bpf_send_enter"`
+	MochiStreamBpfSendExit  *ebpf.Program `ebpf:"mochi_stream_bpf_send_exit"`
+	MochiStreamRecvEnter    *ebpf.Program `ebpf:"mochi_stream_recv_enter"`
+	MochiStreamRecvExit     *ebpf.Program `ebpf:"mochi_stream_recv_exit"`
+	MochiStreamSendEnter    *ebpf.Program `ebpf:"mochi_stream_send_enter"`
+	MochiStreamSendExit     *ebpf.Program `ebpf:"mochi_stream_send_exit"`
 }
 
 func (p *tcpstreamPrograms) Close() error {
 	return _TcpstreamClose(
+		p.MochiStreamBpfSendEnter,
+		p.MochiStreamBpfSendExit,
 		p.MochiStreamRecvEnter,
 		p.MochiStreamRecvExit,
 		p.MochiStreamSendEnter,

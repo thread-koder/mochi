@@ -71,7 +71,7 @@ const (
 	tlsplainProgMochiTlsEnter     = "mochi_tls_enter"
 	tlsplainProgMochiTlsRecvEnter = "mochi_tls_recv_enter"
 	tlsplainProgMochiTlsRet       = "mochi_tls_ret"
-	tlsplainProgMochiTlsSendEnter = "mochi_tls_send_enter"
+	tlsplainProgMochiTlsTxEnter   = "mochi_tls_tx_enter"
 )
 
 // loadTlsplain returns the embedded CollectionSpec for tlsplain.
@@ -119,7 +119,7 @@ type tlsplainProgramSpecs struct {
 	MochiTlsEnter     *ebpf.ProgramSpec `ebpf:"mochi_tls_enter"`
 	MochiTlsRecvEnter *ebpf.ProgramSpec `ebpf:"mochi_tls_recv_enter"`
 	MochiTlsRet       *ebpf.ProgramSpec `ebpf:"mochi_tls_ret"`
-	MochiTlsSendEnter *ebpf.ProgramSpec `ebpf:"mochi_tls_send_enter"`
+	MochiTlsTxEnter   *ebpf.ProgramSpec `ebpf:"mochi_tls_tx_enter"`
 }
 
 // tlsplainMapSpecs contains maps before they are loaded into the kernel.
@@ -186,7 +186,7 @@ type tlsplainPrograms struct {
 	MochiTlsEnter     *ebpf.Program `ebpf:"mochi_tls_enter"`
 	MochiTlsRecvEnter *ebpf.Program `ebpf:"mochi_tls_recv_enter"`
 	MochiTlsRet       *ebpf.Program `ebpf:"mochi_tls_ret"`
-	MochiTlsSendEnter *ebpf.Program `ebpf:"mochi_tls_send_enter"`
+	MochiTlsTxEnter   *ebpf.Program `ebpf:"mochi_tls_tx_enter"`
 }
 
 func (p *tlsplainPrograms) Close() error {
@@ -194,7 +194,7 @@ func (p *tlsplainPrograms) Close() error {
 		p.MochiTlsEnter,
 		p.MochiTlsRecvEnter,
 		p.MochiTlsRet,
-		p.MochiTlsSendEnter,
+		p.MochiTlsTxEnter,
 	)
 }
 

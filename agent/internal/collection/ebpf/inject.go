@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/cilium/ebpf"
@@ -18,13 +20,30 @@ import (
 const (
 	tpSampledFlag = 0x01
 	cgroupFSRoot  = "/sys/fs/cgroup"
+
+	// Must match INJECT_COOKIE_* in bpf/inject.c.
+	injectCookieGoWrite   = 1
+	injectCookieGoRead    = 2
+	injectCookieGoRet     = 3
+	injectCookieSSLRead   = 4
+	injectCookieSSLReadEx = 5
 )
 
-func (c *Collector) loadHTTP1Inject(sampleRate float64) error {
-	log := logger.WithComponent("ebpf-inject-http1")
+var injectGoHooks = []uprobeHook{
+	{"crypto/tls.(*Conn).Write", injectCookieGoWrite, true},
+	{"crypto/tls.(*Conn).Read", injectCookieGoRead, false},
+}
 
-	if err := loadHttp1injectObjects(&c.injectObjs, nil); err != nil {
-		return fmt.Errorf("load HTTP/1 inject eBPF objects: %w", err)
+var injectOpenSSLReadHooks = []uprobeHook{
+	{"SSL_read", injectCookieSSLRead, false},
+	{"SSL_read_ex", injectCookieSSLReadEx, false},
+}
+
+func (c *Collector) loadInject(sampleRate float64) error {
+	log := logger.WithComponent("ebpf-inject")
+
+	if err := loadInjectObjects(&c.injectObjs, nil); err != nil {
+		return fmt.Errorf("load inject eBPF objects: %w", err)
 	}
 
 	if err := c.writeInjectSampleThreshold(sampleRate); err != nil {
@@ -66,6 +85,7 @@ func (c *Collector) loadHTTP1Inject(sampleRate float64) error {
 	}{
 		{c.injectObjs.MochiInjectRecvEnter, "fentry tcp_recvmsg inject"},
 		{c.injectObjs.MochiInjectRecvExit, "fexit tcp_recvmsg inject"},
+		{c.injectObjs.MochiInjectTxEnter, "fentry tcp_sendmsg_locked inject"},
 	} {
 		if err := attachTracing(&links, step.prog, step.name); err != nil {
 			closeErr := errors.Join(
@@ -78,12 +98,27 @@ func (c *Collector) loadHTTP1Inject(sampleRate float64) error {
 	}
 
 	if err := c.seedInjectSocks(); err != nil {
-		log.Error().Err(err).Msg("Failed to seed inject_socks from iter/tcp. Continuing with sockops-only insert")
+		log.Error().Err(err).Msg("Failed to seed inject sockets from iter/tcp. Continuing with sockops-only insert")
 	}
 
+	c.writeUserAllowed = bpfProbeWriteUserAllowed()
+	if !c.writeUserAllowed {
+		log.Info().Msg("Kernel lockdown blocks bpf_probe_write_user. Continuing without TLS Traceparent inject")
+	}
+
+	c.ensureAgentFile(log, "Go inject probes may include the agent")
+	c.ensureUprobeWatch()
+	c.uprobeMu.Lock()
+	if c.injectInodes == nil {
+		c.injectInodes = make(map[fileID][]io.Closer)
+	}
+	if c.injectSkip == nil {
+		c.injectSkip = make(map[fileID]struct{})
+	}
+	c.uprobeMu.Unlock()
 	c.injectLinks = links
 	c.injectEnabled = true
-	log.Info().Msg("eBPF HTTP/1 Traceparent inject loaded")
+	log.Info().Msg("eBPF Traceparent inject loaded")
 	return nil
 }
 
@@ -98,7 +133,7 @@ func (c *Collector) writeInjectSampleThreshold(sampleRate float64) error {
 		threshold = uint64(sampleRate * float64(uint64(1)<<63))
 	}
 	key := uint32(0)
-	cfg := http1injectInjectCfg{SampleThreshold: threshold}
+	cfg := injectInjectCfg{SampleThreshold: threshold}
 	return c.injectObjs.InjectCfg.Put(key, cfg)
 }
 
@@ -137,23 +172,35 @@ func (c *Collector) detachInjectSkMsg() error {
 	return err
 }
 
-func (c *Collector) closeHTTP1Inject() error {
+func (c *Collector) closeInject() error {
+	c.uprobeMu.Lock()
+	var uprobes []io.Closer
+	for _, inodeLinks := range c.injectInodes {
+		uprobes = append(uprobes, inodeLinks...)
+	}
+	c.injectInodes = nil
+	c.injectSkip = nil
+	kernel := c.injectLinks
+	c.injectLinks = nil
+	c.uprobeMu.Unlock()
+
 	var err error
 	err = errors.Join(err, c.detachInjectSkMsg())
-	err = errors.Join(err, closeLinks(c.injectLinks))
+	err = errors.Join(err, closeLinks(kernel))
+	err = errors.Join(err, closeLinks(uprobes))
 	err = errors.Join(err, c.injectObjs.Close())
 	c.injectEnabled = false
 	return err
 }
 
-// TakeOutgoing adopts IDs written by sk_msg inject for this outbound hop.
-// Deletes the map entry so a later extract cannot remint against the wire.
-func (c *Collector) TakeOutgoing(pid uint32, sport, dport uint16) (l7.InjectedIDs, bool) {
-	if !c.injectEnabled || c.injectObjs.OutgoingTp == nil {
+// TakeOutgoing adopts IDs written by inject for this outbound hop.
+// LookupAndDelete so extract cannot remint against the same wire IDs.
+func (c *Collector) TakeOutgoing(pid uint32, sport, dport uint16, stream uint32) (l7.InjectedIDs, bool) {
+	if !c.injectEnabled {
 		return l7.InjectedIDs{}, false
 	}
-	key := http1injectEgressKey{Pid: pid, Sport: sport, Dport: dport}
-	var tp http1injectTpIds
+	key := injectEgressKey{Pid: pid, Sport: sport, Dport: dport, Stream: stream}
+	var tp injectTpIds
 	if err := c.injectObjs.OutgoingTp.LookupAndDelete(&key, &tp); err != nil {
 		return l7.InjectedIDs{}, false
 	}
@@ -166,6 +213,68 @@ func (c *Collector) TakeOutgoing(pid uint32, sport, dport uint16) (l7.InjectedID
 	}
 	ids.Sampled = tp.Flags&tpSampledFlag != 0
 	return ids, true
+}
+
+func (c *Collector) attachInjectFile(openPath string, allowGo bool, goRETs map[string]goRETInfo) ([]io.Closer, bool, error) {
+	return c.attachUprobeFile(
+		openPath,
+		allowGo,
+		goRETs,
+		injectOpenSSLReadHooks,
+		injectGoHooks,
+		c.injectObjs.MochiInjectSslEnter,
+		c.injectObjs.MochiInjectSslRet,
+		c.injectObjs.MochiInjectGoEnter,
+		c.injectObjs.MochiInjectGoRet,
+		injectCookieGoRet,
+		c.writeUserAllowed,
+	)
+}
+
+func (c *Collector) knownInjectFile(id fileID) bool {
+	c.uprobeMu.Lock()
+	defer c.uprobeMu.Unlock()
+	if c.uprobeStop {
+		return true
+	}
+	if c.injectInodes == nil {
+		return true
+	}
+	if _, ok := c.injectInodes[id]; ok {
+		return true
+	}
+	_, ok := c.injectSkip[id]
+	return ok
+}
+
+func (c *Collector) storeInjectSkip(id fileID) {
+	c.uprobeMu.Lock()
+	defer c.uprobeMu.Unlock()
+	if c.uprobeStop || c.injectSkip == nil {
+		return
+	}
+	c.injectSkip[id] = struct{}{}
+}
+
+func (c *Collector) storeInjectLinks(id fileID, links []io.Closer) bool {
+	c.uprobeMu.Lock()
+	defer c.uprobeMu.Unlock()
+	if c.uprobeStop || c.injectInodes == nil {
+		return false
+	}
+	if _, ok := c.injectInodes[id]; ok {
+		return false
+	}
+	c.injectInodes[id] = links
+	return true
+}
+
+func bpfProbeWriteUserAllowed() bool {
+	lockdown, err := os.ReadFile("/sys/kernel/security/lockdown")
+	if err != nil {
+		return true
+	}
+	return strings.Contains(string(lockdown), "[none]")
 }
 
 func findCgroupV2Path() (string, error) {

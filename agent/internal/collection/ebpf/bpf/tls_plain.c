@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 // CO-RE program: TLS plaintext from OpenSSL and Go crypto/tls uprobes.
-// Nested tcp_sendmsg / tcp_recvmsg is ciphertext. It only snapshots the
-// 4-tuple while struct sock is live. Emit copies the user buffer at return.
+// Nested tcp_sendmsg_locked / tcp_recvmsg is ciphertext. It only snapshots
+// the 4-tuple while struct sock is live. Emit copies the user buffer at return.
 // A held sock pointer would be use-after-free on a later buffered SSL_read.
 // amd64 only. Go is entry plus decoded RET uprobes, never uretprobe.
 // Cookies in this file must match tls.go.
@@ -14,6 +14,7 @@
 #include <bpf/bpf_tracing.h>
 #include "dest.h"
 #include "stream_hdr.h"
+#include "uprobe_abi.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
@@ -25,23 +26,6 @@ char LICENSE[] SEC("license") = "Dual BSD/GPL";
 #define TLS_COOKIE_GO_READ 6
 #define TLS_COOKIE_GO_RET 7
 
-struct inflight_stash {
-	__u64 obj;
-	__u64 buf;
-	__u64 aux;
-	__u32 bound;
-	__u8 dir;
-	__u8 kind;
-	__u8 ex;
-	__u8 pad;
-};
-
-struct go_key {
-	__u32 tgid;
-	__u32 pad;
-	__u64 g;
-};
-
 struct go_stash {
 	__u64 obj;
 	__u64 buf;
@@ -49,12 +33,6 @@ struct go_stash {
 	__u32 bound;
 	__u8 dir;
 	__u8 pad[3];
-};
-
-struct obj_key {
-	__u32 tgid;
-	__u32 pad;
-	__u64 obj;
 };
 
 struct conn_tuple {
@@ -135,6 +113,8 @@ static __always_inline int fill_tuple_map(struct sock *sk)
 	key.tgid = id >> 32;
 	key.obj = act->obj;
 	cur = bpf_map_lookup_elem(&tuples, &key);
+	if (cur && cur->has_tuple)
+		return 0;
 	if (cur)
 		next = *cur;
 	snapshot_tuple(sk, &next);
@@ -354,8 +334,9 @@ int mochi_tls_ret(struct pt_regs *ctx)
 	return 0;
 }
 
-SEC("fentry/tcp_sendmsg")
-int BPF_PROG(mochi_tls_send_enter, struct sock *sk, struct msghdr *msg, size_t size)
+/* Nested TX snapshot. Locked covers non-sockmap and sockhashed paths. */
+SEC("fentry/tcp_sendmsg_locked")
+int BPF_PROG(mochi_tls_tx_enter, struct sock *sk, struct msghdr *msg, size_t size)
 {
 	(void)msg;
 	(void)size;
