@@ -78,7 +78,7 @@ type connState struct {
 	h2        *http2.Conn
 }
 
-// InjectedIDs are client-span IDs written by sk_msg inject for an outbound hop.
+// InjectedIDs are IDs inject wrote for this outbound hop (sk_msg or Go Write).
 type InjectedIDs struct {
 	TraceID      [span.TraceIDSize]byte
 	SpanID       [span.SpanIDSize]byte
@@ -86,9 +86,10 @@ type InjectedIDs struct {
 	Sampled      bool
 }
 
-// InjectedHops looks up IDs minted by HTTP/1 inject for a send.
+// InjectedHops looks up IDs minted by inject for a send.
+// HTTP/1 uses stream 0. HTTP/2 uses the HEADERS stream id.
 type InjectedHops interface {
-	TakeOutgoing(pid uint32, sport, dport uint16) (InjectedIDs, bool)
+	TakeOutgoing(pid uint32, sport, dport uint16, stream uint32) (InjectedIDs, bool)
 }
 
 // Tracker demuxes HTTP/1 and HTTP/2 prefixes into hop RED and sampled spans.
@@ -112,7 +113,6 @@ type Tracker struct {
 	series   map[metrics.HTTPSeriesKey]struct{}
 }
 
-// SetInjectedHops wires HTTP/1 inject hop adoption into stamp.
 func (t *Tracker) SetInjectedHops(injected InjectedHops) {
 	t.injected = injected
 }
@@ -295,7 +295,7 @@ func (t *Tracker) feedHTTP2(conn *connState, flow aggregate.Flow, chunk Chunk, n
 		if key, ok := t.store.Lookup(flow); ok {
 			req.Route = t.routeFor(key, req.Path, req.GRPC)
 			req.Key = key
-			t.enqueueHTTP2(conn, req, replaceTLS)
+			t.enqueueHTTP2(conn, req, replaceTLS, chunk.Pid, chunk.Sport, chunk.Dport)
 			continue
 		}
 		pending = append(pending, pendingFrom(flow, chunk, req.Method, req.Path, req.GRPC, req.StreamID, req.Traceparent, req.GRPCTraceBin, now))
@@ -377,23 +377,38 @@ func (t *Tracker) enqueuePending(conn *connState, pending pendingRequest, key me
 			Start:        pending.now,
 			Traceparent:  pending.traceparent,
 			GRPCTraceBin: pending.grpcTraceBin,
-		}, replaceTLS)
+		}, replaceTLS, pending.pid, pending.sport, pending.dport)
 	}
 }
 
 func (t *Tracker) enqueueHTTP1(conn *connState, req http1.Request, replaceTLS bool, pid uint32, sport, dport uint16) {
-	ids := t.stampHTTP1(pid, sport, dport, req.Traceparent)
+	if replaceTLS && conn.h1.ReplaceTLS(req) {
+		return
+	}
+	ids := t.stampHop(pid, sport, dport, 0, req.Traceparent, "")
 	req.TraceID = ids.traceID
 	req.SpanID = ids.spanID
 	req.ParentSpanID = ids.parentSpanID
 	req.Sampled = ids.sampled
-	conn.h1.Enqueue(req, replaceTLS, &t.outstanding, maxOutstanding)
+	conn.h1.Enqueue(req, &t.outstanding, maxOutstanding)
 }
 
-// Prefer IDs written by inject for this send. Otherwise parse the captured header.
-func (t *Tracker) stampHTTP1(pid uint32, sport, dport uint16, traceparent string) hopIDs {
+func (t *Tracker) enqueueHTTP2(conn *connState, req http2.Request, replaceTLS bool, pid uint32, sport, dport uint16) {
+	if replaceTLS && conn.h2.ReplaceTLS(req) {
+		return
+	}
+	ids := t.stampHop(pid, sport, dport, req.StreamID, req.Traceparent, req.GRPCTraceBin)
+	req.TraceID = ids.traceID
+	req.SpanID = ids.spanID
+	req.ParentSpanID = ids.parentSpanID
+	req.Sampled = ids.sampled
+	conn.h2.Enqueue(req, &t.outstanding, maxOutstanding)
+}
+
+// Prefer inject IDs for this send, else extract from the captured header.
+func (t *Tracker) stampHop(pid uint32, sport, dport uint16, stream uint32, traceparent, grpcTraceBin string) hopIDs {
 	if t.injected != nil {
-		if ids, ok := t.injected.TakeOutgoing(pid, sport, dport); ok {
+		if ids, ok := t.injected.TakeOutgoing(pid, sport, dport, stream); ok {
 			return hopIDs{
 				traceID:      ids.TraceID,
 				spanID:       ids.SpanID,
@@ -402,16 +417,7 @@ func (t *Tracker) stampHTTP1(pid uint32, sport, dport uint16, traceparent string
 			}
 		}
 	}
-	return t.stampIDs(traceparent, "")
-}
-
-func (t *Tracker) enqueueHTTP2(conn *connState, req http2.Request, replaceTLS bool) {
-	ids := t.stampIDs(req.Traceparent, req.GRPCTraceBin)
-	req.TraceID = ids.traceID
-	req.SpanID = ids.spanID
-	req.ParentSpanID = ids.parentSpanID
-	req.Sampled = ids.sampled
-	conn.h2.Enqueue(req, replaceTLS, &t.outstanding, maxOutstanding)
+	return t.stampIDs(traceparent, grpcTraceBin)
 }
 
 type hopIDs struct {

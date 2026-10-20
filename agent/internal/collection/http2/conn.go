@@ -458,17 +458,23 @@ func (c *Conn) finishHop(streamID uint32, req *Request, class string, statusCode
 	}, true
 }
 
-// Enqueue stores a pending stream request. replaceTLS replaces an existing
-// pending hop for the same stream ID, keeping stamped IDs.
-func (c *Conn) Enqueue(req Request, replaceTLS bool, outstanding *int, maxOutstanding int) {
-	if existing := c.streams[req.StreamID]; existing != nil {
-		if replaceTLS {
-			req.TraceID = existing.TraceID
-			req.SpanID = existing.SpanID
-			req.ParentSpanID = existing.ParentSpanID
-			req.Sampled = existing.Sampled
-			c.streams[req.StreamID] = &req
-		}
+// ReplaceTLS updates a pending hop for the same stream ID when a TLS kind
+// revisits a socket-queued request. Keeps stamped IDs. Returns true on replace.
+func (c *Conn) ReplaceTLS(req Request) bool {
+	existing := c.streams[req.StreamID]
+	if existing == nil {
+		return false
+	}
+	req.TraceID = existing.TraceID
+	req.SpanID = existing.SpanID
+	req.ParentSpanID = existing.ParentSpanID
+	req.Sampled = existing.Sampled
+	c.streams[req.StreamID] = &req
+	return true
+}
+
+func (c *Conn) Enqueue(req Request, outstanding *int, maxOutstanding int) {
+	if c.streams[req.StreamID] != nil {
 		return
 	}
 	if *outstanding >= maxOutstanding {

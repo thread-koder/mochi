@@ -138,23 +138,25 @@ func (c *Conn) Feed(dir uint8, data []byte, now time.Time, outstanding *int) (re
 	return reqs, hops, opaque
 }
 
-// Enqueue appends a pending request. replaceTLS replaces the last matching
-// method+route when a TLS kind revisits a socket queued hop, keeping stamped IDs.
-func (c *Conn) Enqueue(req Request, replaceTLS bool, outstanding *int, maxOutstanding int) {
-	if replaceTLS {
-		if n := len(c.outstanding); n > 0 {
-			last := &c.outstanding[n-1]
-			if last.Method == req.Method && last.Route == req.Route {
-				traceID, spanID, parentID, sampled := last.TraceID, last.SpanID, last.ParentSpanID, last.Sampled
-				*last = req
-				last.TraceID = traceID
-				last.SpanID = spanID
-				last.ParentSpanID = parentID
-				last.Sampled = sampled
-				return
-			}
+// ReplaceTLS updates the last matching method+route hop when a TLS kind
+// revisits a socket-queued request. Keeps stamped IDs. Returns true on replace.
+func (c *Conn) ReplaceTLS(req Request) bool {
+	if n := len(c.outstanding); n > 0 {
+		last := &c.outstanding[n-1]
+		if last.Method == req.Method && last.Route == req.Route {
+			traceID, spanID, parentID, sampled := last.TraceID, last.SpanID, last.ParentSpanID, last.Sampled
+			*last = req
+			last.TraceID = traceID
+			last.SpanID = spanID
+			last.ParentSpanID = parentID
+			last.Sampled = sampled
+			return true
 		}
 	}
+	return false
+}
+
+func (c *Conn) Enqueue(req Request, outstanding *int, maxOutstanding int) {
 	if *outstanding >= maxOutstanding {
 		return
 	}
