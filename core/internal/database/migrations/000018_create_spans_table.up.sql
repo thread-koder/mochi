@@ -9,8 +9,9 @@ CREATE TABLE IF NOT EXISTS spans (
     status_class VARCHAR(8) NOT NULL,
     status_code INT NOT NULL,
     grpc_status INT,
-    rpc_system VARCHAR(16) NOT NULL CHECK (rpc_system IN ('http', 'grpc')),
-    source VARCHAR(50) NOT NULL DEFAULT 'mochi-ebpf',
+    rpc_system VARCHAR(16) NOT NULL CHECK (rpc_system IN ('http', 'grpc', 'db', 'other')),
+    kind VARCHAR(16) NOT NULL CHECK (kind IN ('unspecified', 'internal', 'server', 'client', 'producer', 'consumer')),
+    source VARCHAR(50) NOT NULL,
     sampled_by VARCHAR(16) NOT NULL CHECK (sampled_by IN ('head', 'error')),
     src_pod_uid VARCHAR(255) NOT NULL,
     src_namespace VARCHAR(255) NOT NULL,
@@ -39,6 +40,12 @@ CREATE TABLE IF NOT EXISTS spans (
 
 CREATE INDEX IF NOT EXISTS idx_spans_start_at
     ON spans (start_at);
+
+CREATE INDEX IF NOT EXISTS idx_spans_trace_id
+    ON spans (trace_id);
+
+CREATE INDEX IF NOT EXISTS idx_spans_trace_parent
+    ON spans (trace_id, parent_span_id);
 
 CREATE INDEX IF NOT EXISTS idx_spans_src_namespace_start
     ON spans (src_namespace, start_at DESC);

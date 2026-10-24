@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/thread_koder/mochi/core/internal/database"
@@ -12,9 +13,19 @@ import (
 
 const (
 	SourceMochiEBPF = "mochi-ebpf"
+	SourceOTLP      = "otlp"
 
-	RPCSystemHTTP = "http"
-	RPCSystemGRPC = "grpc"
+	KindUnspecified = "unspecified"
+	KindInternal    = "internal"
+	KindServer      = "server"
+	KindClient      = "client"
+	KindProducer    = "producer"
+	KindConsumer    = "consumer"
+
+	RPCSystemHTTP  = "http"
+	RPCSystemGRPC  = "grpc"
+	RPCSystemDB    = "db"
+	RPCSystemOther = "other"
 
 	SampledByHead  = "head"
 	SampledByError = "error"
@@ -38,6 +49,7 @@ type IngestSpan struct {
 	StatusCode    int       `json:"status_code"`
 	GRPCStatus    *int      `json:"grpc_status"`
 	RPCSystem     string    `json:"rpc_system"`
+	Kind          string    `json:"kind"`
 	Source        string    `json:"source"`
 	SampledBy     string    `json:"sampled_by"`
 	SrcPodUID     string    `json:"src_pod_uid"`
@@ -77,6 +89,7 @@ type SpanDTO struct {
 	StatusCode      int          `json:"status_code"`
 	GRPCStatus      *int         `json:"grpc_status"`
 	RPCSystem       string       `json:"rpc_system"`
+	Kind            string       `json:"kind"`
 	Source          string       `json:"source"`
 	SampledBy       string       `json:"sampled_by"`
 	SrcPodUID       string       `json:"src_pod_uid"`
@@ -125,6 +138,7 @@ func toDTO(s *database.Span) SpanDTO {
 		StatusCode:      s.StatusCode,
 		GRPCStatus:      s.GRPCStatus,
 		RPCSystem:       s.RPCSystem,
+		Kind:            s.Kind,
 		Source:          s.Source,
 		SampledBy:       s.SampledBy,
 		SrcPodUID:       s.SrcPodUID,
@@ -186,4 +200,10 @@ func connectionSeries(s IngestSpan) dependency.ConnectionSeries {
 	series.Protocol = s.Protocol
 	series.DstHostname = s.DstHostname
 	return series
+}
+
+func hasDest(s *IngestSpan) bool {
+	return strings.TrimSpace(s.ActualDstIP) != "" ||
+		strings.TrimSpace(s.DstIP) != "" ||
+		strings.TrimSpace(s.DstHostname) != ""
 }

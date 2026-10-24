@@ -157,7 +157,20 @@ func Resolve(ctx context.Context, series ConnectionSeries, opts ResolveOptions) 
 	}, true, nil
 }
 
+// ResolveSource maps src_pod_uid to a modeled workload. kept=false on miss/skip-kind.
+func ResolveSource(ctx context.Context, srcPodUID string, opts ResolveOptions) (NodeRef, bool, error) {
+	from, hit, err := lookupNodeRefByUID(ctx, opts, srcPodUID, "src")
+	if err != nil {
+		return NodeRef{}, false, err
+	}
+	if hit != uidModeled {
+		return NodeRef{}, false, nil
+	}
+	return from, true, nil
+}
+
 // ResolveEnds maps a series to from/to workloads without via Service attribution.
+// Hostname-only dest (empty ActualDstIP + DstHostname) resolves as External.
 func ResolveEnds(ctx context.Context, series ConnectionSeries, opts ResolveOptions) (from, to NodeRef, kept bool, err error) {
 	if series.Connects <= 0 && series.ActiveConnections <= 0 {
 		return NodeRef{}, NodeRef{}, false, nil
@@ -167,19 +180,31 @@ func ResolveEnds(ctx context.Context, series ConnectionSeries, opts ResolveOptio
 	}
 
 	dstIP := net.ParseIP(series.ActualDstIP)
-	if dstIP == nil {
+	if dstIP != nil && isLinkLocal(dstIP) {
 		return NodeRef{}, NodeRef{}, false, nil
 	}
-	if isLinkLocal(dstIP) {
+	if dstIP == nil && normalizeHostname(series.DstHostname) == "" {
 		return NodeRef{}, NodeRef{}, false, nil
 	}
 
-	from, hit, err := lookupNodeRefByUID(ctx, opts, series.SrcPodUID, "src")
+	from, kept, err = ResolveSource(ctx, series.SrcPodUID, opts)
 	if err != nil {
 		return NodeRef{}, NodeRef{}, false, err
 	}
-	if hit != uidModeled {
+	if !kept {
 		return NodeRef{}, NodeRef{}, false, nil
+	}
+
+	if dstIP == nil {
+		to = NodeRef{
+			Kind:      KindExternal,
+			Namespace: "",
+			Name:      normalizeHostname(series.DstHostname),
+		}
+		if sameNode(from, to) {
+			return NodeRef{}, NodeRef{}, false, nil
+		}
+		return from, to, true, nil
 	}
 
 	to, kept, err = resolveDestination(ctx, series, opts)

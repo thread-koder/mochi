@@ -26,11 +26,41 @@ func Ingest(ctx context.Context, spans []IngestSpan) error {
 	}
 
 	opts := dependency.DefaultResolveOptions(nil, nil)
-	rows := make([]*database.Span, 0, len(spans))
+	parentKeys := make([]database.SpanIDPair, 0)
+	seenParents := make(map[string]struct{})
+	decodedSpans := make([]decodedSpan, 0, len(spans))
+
 	for i := range spans {
-		row, err := prepareSpan(ctx, &spans[i], opts)
+		decoded, err := decodeSpan(&spans[i])
 		if err != nil {
 			return fmt.Errorf("span[%d]: %w", i, err)
+		}
+		if decoded.source == SourceMochiEBPF && len(decoded.parentSpanID) > 0 {
+			key := string(decoded.traceID) + string(decoded.parentSpanID)
+			if _, ok := seenParents[key]; !ok {
+				seenParents[key] = struct{}{}
+				parentKeys = append(parentKeys, database.SpanIDPair{
+					TraceID: decoded.traceID,
+					SpanID:  decoded.parentSpanID,
+				})
+			}
+		}
+		decodedSpans = append(decodedSpans, decoded)
+	}
+
+	otlpParents, err := database.HasOTLPClientParents(ctx, parentKeys)
+	if err != nil {
+		return fmt.Errorf("check OTLP client parents: %w", err)
+	}
+
+	rows := make([]*database.Span, 0, len(decodedSpans))
+	for i := range decodedSpans {
+		row, err := prepareDecoded(ctx, &decodedSpans[i], &spans[i], opts, otlpParents)
+		if err != nil {
+			return fmt.Errorf("span[%d]: %w", i, err)
+		}
+		if row == nil {
+			continue
 		}
 		rows = append(rows, row)
 	}
@@ -41,101 +71,170 @@ func Ingest(ctx context.Context, spans []IngestSpan) error {
 	return nil
 }
 
-func prepareSpan(ctx context.Context, s *IngestSpan, opts dependency.ResolveOptions) (*database.Span, error) {
+type decodedSpan struct {
+	traceID      []byte
+	spanID       []byte
+	parentSpanID []byte
+	method       string
+	statusClass  string
+	rpcSystem    string
+	kind         string
+	sampledBy    string
+	source       string
+	protocol     string
+}
+
+func decodeSpan(s *IngestSpan) (decodedSpan, error) {
 	traceID, err := decodeID(s.TraceID, TraceIDSize)
 	if err != nil {
-		return nil, invalid("trace_id: %v", err)
+		return decodedSpan{}, invalid("trace_id: %v", err)
 	}
 	spanID, err := decodeID(s.SpanID, SpanIDSize)
 	if err != nil {
-		return nil, invalid("span_id: %v", err)
+		return decodedSpan{}, invalid("span_id: %v", err)
 	}
 	var parentSpanID []byte
 	if s.ParentSpanID != nil && *s.ParentSpanID != "" {
 		parentSpanID, err = decodeID(*s.ParentSpanID, SpanIDSize)
 		if err != nil {
-			return nil, invalid("parent_span_id: %v", err)
+			return decodedSpan{}, invalid("parent_span_id: %v", err)
 		}
 	}
 	if s.StartAt.IsZero() || s.EndAt.IsZero() {
-		return nil, invalid("start_at and end_at are required")
+		return decodedSpan{}, invalid("start_at and end_at are required")
 	}
 	if s.EndAt.Before(s.StartAt) {
-		return nil, invalid("end_at before start_at")
+		return decodedSpan{}, invalid("end_at before start_at")
 	}
 	method := strings.TrimSpace(s.Method)
 	if method == "" {
-		return nil, invalid("method is required")
+		return decodedSpan{}, invalid("method is required")
 	}
 	statusClass := strings.TrimSpace(s.StatusClass)
 	if statusClass == "" {
-		return nil, invalid("status_class is required")
+		return decodedSpan{}, invalid("status_class is required")
 	}
 	rpcSystem := strings.TrimSpace(s.RPCSystem)
 	switch rpcSystem {
-	case RPCSystemHTTP, RPCSystemGRPC:
+	case RPCSystemHTTP, RPCSystemGRPC, RPCSystemDB, RPCSystemOther:
 	default:
-		return nil, invalid("rpc_system must be http or grpc")
+		return decodedSpan{}, invalid("rpc_system must be http, grpc, db, or other")
+	}
+	kind := strings.TrimSpace(s.Kind)
+	switch kind {
+	case KindUnspecified, KindInternal, KindServer, KindClient, KindProducer, KindConsumer:
+	default:
+		return decodedSpan{}, invalid("kind must be unspecified, internal, server, client, producer, or consumer")
 	}
 	sampledBy := strings.TrimSpace(s.SampledBy)
 	switch sampledBy {
 	case SampledByHead, SampledByError:
 	default:
-		return nil, invalid("sampled_by must be head or error")
+		return decodedSpan{}, invalid("sampled_by must be head or error")
 	}
 	source := strings.TrimSpace(s.Source)
 	if source == "" {
-		source = SourceMochiEBPF
+		return decodedSpan{}, invalid("source is required")
 	}
 	if strings.TrimSpace(s.SrcPodUID) == "" {
-		return nil, invalid("src_pod_uid is required")
+		return decodedSpan{}, invalid("src_pod_uid is required")
 	}
 	protocol := strings.TrimSpace(s.Protocol)
 	if protocol == "" {
 		protocol = dependency.ProtocolTCP
 	}
+	return decodedSpan{
+		traceID:      traceID,
+		spanID:       spanID,
+		parentSpanID: parentSpanID,
+		method:       method,
+		statusClass:  statusClass,
+		rpcSystem:    rpcSystem,
+		kind:         kind,
+		sampledBy:    sampledBy,
+		source:       source,
+		protocol:     protocol,
+	}, nil
+}
 
-	row := &database.Span{
-		TraceID:       traceID,
-		SpanID:        spanID,
-		ParentSpanID:  parentSpanID,
-		StartAt:       s.StartAt.UTC(),
-		EndAt:         s.EndAt.UTC(),
-		Method:        method,
-		Route:         s.Route,
-		StatusClass:   statusClass,
-		StatusCode:    s.StatusCode,
-		GRPCStatus:    s.GRPCStatus,
-		RPCSystem:     rpcSystem,
-		Source:        source,
-		SampledBy:     sampledBy,
-		SrcPodUID:     s.SrcPodUID,
-		SrcNamespace:  s.SrcNamespace,
-		SrcPod:        s.SrcPod,
-		DstPodUID:     s.DstPodUID,
-		DstNamespace:  s.DstNamespace,
-		DstPod:        s.DstPod,
-		DstIP:         s.DstIP,
-		DstPort:       s.DstPort,
-		ActualDstIP:   s.ActualDstIP,
-		ActualDstPort: s.ActualDstPort,
-		Protocol:      protocol,
-		DstHostname:   s.DstHostname,
+func prepareDecoded(
+	ctx context.Context,
+	decoded *decodedSpan,
+	ingestSpan *IngestSpan,
+	opts dependency.ResolveOptions,
+	otlpParents map[string]struct{},
+) (*database.Span, error) {
+	// Prefer app CLIENT: skip eBPF hop whose parent is already an OTLP client span.
+	if decoded.source == SourceMochiEBPF && len(decoded.parentSpanID) > 0 {
+		key := string(decoded.traceID) + string(decoded.parentSpanID)
+		if _, ok := otlpParents[key]; ok {
+			return nil, nil
+		}
 	}
 
-	cs := connectionSeries(*s)
-	cs.Protocol = protocol
-	from, to, kept, err := dependency.ResolveEnds(ctx, cs, opts)
+	row := &database.Span{
+		TraceID:       decoded.traceID,
+		SpanID:        decoded.spanID,
+		ParentSpanID:  decoded.parentSpanID,
+		StartAt:       ingestSpan.StartAt.UTC(),
+		EndAt:         ingestSpan.EndAt.UTC(),
+		Method:        decoded.method,
+		Route:         ingestSpan.Route,
+		StatusClass:   decoded.statusClass,
+		StatusCode:    ingestSpan.StatusCode,
+		GRPCStatus:    ingestSpan.GRPCStatus,
+		RPCSystem:     decoded.rpcSystem,
+		Kind:          decoded.kind,
+		Source:        decoded.source,
+		SampledBy:     decoded.sampledBy,
+		SrcPodUID:     ingestSpan.SrcPodUID,
+		SrcNamespace:  ingestSpan.SrcNamespace,
+		SrcPod:        ingestSpan.SrcPod,
+		DstPodUID:     ingestSpan.DstPodUID,
+		DstNamespace:  ingestSpan.DstNamespace,
+		DstPod:        ingestSpan.DstPod,
+		DstIP:         ingestSpan.DstIP,
+		DstPort:       ingestSpan.DstPort,
+		ActualDstIP:   ingestSpan.ActualDstIP,
+		ActualDstPort: ingestSpan.ActualDstPort,
+		Protocol:      decoded.protocol,
+		DstHostname:   ingestSpan.DstHostname,
+	}
+
+	if err := resolveSpan(ctx, row, ingestSpan, decoded.kind, decoded.protocol, opts); err != nil {
+		return nil, err
+	}
+	return row, nil
+}
+
+func resolveSpan(ctx context.Context, row *database.Span, s *IngestSpan, kind, protocol string, opts dependency.ResolveOptions) error {
+	needEnds := (kind == KindClient || kind == KindProducer) && hasDest(s)
+	if needEnds {
+		cs := connectionSeries(*s)
+		cs.Protocol = protocol
+		from, to, kept, err := dependency.ResolveEnds(ctx, cs, opts)
+		if err != nil {
+			return fmt.Errorf("resolve ends: %w", err)
+		}
+		if kept {
+			row.FromKind = new(from.Kind)
+			row.FromNamespace = new(from.Namespace)
+			row.FromName = new(from.Name)
+			row.ToKind = new(to.Kind)
+			row.ToNamespace = new(to.Namespace)
+			row.ToName = new(to.Name)
+		}
+		return nil
+	}
+
+	from, kept, err := dependency.ResolveSource(ctx, s.SrcPodUID, opts)
 	if err != nil {
-		return nil, fmt.Errorf("resolve ends: %w", err)
+		return fmt.Errorf("resolve source: %w", err)
 	}
 	if kept {
 		row.FromKind = new(from.Kind)
 		row.FromNamespace = new(from.Namespace)
 		row.FromName = new(from.Name)
-		row.ToKind = new(to.Kind)
-		row.ToNamespace = new(to.Namespace)
-		row.ToName = new(to.Name)
 	}
-	return row, nil
+	return nil
 }
