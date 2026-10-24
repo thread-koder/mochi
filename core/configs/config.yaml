@@ -11,6 +11,10 @@ api:
   read_timeout: 30 # seconds
   write_timeout: 30 # seconds
   mode: "release" # debug | release | test
+  otlp:
+    grpc_port: 4317 # 0 disables
+    http_port: 4318 # 0 disables
+    max_recv_bytes: 4194304 # 4 MiB
 
 database:
   host: "localhost"

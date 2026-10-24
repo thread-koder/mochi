@@ -49,11 +49,18 @@ type LogConfig struct {
 }
 
 type APIConfig struct {
-	Host         string `mapstructure:"host"`
-	Port         int    `mapstructure:"port"`
-	ReadTimeout  int    `mapstructure:"read_timeout"`
-	WriteTimeout int    `mapstructure:"write_timeout"`
-	Mode         string `mapstructure:"mode"`
+	Host         string     `mapstructure:"host"`
+	Port         int        `mapstructure:"port"`
+	ReadTimeout  int        `mapstructure:"read_timeout"`
+	WriteTimeout int        `mapstructure:"write_timeout"`
+	Mode         string     `mapstructure:"mode"`
+	OTLP         OTLPConfig `mapstructure:"otlp"`
+}
+
+type OTLPConfig struct {
+	GRPCPort     int `mapstructure:"grpc_port"`
+	HTTPPort     int `mapstructure:"http_port"`
+	MaxRecvBytes int `mapstructure:"max_recv_bytes"`
 }
 
 func (c *APIConfig) ReadTimeoutDuration() time.Duration {
@@ -214,6 +221,9 @@ func setDefaults() {
 	viper.SetDefault("api.read_timeout", 30)
 	viper.SetDefault("api.write_timeout", 30)
 	viper.SetDefault("api.mode", "release")
+	viper.SetDefault("api.otlp.grpc_port", 4317)
+	viper.SetDefault("api.otlp.http_port", 4318)
+	viper.SetDefault("api.otlp.max_recv_bytes", 4194304)
 
 	viper.SetDefault("database.host", "localhost")
 	viper.SetDefault("database.port", 5432)
@@ -365,6 +375,22 @@ func (c *APIConfig) Validate() error {
 	}
 	if !validModes[c.Mode] {
 		return fmt.Errorf("mode must be one of: debug, release, test, got: %s", c.Mode)
+	}
+	if err := c.OTLP.Validate(); err != nil {
+		return fmt.Errorf("otlp: %w", err)
+	}
+	return nil
+}
+
+func (c *OTLPConfig) Validate() error {
+	if c.GRPCPort < 0 || c.GRPCPort > 65535 {
+		return fmt.Errorf("grpc_port must be between 0 and 65535, got: %d", c.GRPCPort)
+	}
+	if c.HTTPPort < 0 || c.HTTPPort > 65535 {
+		return fmt.Errorf("http_port must be between 0 and 65535, got: %d", c.HTTPPort)
+	}
+	if c.MaxRecvBytes <= 0 {
+		return fmt.Errorf("max_recv_bytes must be greater than 0, got: %d", c.MaxRecvBytes)
 	}
 	return nil
 }

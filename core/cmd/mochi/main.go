@@ -13,6 +13,7 @@ import (
 	"github.com/thread_koder/mochi/core/internal/database"
 	"github.com/thread_koder/mochi/core/internal/kubernetes"
 	"github.com/thread_koder/mochi/core/internal/logger"
+	"github.com/thread_koder/mochi/core/internal/otlp"
 	"github.com/thread_koder/mochi/core/internal/prometheus"
 	"github.com/thread_koder/mochi/core/internal/redis"
 	"github.com/thread_koder/mochi/core/internal/workers"
@@ -89,9 +90,16 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("create API server: %w", err)
 	}
+
+	otlpSrv := otlp.NewServer(cfg)
 	log.Info().Msg("Components initialized")
 
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 3)
+	// OTLP Start binds and returns. Gin Start blocks in ListenAndServe, so it runs in a goroutine.
+	// Bind OTLP first so a listen failure exits before Gin is already serving.
+	if err := otlpSrv.Start(errCh); err != nil {
+		return fmt.Errorf("start OTLP server: %w", err)
+	}
 	go func() {
 		if err := srv.Start(); err != nil {
 			errCh <- err
@@ -115,17 +123,24 @@ func run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	var shutdownErr error
+	if err := otlpSrv.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("OTLP server forced to shutdown")
+		shutdownErr = err
+	}
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Error().Err(err).Msg("Server forced to shutdown")
-		if startErr != nil {
-			return fmt.Errorf("API server: %w (shutdown: %v)", startErr, err)
+		log.Error().Err(err).Msg("API server forced to shutdown")
+		if shutdownErr == nil {
+			shutdownErr = err
 		}
-		return fmt.Errorf("API server shutdown: %w", err)
 	}
 
 	log.Info().Msg("Server shutdown")
 	if startErr != nil {
-		return fmt.Errorf("API server: %w", startErr)
+		if shutdownErr != nil {
+			return fmt.Errorf("%w (shutdown: %v)", startErr, shutdownErr)
+		}
+		return startErr
 	}
-	return nil
+	return shutdownErr
 }
