@@ -20,6 +20,8 @@ import (
 const (
 	SourceMochiEBPF = "mochi-ebpf"
 
+	KindClient = "client"
+
 	RPCSystemHTTP = "http"
 	RPCSystemGRPC = "grpc"
 
@@ -60,6 +62,7 @@ type exportSpan struct {
 	StatusCode    int       `json:"status_code"`
 	GRPCStatus    *int      `json:"grpc_status"`
 	RPCSystem     string    `json:"rpc_system"`
+	Kind          string    `json:"kind"`
 	Source        string    `json:"source"`
 	SampledBy     string    `json:"sampled_by"`
 	SrcPodUID     string    `json:"src_pod_uid"`
@@ -197,6 +200,7 @@ func (e *Exporter) post(ctx context.Context, batch []Hop) error {
 			StatusCode:    hop.StatusCode,
 			GRPCStatus:    hop.GRPCStatus,
 			RPCSystem:     rpcSystem,
+			Kind:          KindClient,
 			Source:        SourceMochiEBPF,
 			SampledBy:     hop.SampledBy,
 			SrcPodUID:     hop.Key.SrcPodUID,
